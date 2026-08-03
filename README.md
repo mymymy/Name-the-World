@@ -1,4 +1,4 @@
-# The Plate — name the world
+# Name the World
 
 A map naming game. Click a country on the world map and name it.
 
