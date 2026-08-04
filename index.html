@@ -8,6 +8,10 @@
 <meta name="theme-color" content="#F2EDE0">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<!-- the standard tag current iOS reads; the apple- one it replaces is deprecated
+     but kept for older versions. Without this a home screen tap opens a Safari
+     tab instead of the app, and stacks up a new tab every time. -->
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Name the World">
@@ -326,7 +330,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
       <button data-check="auto" class="caps">As you go</button>
     </div>
     <button id="restart2" class="caps">Restart</button>
-    <span id="build" class="caps">build 4 aug · v15</span>
+    <span id="build" class="caps">build 4 aug · v16</span>
   </div>
 
   <main>
