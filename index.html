@@ -92,9 +92,16 @@ body.setup #bar{transform:none;visibility:visible;transition-delay:0s,0s}
 /* in a row of its own a segment would stretch the full width and leave dead
    space inside its border, so let it hug its buttons instead */
 #bar .seg{width:fit-content;max-width:100%}
-/* once a segment is wide enough to wrap it fills the row, so let its buttons
-   share each line rather than leaving an empty cell at the end */
-#bar .seg button{flex:1 1 auto}
+/* the games are too many, and too unalike, to sit in one segmented control -
+   five names wrapped badly and shared a single explanation. One per line, each
+   able to explain itself. */
+.mode{display:flex;align-items:center;gap:8px;margin-top:7px}
+.modebtn{
+  flex:1 1 auto;text-align:left;background:none;color:inherit;
+  border:1px solid var(--ink);border-radius:4px;padding:10px 12px;
+}
+.modebtn[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+#modeseg .note{margin-top:7px}
 #bar .row{padding:13px var(--pad);border-bottom:1px solid var(--rule)}
 #bar .row:last-of-type{border-bottom:0}
 .rowtop{display:flex;align-items:center;gap:8px;margin-bottom:8px}
@@ -338,22 +345,39 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
   <main>
   <div id="bar">
     <div class="row">
-      <div class="rowtop">
-        <span class="rowlabel caps">Game</span>
-        <button class="info" type="button" aria-expanded="false" aria-controls="i-mode">
-          <span aria-hidden="true">i</span><span class="sr">What is Game?</span></button>
+      <div class="rowtop"><span class="rowlabel caps">Game</span></div>
+      <div id="modeseg" role="group" aria-label="Game">
+        <div class="mode">
+          <button data-mode="world" class="modebtn caps">World</button>
+          <button class="info" type="button" aria-expanded="false" aria-controls="i-m-world">
+            <span aria-hidden="true">i</span><span class="sr">About World</span></button>
+        </div>
+        <p class="note" id="i-m-world" hidden>Every country on the map, 200 of them. The long game.</p>
+        <div class="mode">
+          <button data-mode="continents" class="modebtn caps">Continents</button>
+          <button class="info" type="button" aria-expanded="false" aria-controls="i-m-continents">
+            <span aria-hidden="true">i</span><span class="sr">About Continents</span></button>
+        </div>
+        <p class="note" id="i-m-continents" hidden>The seven continents themselves, and nothing smaller. Seven to name, so a short game and an easy way in.</p>
+        <div class="mode">
+          <button data-mode="capitals" class="modebtn caps">Capitals</button>
+          <button class="info" type="button" aria-expanded="false" aria-controls="i-m-capitals">
+            <span aria-hidden="true">i</span><span class="sr">About Capitals</span></button>
+        </div>
+        <p class="note" id="i-m-capitals" hidden>A dot marks each capital city where it really sits, 198 of them, and you name the city rather than the country it belongs to. The country it is in is outlined while you answer.</p>
+        <div class="mode">
+          <button data-mode="counties" class="modebtn caps">Counties</button>
+          <button class="info" type="button" aria-expanded="false" aria-controls="i-m-counties">
+            <span aria-hidden="true">i</span><span class="sr">About Counties</span></button>
+        </div>
+        <p class="note" id="i-m-counties" hidden>The 48 ceremonial counties of England on a map of their own: Kent, Devon, the Yorkshires, Greater London and the rest. County Durham, Salop and the everyday abbreviations are all accepted.</p>
+        <div class="mode">
+          <button data-mode="states" class="modebtn caps">US states</button>
+          <button class="info" type="button" aria-expanded="false" aria-controls="i-m-states">
+            <span aria-hidden="true">i</span><span class="sr">About US states</span></button>
+        </div>
+        <p class="note" id="i-m-states" hidden>All 50 states, on a map of their own, with Alaska and Hawaii inset in the Pacific corner the way US maps usually show them. Postal codes such as CA and NY are accepted.</p>
       </div>
-      <div class="seg" id="modeseg" role="group" aria-label="Game">
-        <button data-mode="world" class="caps">World</button>
-        <button data-mode="continents" class="caps">Continents</button>
-        <button data-mode="capitals" class="caps">Capitals</button>
-        <button data-mode="counties" class="caps">Counties</button>
-        <button data-mode="states" class="caps">US states</button>
-      </div>
-      <p class="note" id="i-mode" hidden>Which set of places you are naming. World is every
-        country; Continents is the seven themselves; Capitals puts a dot on each capital city;
-        Counties is the ceremonial counties of England; US states is the fifty. Each game keeps
-        its own answers, so you can switch between them without losing your place.</p>
     </div>
 
     <div class="row">
@@ -428,7 +452,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 4 aug · v17</span>
+      <span id="build" class="caps">build 4 aug · v18</span>
     </div>
   </div>
 
@@ -1375,7 +1399,7 @@ function checkAll(){
 
 /* ============ chrome ============ */
 function renderBar(){
-  document.querySelectorAll('#modeseg button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.mode===S.mode)));
+  document.querySelectorAll('#modeseg button[data-mode]').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.mode===S.mode)));
   document.querySelectorAll('#listseg button').forEach(b=>b.setAttribute('aria-pressed', String((b.dataset.list==='1')===S.list)));
   document.querySelectorAll('#checkseg button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.check===S.check)));
   document.querySelectorAll('#advseg button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.adv===S.adv)));
@@ -1458,7 +1482,7 @@ function reset(){
   $('#sheet').classList.remove('on');
   render(); fitCurrent();
 }
-document.querySelectorAll('#modeseg button').forEach(b=>b.onclick = ()=>{ S.mode = b.dataset.mode; switchView(); });
+document.querySelectorAll('#modeseg button[data-mode]').forEach(b=>b.onclick = ()=>{ S.mode = b.dataset.mode; switchView(); });
 document.querySelectorAll('#listseg button').forEach(b=>b.onclick = ()=>{ S.list = b.dataset.list === '1'; render(); renderSuggestions(); });
 document.querySelectorAll('#advseg button').forEach(b=>b.onclick = ()=>{ S.adv = b.dataset.adv; clearWaiting(); render(); });
 document.querySelectorAll('#motionseg button').forEach(b=>b.onclick = ()=>{
@@ -1478,7 +1502,7 @@ $('#gear').onclick = ()=> setSetup(!document.body.classList.contains('setup'));
 $('#done').onclick = ()=> setSetup(false);
 /* changing the game takes you to a different map, so get out of the way; the
    rest of the settings leave the panel up, to be read and adjusted together */
-document.querySelectorAll('#modeseg button').forEach(b=>b.addEventListener('click', ()=>setSetup(false)));
+document.querySelectorAll('#modeseg button[data-mode]').forEach(b=>b.addEventListener('click', ()=>setSetup(false)));
 document.addEventListener('keydown', ev=>{
   if(ev.key === 'Escape' && document.body.classList.contains('setup')) setSetup(false);
 });
