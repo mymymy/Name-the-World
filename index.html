@@ -74,23 +74,62 @@ h1{margin:0;font-size:16px;font-weight:500;letter-spacing:.03em}
   transition:width .55s cubic-bezier(.4,0,.2,1), background-color .3s ease}
 #prog.won i{background:var(--ok)}
 
+/* the setup panel slides out from under the header and may take the whole
+   screen; it lives inside main so its height is exactly what is left below the
+   header, and hides behind the header when closed rather than being clipped */
+#top{position:relative;z-index:3;flex:0 0 auto;background:var(--paper)}
 #bar{
-  display:none;align-items:center;gap:6px;flex-wrap:wrap;
-  padding:9px var(--pad);border-bottom:1px solid var(--rule);flex:0 0 auto;
-  background:var(--panel);
+  position:absolute;left:0;right:0;top:0;z-index:12;   /* over the map's own chrome, under the results sheet */
+  max-height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  background:var(--panel);border-bottom:1px solid var(--rule);
+  box-shadow:0 12px 24px rgba(20,26,28,.16);
+  transform:translateY(-100%);visibility:hidden;
+  transition:transform .3s cubic-bezier(.4,0,.2,1), visibility 0s linear .3s;
 }
-body.setup #bar{display:flex}
+body.setup #bar{transform:none;visibility:visible;transition-delay:0s,0s}
+@media (prefers-reduced-motion: reduce){ #bar{transition:none} }
+
+/* in a row of its own a segment would stretch the full width and leave dead
+   space inside its border, so let it hug its buttons instead */
+#bar .seg{width:fit-content;max-width:100%}
+/* the games are too many, and too unalike, to sit in one segmented control -
+   five names wrapped badly and shared a single explanation. One per line, each
+   able to explain itself. */
+.mode{display:flex;align-items:center;gap:8px;margin-top:7px}
+.modebtn{
+  flex:1 1 auto;text-align:left;background:none;color:inherit;
+  border:1px solid var(--ink);border-radius:4px;padding:10px 12px;
+}
+.modebtn[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+#modeseg .note{margin-top:7px}
+#bar .row{padding:13px var(--pad);border-bottom:1px solid var(--rule)}
+#bar .row:last-of-type{border-bottom:0}
+.rowtop{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.rowlabel{flex:1 1 auto;color:var(--ink-2)}
+.info{
+  flex:0 0 auto;width:22px;height:22px;border-radius:999px;padding:0;
+  border:1px solid var(--ink-3);background:none;color:var(--ink-2);
+  font:italic 600 12px/1 "Iowan Old Style",Palatino,serif;
+}
+.info[aria-expanded="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.note{
+  margin:9px 0 0;max-width:62ch;color:var(--ink-2);font-size:13.5px;line-height:1.5;
+  border-left:2px solid var(--rule);padding-left:10px;
+}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#barfoot{display:flex;align-items:center;gap:10px;padding:12px var(--pad) 16px}
+#done{background:var(--ink);color:var(--paper);border:1px solid var(--ink);
+  border-radius:4px;padding:8px 16px}
 /* wraps rather than clipping - the mode row outgrew one line on a phone */
 .seg{display:flex;flex-wrap:wrap;border:1px solid var(--ink);border-radius:4px;overflow:hidden}
 .seg button{background:none;border:0;padding:7px 10px;border-right:1px solid var(--ink)}
 .seg button:last-child{border-right:0}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
-.barlabel{color:var(--ink-3);margin-left:4px}
 #restart2{background:none;border:1px solid var(--ink);border-radius:4px;padding:6px 10px}
 #build{color:var(--ink-3);margin-left:auto;align-self:center}
 button:focus-visible{outline:2px solid var(--live);outline-offset:2px}
 
-main{flex:1 1 auto;min-height:0;display:flex}
+main{flex:1 1 auto;min-height:0;display:flex;position:relative;z-index:1}
 #mapwrap{position:relative;flex:1 1 auto;background:var(--sea);overflow:hidden;touch-action:none}
 svg#map{display:block;width:100%;height:100%;cursor:grab}
 svg#map.dragging{cursor:grabbing}
@@ -292,6 +331,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 </head>
 <body>
 <div id="app">
+  <div id="top">
   <header>
     <svg id="rose" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M12 1.5 13.7 10.3 22.5 12 13.7 13.7 12 22.5 10.3 13.7 1.5 12 10.3 10.3Z"/><path class="thin" d="M18.4 5.6 13.9 10.1 12 12 10.1 13.9 5.6 18.4 10.1 13.9 12 12 13.9 10.1Z"/><circle cx="12" cy="12" r="1.5"/></g></svg>
     <h1 class="serif">Name the World</h1>
@@ -299,41 +339,123 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     <button id="gear" class="caps" aria-expanded="false" aria-controls="bar">Setup</button>
   </header>
 
-  <div id="prog"><i></i></div>
-
-  <div id="bar">
-    <div class="seg" id="modeseg" role="group" aria-label="Game">
-      <button data-mode="world" class="caps">World</button>
-      <button data-mode="continents" class="caps">Continents</button>
-      <button data-mode="capitals" class="caps">Capitals</button>
-      <button data-mode="counties" class="caps">Counties</button>
-      <button data-mode="states" class="caps">US states</button>
-    </div>
-    <span class="barlabel caps">Suggest</span>
-    <div class="seg" id="listseg" role="group" aria-label="Suggestions">
-      <button data-list="1" class="caps">On</button>
-      <button data-list="0" class="caps">Off</button>
-    </div>
-    <span class="barlabel caps">Next</span>
-    <div class="seg" id="advseg" role="group" aria-label="Moving on">
-      <button data-adv="manual" class="caps">On tap</button>
-      <button data-adv="auto" class="caps">Automatic</button>
-    </div>
-    <span class="barlabel caps">Motion</span>
-    <div class="seg" id="motionseg" role="group" aria-label="Motion">
-      <button data-motion="1" class="caps">On</button>
-      <button data-motion="0" class="caps">Off</button>
-    </div>
-    <span class="barlabel caps">Check</span>
-    <div class="seg" id="checkseg" role="group" aria-label="When to check">
-      <button data-check="end" class="caps">At the end</button>
-      <button data-check="auto" class="caps">As you go</button>
-    </div>
-    <button id="restart2" class="caps">Restart</button>
-    <span id="build" class="caps">build 4 aug · v16</span>
+    <div id="prog"><i></i></div>
   </div>
 
   <main>
+  <div id="bar">
+    <div class="row">
+      <div class="rowtop"><span class="rowlabel caps">Game</span></div>
+      <div id="modeseg" role="group" aria-label="Game">
+        <div class="mode">
+          <button data-mode="world" class="modebtn caps">World</button>
+          <button class="info" type="button" aria-expanded="false" aria-controls="i-m-world">
+            <span aria-hidden="true">i</span><span class="sr">About World</span></button>
+        </div>
+        <p class="note" id="i-m-world" hidden>Every country on the map, 200 of them. The long game.</p>
+        <div class="mode">
+          <button data-mode="continents" class="modebtn caps">Continents</button>
+          <button class="info" type="button" aria-expanded="false" aria-controls="i-m-continents">
+            <span aria-hidden="true">i</span><span class="sr">About Continents</span></button>
+        </div>
+        <p class="note" id="i-m-continents" hidden>The seven continents themselves, and nothing smaller. Seven to name, so a short game and an easy way in.</p>
+        <div class="mode">
+          <button data-mode="capitals" class="modebtn caps">Capitals</button>
+          <button class="info" type="button" aria-expanded="false" aria-controls="i-m-capitals">
+            <span aria-hidden="true">i</span><span class="sr">About Capitals</span></button>
+        </div>
+        <p class="note" id="i-m-capitals" hidden>A dot marks each capital city where it really sits, 198 of them, and you name the city rather than the country it belongs to. The country it is in is outlined while you answer.</p>
+        <div class="mode">
+          <button data-mode="counties" class="modebtn caps">Counties</button>
+          <button class="info" type="button" aria-expanded="false" aria-controls="i-m-counties">
+            <span aria-hidden="true">i</span><span class="sr">About Counties</span></button>
+        </div>
+        <p class="note" id="i-m-counties" hidden>The 48 ceremonial counties of England on a map of their own: Kent, Devon, the Yorkshires, Greater London and the rest. County Durham, Salop and the everyday abbreviations are all accepted.</p>
+        <div class="mode">
+          <button data-mode="states" class="modebtn caps">US states</button>
+          <button class="info" type="button" aria-expanded="false" aria-controls="i-m-states">
+            <span aria-hidden="true">i</span><span class="sr">About US states</span></button>
+        </div>
+        <p class="note" id="i-m-states" hidden>All 50 states, on a map of their own, with Alaska and Hawaii inset in the Pacific corner the way US maps usually show them. Postal codes such as CA and NY are accepted.</p>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="rowtop">
+        <span class="rowlabel caps">Suggestions</span>
+        <button class="info" type="button" aria-expanded="false" aria-controls="i-list">
+          <span aria-hidden="true">i</span><span class="sr">What is Suggestions?</span></button>
+      </div>
+      <div class="seg" id="listseg" role="group" aria-label="Suggestions">
+        <button data-list="1" class="caps">On</button>
+        <button data-list="0" class="caps">Off</button>
+      </div>
+      <p class="note" id="i-list" hidden>Offer a list of matching names as you type, to pick from.
+        Turn it off to type every answer out in full, which is harder.</p>
+    </div>
+
+    <div class="row">
+      <div class="rowtop">
+        <span class="rowlabel caps">Moving on</span>
+        <button class="info" type="button" aria-expanded="false" aria-controls="i-adv">
+          <span aria-hidden="true">i</span><span class="sr">What is Moving on?</span></button>
+      </div>
+      <div class="seg" id="advseg" role="group" aria-label="Moving on">
+        <button data-adv="manual" class="caps">On tap</button>
+        <button data-adv="auto" class="caps">Automatic</button>
+      </div>
+      <p class="note" id="i-adv" hidden>What happens once you have named a place. On tap waits for
+        you to choose where to go next; Automatic moves straight on to the nearest place still
+        unnamed.</p>
+    </div>
+
+    <div class="row">
+      <div class="rowtop">
+        <span class="rowlabel caps">Marking</span>
+        <button class="info" type="button" aria-expanded="false" aria-controls="i-check">
+          <span aria-hidden="true">i</span><span class="sr">What is Marking?</span></button>
+      </div>
+      <div class="seg" id="checkseg" role="group" aria-label="When to check">
+        <button data-check="end" class="caps">At the end</button>
+        <button data-check="auto" class="caps">As you go</button>
+      </div>
+      <p class="note" id="i-check" hidden>When answers are marked right or wrong. At the end holds
+        everything back until you tap Check answers, so nothing gives the game away; As you go
+        marks each answer the moment you give it.</p>
+    </div>
+
+    <div class="row">
+      <div class="rowtop">
+        <span class="rowlabel caps">Motion</span>
+        <button class="info" type="button" aria-expanded="false" aria-controls="i-motion">
+          <span aria-hidden="true">i</span><span class="sr">What is Motion?</span></button>
+      </div>
+      <div class="seg" id="motionseg" role="group" aria-label="Motion">
+        <button data-motion="1" class="caps">On</button>
+        <button data-motion="0" class="caps">Off</button>
+      </div>
+      <p class="note" id="i-motion" hidden>Gliding between places, confetti and the other
+        movement. Turn it off for a map that changes without animating. It starts off if your
+        device asks for reduced motion.</p>
+    </div>
+
+    <div class="row">
+      <div class="rowtop">
+        <span class="rowlabel caps">Start again</span>
+        <button class="info" type="button" aria-expanded="false" aria-controls="i-restart">
+          <span aria-hidden="true">i</span><span class="sr">What is Start again?</span></button>
+      </div>
+      <button id="restart2" class="caps">Restart</button>
+      <p class="note" id="i-restart" hidden>Forget every answer in every game and begin from an
+        empty map. This cannot be undone.</p>
+    </div>
+
+    <div id="barfoot">
+      <button id="done" class="caps">Done</button>
+      <span id="build" class="caps">build 4 aug · v18</span>
+    </div>
+  </div>
+
     <div id="mapwrap">
       <svg id="map" viewBox="0 0 2000 1000" preserveAspectRatio="xMidYMid meet" aria-label="World map">
         <defs>
@@ -1277,7 +1399,7 @@ function checkAll(){
 
 /* ============ chrome ============ */
 function renderBar(){
-  document.querySelectorAll('#modeseg button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.mode===S.mode)));
+  document.querySelectorAll('#modeseg button[data-mode]').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.mode===S.mode)));
   document.querySelectorAll('#listseg button').forEach(b=>b.setAttribute('aria-pressed', String((b.dataset.list==='1')===S.list)));
   document.querySelectorAll('#checkseg button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.check===S.check)));
   document.querySelectorAll('#advseg button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.adv===S.adv)));
@@ -1360,7 +1482,7 @@ function reset(){
   $('#sheet').classList.remove('on');
   render(); fitCurrent();
 }
-document.querySelectorAll('#modeseg button').forEach(b=>b.onclick = ()=>{ S.mode = b.dataset.mode; switchView(); });
+document.querySelectorAll('#modeseg button[data-mode]').forEach(b=>b.onclick = ()=>{ S.mode = b.dataset.mode; switchView(); });
 document.querySelectorAll('#listseg button').forEach(b=>b.onclick = ()=>{ S.list = b.dataset.list === '1'; render(); renderSuggestions(); });
 document.querySelectorAll('#advseg button').forEach(b=>b.onclick = ()=>{ S.adv = b.dataset.adv; clearWaiting(); render(); });
 document.querySelectorAll('#motionseg button').forEach(b=>b.onclick = ()=>{
@@ -1371,20 +1493,29 @@ document.querySelectorAll('#checkseg button').forEach(b=>b.onclick = ()=>{
   if(S.check === 'auto') S.checked = false;
   render();
 });
-$('#gear').onclick = ()=>{
-  const open = document.body.classList.toggle('setup');
+function setSetup(open){
+  document.body.classList.toggle('setup', open);
   $('#gear').setAttribute('aria-expanded', String(open));
   sizeCanvas(); placeFloaters();
-};
-document.querySelectorAll('#bar .seg button').forEach(b=>b.addEventListener('click', ()=>{
-  document.body.classList.remove('setup');
-  $('#gear').setAttribute('aria-expanded','false');
-  sizeCanvas(); placeFloaters();
-}));
-$('#restart2').onclick = ()=>{
-  reset(); document.body.classList.remove('setup');
-  $('#gear').setAttribute('aria-expanded','false');
-};
+}
+$('#gear').onclick = ()=> setSetup(!document.body.classList.contains('setup'));
+$('#done').onclick = ()=> setSetup(false);
+/* changing the game takes you to a different map, so get out of the way; the
+   rest of the settings leave the panel up, to be read and adjusted together */
+document.querySelectorAll('#modeseg button[data-mode]').forEach(b=>b.addEventListener('click', ()=>setSetup(false)));
+document.addEventListener('keydown', ev=>{
+  if(ev.key === 'Escape' && document.body.classList.contains('setup')) setSetup(false);
+});
+/* each row can explain itself */
+document.querySelectorAll('#bar .info').forEach(b=>{
+  b.onclick = ()=>{
+    const note = document.getElementById(b.getAttribute('aria-controls'));
+    const show = note.hasAttribute('hidden');
+    note.toggleAttribute('hidden', !show);
+    b.setAttribute('aria-expanded', String(show));
+  };
+});
+$('#restart2').onclick = ()=>{ reset(); setSetup(false); };
 $('#check').onclick = checkAll;
 $('#skip').onclick = advance;
 
