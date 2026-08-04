@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Name the World</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#F2EDE0">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Name the World">
 <style>
 :root{
   --sea:#A3C0CB;
@@ -313,7 +320,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
       <button data-check="auto" class="caps">As you go</button>
     </div>
     <button id="restart2" class="caps">Restart</button>
-    <span id="build" class="caps">build 4 aug · v11</span>
+    <span id="build" class="caps">build 4 aug · v12</span>
   </div>
 
   <main>
@@ -1362,6 +1369,23 @@ if(resumed){
 window.addEventListener('pagehide', ()=>{
   clearTimeout(saveTimer);
   try{ store && store.setItem(KEY, snapshot()); }catch(e){}
+});
+
+/* ============ offline ============
+   The page is the whole game, so once it is cached there is nothing else to
+   fetch - the map, every name and your progress all work with no connection. */
+if('serviceWorker' in navigator && location.protocol !== 'file:'){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+let wasOffline = !navigator.onLine;
+window.addEventListener('offline', ()=>{
+  wasOffline = true;
+  showToast('Offline — the game keeps working, and your progress is saved.', 3600);
+});
+window.addEventListener('online', ()=>{
+  if(wasOffline){ wasOffline = false; showToast('Back online.', 2200); }
 });
 
 </script>
