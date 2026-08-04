@@ -627,7 +627,7 @@ function toView(cx, cy){
   return m ? pt.matrixTransform(m.inverse()) : {x:0,y:0};
 }
 function zoomAt(clientX, clientY, factor){
-  const nk = Math.min(16, Math.max(1, k*factor));
+  const nk = Math.min(40, Math.max(1, k*factor));
   if(nk === k) return;
   const v = toView(clientX, clientY);
   tx = v.x - (v.x - tx) * (nk/k);
