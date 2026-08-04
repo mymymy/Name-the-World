@@ -77,6 +77,53 @@ h1{margin:0;font-size:16px;font-weight:500;letter-spacing:.03em}
 /* the setup panel slides out from under the header and may take the whole
    screen; it lives inside main so its height is exactly what is left below the
    header, and hides behind the header when closed rather than being clipped */
+/* ============ homepage ============ */
+#home{
+  position:fixed;inset:0;z-index:30;background:var(--paper);
+  display:flex;align-items:flex-start;justify-content:center;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:max(20px,env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+}
+body.playing #home{display:none}
+#homeinner{width:100%;max-width:520px;margin:auto 0}
+#homehead{text-align:center;padding:14px 0 22px}
+#homehead .rose{width:40px;height:40px;fill:var(--ink);display:block;margin:0 auto 10px}
+#homehead .rose .thin{opacity:.5}
+#homehead h1{margin:0;font-size:clamp(30px,8vw,42px);font-weight:400;letter-spacing:.01em}
+#homesub{margin:8px 0 0;color:var(--ink-2);font-size:15px}
+
+#menu button{
+  display:block;width:100%;text-align:left;background:var(--panel);color:inherit;
+  border:1px solid var(--ink);border-radius:8px;padding:14px 15px;margin-bottom:9px;
+  font-size:19px;font-family:"Iowan Old Style","Palatino Linotype",Palatino,serif;
+  position:relative;
+}
+#menu button small{
+  display:block;margin-top:3px;color:var(--ink-2);font-size:13px;
+  font-family:inherit;letter-spacing:0;
+}
+#menu button:active{background:var(--land-out)}
+/* the game you were last in, so coming back to the menu shows where you were */
+#menu .game[aria-current]{border-width:2px;background:var(--land-out)}
+#menu .game[aria-current]::after{
+  content:'in progress';position:absolute;right:15px;top:17px;
+  font:600 9.5px/1 "Helvetica Neue",sans-serif;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--ink-3);font-style:normal;
+}
+#menu .more .chev,#menu .back .chev{font-size:22px;line-height:1}
+#menu .more .chev{position:absolute;right:15px;top:16px;color:var(--ink-3)}
+#menu .back{
+  font-size:13px;padding:8px 12px;width:auto;background:none;border-color:var(--ink-3);
+  color:var(--ink-2);margin-bottom:16px;font-family:inherit;
+  letter-spacing:.1em;text-transform:uppercase;font-weight:600;
+}
+#menu h2{
+  margin:18px 0 8px;color:var(--ink-3);font-size:10.5px;letter-spacing:.14em;
+  font-weight:600;font-family:inherit;
+}
+#menu h2:first-of-type{margin-top:4px}
+#menubtn{background:none;border:1px solid var(--ink);border-radius:4px;padding:5px 9px;margin-left:4px}
+
 #top{position:relative;z-index:3;flex:0 0 auto;background:var(--paper)}
 #bar{
   position:absolute;left:0;right:0;top:0;z-index:12;   /* over the map's own chrome, under the results sheet */
@@ -336,6 +383,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     <svg id="rose" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M12 1.5 13.7 10.3 22.5 12 13.7 13.7 12 22.5 10.3 13.7 1.5 12 10.3 10.3Z"/><path class="thin" d="M18.4 5.6 13.9 10.1 12 12 10.1 13.9 5.6 18.4 10.1 13.9 12 12 13.9 10.1Z"/><circle cx="12" cy="12" r="1.5"/></g></svg>
     <h1 class="serif">Name the World</h1>
     <div id="tally" class="caps"></div>
+    <button id="menubtn" class="caps">Menu</button>
     <button id="gear" class="caps" aria-expanded="false" aria-controls="bar">Setup</button>
   </header>
 
@@ -344,42 +392,6 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
   <main>
   <div id="bar">
-    <div class="row">
-      <div class="rowtop"><span class="rowlabel caps">Game</span></div>
-      <div id="modeseg" role="group" aria-label="Game">
-        <div class="mode">
-          <button data-mode="world" class="modebtn caps">World</button>
-          <button class="info" type="button" aria-expanded="false" aria-controls="i-m-world">
-            <span aria-hidden="true">i</span><span class="sr">About World</span></button>
-        </div>
-        <p class="note" id="i-m-world" hidden>Every country on the map, 200 of them. The long game.</p>
-        <div class="mode">
-          <button data-mode="continents" class="modebtn caps">Continents</button>
-          <button class="info" type="button" aria-expanded="false" aria-controls="i-m-continents">
-            <span aria-hidden="true">i</span><span class="sr">About Continents</span></button>
-        </div>
-        <p class="note" id="i-m-continents" hidden>The seven continents themselves, and nothing smaller. Seven to name, so a short game and an easy way in.</p>
-        <div class="mode">
-          <button data-mode="capitals" class="modebtn caps">Capitals</button>
-          <button class="info" type="button" aria-expanded="false" aria-controls="i-m-capitals">
-            <span aria-hidden="true">i</span><span class="sr">About Capitals</span></button>
-        </div>
-        <p class="note" id="i-m-capitals" hidden>A dot marks each capital city where it really sits, 198 of them, and you name the city rather than the country it belongs to. The country it is in is outlined while you answer.</p>
-        <div class="mode">
-          <button data-mode="counties" class="modebtn caps">Counties</button>
-          <button class="info" type="button" aria-expanded="false" aria-controls="i-m-counties">
-            <span aria-hidden="true">i</span><span class="sr">About Counties</span></button>
-        </div>
-        <p class="note" id="i-m-counties" hidden>The 48 ceremonial counties of England on a map of their own: Kent, Devon, the Yorkshires, Greater London and the rest. County Durham, Salop and the everyday abbreviations are all accepted.</p>
-        <div class="mode">
-          <button data-mode="states" class="modebtn caps">US states</button>
-          <button class="info" type="button" aria-expanded="false" aria-controls="i-m-states">
-            <span aria-hidden="true">i</span><span class="sr">About US states</span></button>
-        </div>
-        <p class="note" id="i-m-states" hidden>All 50 states, on a map of their own, with Alaska and Hawaii inset in the Pacific corner the way US maps usually show them. Postal codes such as CA and NY are accepted.</p>
-      </div>
-    </div>
-
     <div class="row">
       <div class="rowtop">
         <span class="rowlabel caps">Suggestions</span>
@@ -452,7 +464,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 4 aug · v18</span>
+      <span id="build" class="caps">build 4 aug · v19</span>
     </div>
   </div>
 
@@ -495,6 +507,34 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
       </div>
     </div>
   </main>
+</div>
+
+
+<div id="home">
+  <div id="homeinner">
+    <div id="homehead">
+      <svg viewBox="0 0 24 24" aria-hidden="true" class="rose"><g><path d="M12 1.5 13.7 10.3 22.5 12 13.7 13.7 12 22.5 10.3 13.7 1.5 12 10.3 10.3Z"/><path class="thin" d="M18.4 5.6 13.9 10.1 12 12 10.1 13.9 5.6 18.4 10.1 13.9 12 12 13.9 10.1Z"/><circle cx="12" cy="12" r="1.5"/></g></svg>
+      <h1 class="serif">Name the World</h1>
+      <p id="homesub">How much of it can you name?</p>
+    </div>
+
+    <nav id="menu" aria-label="Games">
+      <div class="menupanel" data-menu="main">
+        <button class="game" data-mode="continents">Continents<small>The seven. A short game.</small></button>
+        <button class="game" data-mode="world">Countries<small>All 200 of them.</small></button>
+        <button class="game" data-mode="capitals">Capitals<small>198 cities, where they really are.</small></button>
+        <button class="more" data-open="locals">For the locals<span class="chev" aria-hidden="true">›</span><small>Closer to home: the UK and the USA.</small></button>
+      </div>
+
+      <div class="menupanel" data-menu="locals" hidden>
+        <button class="back" data-open="main"><span class="chev" aria-hidden="true">‹</span> All games</button>
+        <h2 class="caps">United Kingdom</h2>
+        <button class="game" data-mode="counties">English counties<small>The 48 ceremonial counties.</small></button>
+        <h2 class="caps">United States</h2>
+        <button class="game" data-mode="states">States<small>All 50, Alaska and Hawaii inset.</small></button>
+      </div>
+    </nav>
+  </div>
 </div>
 
 <div id="sheet" role="dialog" aria-modal="true" aria-labelledby="scoretitle">
@@ -554,7 +594,7 @@ const store = (()=>{
 })();
 let saveTimer = 0;
 function snapshot(){
-  return JSON.stringify({v:1, ans:S.ans, mode:S.mode,
+  return JSON.stringify({v:1, ans:S.ans, mode:S.mode, playing:S.playing,
                          list:S.list, check:S.check, checked:S.checked,
                          adv:S.adv, motion:S.motion});
 }
@@ -577,6 +617,7 @@ function restore(){
   S.checked = !!o.checked;
   if(o.adv === 'auto' || o.adv === 'manual') S.adv = o.adv;
   if(typeof o.motion === 'boolean') S.motion = o.motion;
+  S.playing = !!o.playing;
   calm = !S.motion;
   return Object.keys(ans).length > 0;
 }
@@ -646,7 +687,7 @@ const US_BOX = US_ENTRY.reduce((a,e)=>[Math.min(a[0],e.b[0]), Math.min(a[1],e.b[
                                [9e9,9e9,-9e9,-9e9]);
 const PAINTABLE = DATA.concat(CAP_ENTRY, CTY_ENTRY, US_ENTRY);
 
-const S = { mode:'world', list:true, check:'end',
+const S = { mode:'world', playing:false, list:true, check:'end',
             ans:{}, sel:null, checked:false, cursor:0, streak:0, toldMode:false,
             adv:'manual', motion:!systemCalm };
 
@@ -1399,7 +1440,8 @@ function checkAll(){
 
 /* ============ chrome ============ */
 function renderBar(){
-  document.querySelectorAll('#modeseg button[data-mode]').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.mode===S.mode)));
+  document.querySelectorAll('#menu .game').forEach(b=>
+    b.toggleAttribute('aria-current', b.dataset.mode === S.mode));
   document.querySelectorAll('#listseg button').forEach(b=>b.setAttribute('aria-pressed', String((b.dataset.list==='1')===S.list)));
   document.querySelectorAll('#checkseg button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.check===S.check)));
   document.querySelectorAll('#advseg button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.adv===S.adv)));
@@ -1482,7 +1524,6 @@ function reset(){
   $('#sheet').classList.remove('on');
   render(); fitCurrent();
 }
-document.querySelectorAll('#modeseg button[data-mode]').forEach(b=>b.onclick = ()=>{ S.mode = b.dataset.mode; switchView(); });
 document.querySelectorAll('#listseg button').forEach(b=>b.onclick = ()=>{ S.list = b.dataset.list === '1'; render(); renderSuggestions(); });
 document.querySelectorAll('#advseg button').forEach(b=>b.onclick = ()=>{ S.adv = b.dataset.adv; clearWaiting(); render(); });
 document.querySelectorAll('#motionseg button').forEach(b=>b.onclick = ()=>{
@@ -1493,6 +1534,45 @@ document.querySelectorAll('#checkseg button').forEach(b=>b.onclick = ()=>{
   if(S.check === 'auto') S.checked = false;
   render();
 });
+/* ============ menu ============
+   Games are chosen from the homepage now, not from Setup, which is left to
+   settings. The map keeps running underneath, so coming back to the menu and
+   picking the same game again lands you exactly where you were. */
+const LABEL = {continents:'Continents', world:'Countries', capitals:'Capitals',
+               counties:'English counties', states:'States'};
+function showMenu(which){
+  document.querySelectorAll('.menupanel').forEach(p=>
+    p.toggleAttribute('hidden', p.dataset.menu !== which));
+  const first = document.querySelector(`.menupanel[data-menu="${which}"] button`);
+  if(first) first.focus({preventScroll:true});
+}
+/* the game you were in may sit under 'For the locals', so open the menu on the
+   panel that actually holds it rather than always at the top level */
+function panelFor(mode){
+  const b = document.querySelector(`#menu .game[data-mode="${mode}"]`);
+  return b ? b.closest('.menupanel').dataset.menu : 'main';
+}
+function openHome(){
+  S.playing = false; document.body.classList.remove('playing');
+  setSetup(false); closeAsk(); hideTip();
+  $('#sheet').classList.remove('on');
+  showMenu(panelFor(S.mode));
+  save();
+}
+function startGame(mode){
+  const changed = mode !== S.mode;
+  S.mode = mode;
+  S.playing = true; document.body.classList.add('playing');
+  if(changed) switchView(); else render();   // same game: leave the map where you left it
+  sizeCanvas(); placeFloaters();
+  save();
+}
+document.querySelectorAll('#menu .game').forEach(b=>
+  b.onclick = ()=> startGame(b.dataset.mode));
+document.querySelectorAll('#menu [data-open]').forEach(b=>
+  b.onclick = ()=> showMenu(b.dataset.open));
+$('#menubtn').onclick = openHome;
+
 function setSetup(open){
   document.body.classList.toggle('setup', open);
   $('#gear').setAttribute('aria-expanded', String(open));
@@ -1502,7 +1582,6 @@ $('#gear').onclick = ()=> setSetup(!document.body.classList.contains('setup'));
 $('#done').onclick = ()=> setSetup(false);
 /* changing the game takes you to a different map, so get out of the way; the
    rest of the settings leave the panel up, to be read and adjusted together */
-document.querySelectorAll('#modeseg button[data-mode]').forEach(b=>b.addEventListener('click', ()=>setSetup(false)));
 document.addEventListener('keydown', ev=>{
   if(ev.key === 'Escape' && document.body.classList.contains('setup')) setSetup(false);
 });
@@ -1524,11 +1603,15 @@ buildMap();
 unitCache = 0;
 sizeCanvas();
 const resumed = restore();
+document.body.classList.toggle('playing', S.playing);
+showMenu(panelFor(S.mode));
 render();
-fitCurrent();
-if(resumed){
-  const done = targets().filter(e=>S.ans[e.code]).length;
-  if(done) showToast(`Picked up where you left off — ${done} named.`, 3600);
+if(S.playing){
+  fitCurrent();
+  if(resumed){
+    const done = targets().filter(e=>S.ans[e.code]).length;
+    if(done) showToast(`Picked up where you left off — ${done} named.`, 3600);
+  }
 }
 window.addEventListener('pagehide', ()=>{
   clearTimeout(saveTimer);
