@@ -484,7 +484,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 4 aug · v21</span>
+      <span id="build" class="caps">build 4 aug · v22</span>
     </div>
   </div>
 
@@ -559,6 +559,9 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
         <h2 class="caps">United States</h2>
         <button class="game" data-mode="states">States<small>All 50, Alaska and Hawaii inset.</small></button>
       </div>
+
+      <div class="menupanel" data-menu="scope" hidden></div>
+      <div class="menupanel" data-menu="conts" hidden></div>
     </nav>
   </div>
 </div>
@@ -571,7 +574,8 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </div>
     <div id="sheetlist"></div>
     <div id="sheetfoot">
-      <button id="retry" class="key caps">Try the misses again</button>
+      <button id="another" class="key caps">Another ten</button>
+      <button id="retry" class="caps">Try the misses again</button>
       <button id="revealall" class="caps">Show all answers</button>
       <button id="close" class="caps">Close</button>
     </div>
@@ -623,6 +627,7 @@ const store = (()=>{
 let saveTimer = 0;
 function snapshot(){
   return JSON.stringify({v:1, ans:S.ans, mode:S.mode, playing:S.playing,
+                         scope:S.scope, continent:S.continent, pick:S.pick, round:S.round,
                          list:S.list, check:S.check, checked:S.checked,
                          adv:S.adv, motion:S.motion});
 }
@@ -646,6 +651,11 @@ function restore(){
   if(o.adv === 'auto' || o.adv === 'manual') S.adv = o.adv;
   if(typeof o.motion === 'boolean') S.motion = o.motion;
   S.playing = !!o.playing;
+  if(['all','continent','random'].includes(o.scope)) S.scope = o.scope;
+  if(CONTINENTS.includes(o.continent)) S.continent = o.continent;
+  if(Array.isArray(o.pick)) S.pick = o.pick.filter(c=>BY_CODE[c]);
+  if(typeof o.round === 'number') S.round = o.round;
+  if(S.scope === 'random' && !S.pick.length) S.scope = 'all';
   calm = !S.motion;
   return Object.keys(ans).length > 0;
 }
@@ -729,6 +739,7 @@ const LB_BOX = LB_ENTRY.reduce((a,e)=>[Math.min(a[0],e.b[0]), Math.min(a[1],e.b[
    the other games rely on quietly does nothing here. */
 const FLAG_ENTRY = FLAGS.map(e=>({
   code:e.code, name:e.name, iso:e.iso, play:true, isFlag:true,
+  continent:(BY_CODE[e.iso]||{}).continent,
   aliases:e.aliases||[], key:norm(e.name),
   alt:[...new Set((e.aliases||[]).map(norm))].filter(a => a && a !== norm(e.name)),
   exact:new Set((e.also||[]).map(norm))
@@ -738,18 +749,43 @@ const PAINTABLE = DATA.concat(CAP_ENTRY, CTY_ENTRY, US_ENTRY, LB_ENTRY);
 
 const BOARDS = ['counties','states','boroughs'];   // their own map, not the globe
 const MODES = ['world','continents','capitals','counties','states','boroughs','flags'];
-const S = { mode:'world', playing:false, list:true, check:'end',
+const S = { mode:'world', scope:'all', continent:'Europe', pick:[], round:0, playing:false, list:true, check:'end',
             ans:{}, sel:null, checked:false, cursor:0, streak:0, toldMode:false,
             adv:'manual', motion:!systemCalm };
 
-function targets(){
-  if(S.mode==='continents') return CONT_ENTRY;
-  if(S.mode==='capitals') return CAP_ENTRY;
-  if(S.mode==='counties') return CTY_ENTRY;
-  if(S.mode==='states') return US_PLAY;
-  if(S.mode==='boroughs') return LB_ENTRY;
-  if(S.mode==='flags') return FLAG_ENTRY;
+/* everything a game could ask you to name, before any narrowing */
+function basis(mode){
+  mode = mode || S.mode;
+  if(mode==='continents') return CONT_ENTRY;
+  if(mode==='capitals') return CAP_ENTRY;
+  if(mode==='counties') return CTY_ENTRY;
+  if(mode==='states') return US_PLAY;
+  if(mode==='boroughs') return LB_ENTRY;
+  if(mode==='flags') return FLAG_ENTRY;
   return PLAYABLE;
+}
+/* 200 in one sitting is a lot, so a game can be narrowed to one continent or to
+   ten at a time. The ten keep the order they were drawn in, which is random. */
+function targets(){
+  if(S.scope === 'continent') return basis().filter(e=>e.continent === S.continent);
+  if(S.scope === 'random') return S.pick.map(c=>BY_CODE[c]).filter(Boolean);
+  return basis();
+}
+const ROUND = 10;
+function rollRound(){
+  const pool = basis();
+  /* prefer ones not met yet, so round after round covers new ground rather than
+     circling the same handful; fall back to the whole pool once it runs dry */
+  const seen = new Set(Object.keys(S.ans));
+  const bag = pool.filter(e=>!seen.has(e.code));
+  const from = bag.length >= ROUND ? bag : pool.slice();
+  const draw = from.slice(), out = [];
+  while(out.length < ROUND && draw.length)
+    out.push(draw.splice(Math.floor(Math.random()*draw.length), 1)[0].code);
+  S.pick = out;
+  out.forEach(c=>{ delete S.ans[c]; });    // a fresh round starts clean
+  S.checked = false; S.sel = null; S.cursor = 0;
+  S.round = (S.round || 0) + 1;
 }
 function entryForShape(e){
   if(S.mode==='continents') return e.continent ? BY_CODE['CONT-'+e.continent] : null;
@@ -1029,6 +1065,16 @@ function frameOn(t, opts){
   clampView(); ease(); applyView();
 }
 function fitCurrent(){
+  /* a narrowed game on the world map should open on the part of it in play */
+  if(S.scope !== 'all' && !BOARDS.includes(S.mode) && S.mode !== 'flags'){
+    const t = targets().filter(e=>e.mb || e.b);
+    if(t.length){
+      const b = t.reduce((a,e)=>{ const q = e.mb||e.b;
+        return [Math.min(a[0],q[0]),Math.min(a[1],q[1]),Math.max(a[2],q[2]),Math.max(a[3],q[3])];
+      },[9e9,9e9,-9e9,-9e9]);
+      frameOn({mb:b}, {fill:true}); placeFloaters(); return;
+    }
+  }
   if(S.mode === 'counties'){
     frameOn({mb:CTY_BOX}, {fill:true});   // England is squarer than the board - fill what there is
   } else if(S.mode === 'states'){
@@ -1545,7 +1591,8 @@ function openSheet(){
   const t = targets();
   const right = t.filter(e=>S.ans[e.code] && S.ans[e.code].ok).length;
   const misses = t.filter(e=>!S.ans[e.code] || !S.ans[e.code].ok);
-  $('#score').innerHTML = `${right} of ${t.length} <small>named correctly</small>`;
+  $('#score').innerHTML = `${right} of ${t.length} <small>named correctly</small>`
+    + (S.scope === 'random' ? ` <small>· round ${S.round}</small>` : '');
   const list = $('#sheetlist');
   list.innerHTML = '';
   if(!misses.length){
@@ -1560,7 +1607,10 @@ function openSheet(){
       list.appendChild(r);
     });
   }
+  const round = S.scope === 'random';
+  $('#another').style.display = round ? '' : 'none';
   $('#retry').style.display = misses.length ? '' : 'none';
+  $('#retry').classList.toggle('key', !round);   // 'another ten' leads when there is one
   $('#sheet').classList.add('on');
   hideTip();
   if(!misses.length){
@@ -1573,6 +1623,12 @@ $('#close').onclick = ()=> $('#sheet').classList.remove('on');
 $('#revealall').onclick = ()=>{
   targets().forEach(e=>{ if(!S.ans[e.code] || !S.ans[e.code].ok) S.ans[e.code] = {given:e.name, ok:false, told:true}; });
   S.checked = true; $('#sheet').classList.remove('on'); render();
+};
+$('#another').onclick = ()=>{
+  rollRound();
+  $('#sheet').classList.remove('on');
+  render(); fitCurrent(); advance();
+  showToast(`Round ${S.round}. Ten more.`, 2600);
 };
 $('#retry').onclick = ()=>{
   targets().forEach(e=>{ const a = S.ans[e.code]; if(a && !a.ok) delete S.ans[e.code]; });
@@ -1610,7 +1666,20 @@ document.querySelectorAll('#checkseg button').forEach(b=>b.onclick = ()=>{
    settings. The map keeps running underneath, so coming back to the menu and
    picking the same game again lands you exactly where you were. */
 const LABEL = {continents:'Continents', world:'Countries', capitals:'Capitals',
-               counties:'English counties', states:'States'};
+               flags:'Flags', counties:'English counties', boroughs:'London boroughs',
+               states:'States'};
+/* what each game can sensibly be narrowed to. Continents has only seven to
+   name, so there is nothing to narrow; the local games have no continents. */
+const SCOPED = {
+  world:    {conts:true, random:true},
+  capitals: {conts:true, random:true},
+  flags:    {conts:true, random:true},
+  counties: {random:true},
+  boroughs: {random:true},
+  states:   {random:true},
+};
+let pending = null;                 // the game chosen, before its scope is picked
+
 function showMenu(which){
   document.querySelectorAll('.menupanel').forEach(p=>
     p.toggleAttribute('hidden', p.dataset.menu !== which));
@@ -1630,19 +1699,59 @@ function openHome(){
   showMenu(panelFor(S.mode));
   save();
 }
-function startGame(mode){
-  const changed = mode !== S.mode;
-  S.mode = mode;
+
+function showScope(mode){
+  pending = mode;
+  const opt = SCOPED[mode] || {};
+  const total = basis(mode).length;
+  let h = `<button class="back" data-open="${panelFor(mode)}"><span class="chev" aria-hidden="true">‹</span> All games</button>`
+        + `<h2 class="caps">${esc(LABEL[mode] || mode)}</h2>`
+        + `<button class="go" data-scope="all">Every one<small>All ${total} of them.</small></button>`;
+  if(opt.conts)  h += `<button class="more" data-open="conts">One continent<span class="chev" aria-hidden="true">›</span><small>A part of the world at a time.</small></button>`;
+  if(opt.random) h += `<button class="go" data-scope="random">Random ten<small>Ten at a time, then ten more.</small></button>`;
+  const p = document.querySelector('.menupanel[data-menu="scope"]');
+  p.innerHTML = h; wireMenu(); showMenu('scope');
+}
+function showConts(){
+  const counts = {};
+  for(const e of basis(pending)) if(e.continent) counts[e.continent] = (counts[e.continent]||0)+1;
+  let h = `<button class="back" data-open="scope"><span class="chev" aria-hidden="true">‹</span> ${esc(LABEL[pending]||'')}</button>`
+        + `<h2 class="caps">One continent</h2>`;
+  for(const c of CONTINENTS){
+    if((counts[c]||0) < 3) continue;      // Antarctica is one country; not a game
+    h += `<button class="go" data-scope="continent" data-cont="${esc(c)}">${esc(c)}<small>${counts[c]} to name.</small></button>`;
+  }
+  const p = document.querySelector('.menupanel[data-menu="conts"]');
+  p.innerHTML = h; wireMenu(); showMenu('conts');
+}
+
+function startGame(mode, scope, cont){
+  scope = scope || 'all';
+  const changed = mode !== S.mode || scope !== S.scope ||
+                  (scope === 'continent' && cont !== S.continent);
+  /* a round still in play is resumed; one already finished is dealt afresh, so
+     picking 'random ten' again never lands you on ten you have just done */
+  const finished = S.pick.length && S.pick.every(c=>S.ans[c]);
+  S.mode = mode; S.scope = scope;
+  if(cont) S.continent = cont;
+  if(scope === 'random' && (changed || !S.pick.length || finished)) rollRound();
   S.playing = true; document.body.classList.add('playing');
   if(changed) switchView(); else render();   // same game: leave the map where you left it
   if(S.mode === 'flags' && !S.sel) advance();
   sizeCanvas(); placeFloaters();
   save();
 }
-document.querySelectorAll('#menu .game').forEach(b=>
-  b.onclick = ()=> startGame(b.dataset.mode));
-document.querySelectorAll('#menu [data-open]').forEach(b=>
-  b.onclick = ()=> showMenu(b.dataset.open));
+
+function wireMenu(){
+  document.querySelectorAll('#menu .game').forEach(b=>
+    b.onclick = ()=> SCOPED[b.dataset.mode] ? showScope(b.dataset.mode)
+                                            : startGame(b.dataset.mode, 'all'));
+  document.querySelectorAll('#menu .go').forEach(b=>
+    b.onclick = ()=> startGame(pending, b.dataset.scope, b.dataset.cont));
+  document.querySelectorAll('#menu [data-open]').forEach(b=>
+    b.onclick = ()=> b.dataset.open === 'conts' ? showConts() : showMenu(b.dataset.open));
+}
+wireMenu();
 $('#menubtn').onclick = openHome;
 
 function setSetup(open){
