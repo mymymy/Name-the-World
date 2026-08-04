@@ -19,6 +19,10 @@
   --panel:#FBF7EC;
   --land:#EDE4D0;
   --land-out:#E2DAC7;
+  /* the counties and states boards are not the globe, so a sea colour behind
+     them reads as water that is not there - aged paper instead */
+  --board:#DACBA4;
+  --board-edge:#B9A87C;
   --named:#DCBB6E;
   --right:#7FA86A;
   --miss:#C25749;
@@ -109,10 +113,12 @@ path.c.ctx.host{stroke-width:2.2;stroke-opacity:1;stroke:#2E6A50}
 /* the counties board replaces the world one outright - its own projection,
    its own sea, nothing of the globe left showing behind it */
 #counties,#states{display:none}
-#map.counties,#map.states{background:var(--sea)}
-#map.counties #counties,#map.states #states{display:inline}
-#map.counties #sphere,#map.counties #grat,#map.counties #halo,#map.counties #land,
-#map.states #sphere,#map.states #grat,#map.states #halo,#map.states #land{display:none}
+/* the whole map surface, wrapper included, so no sea shows through at the edges */
+#mapwrap.board,#mapwrap.board #map{background:var(--board)}
+#mapwrap.counties #counties,#mapwrap.states #states{display:inline}
+#mapwrap.board #sphere,#mapwrap.board #grat,#mapwrap.board #halo,#mapwrap.board #land{display:none}
+/* a touch more weight on the coast, which has less to push against than sea did */
+#mapwrap.board path.c{stroke:var(--coast);stroke-opacity:.7}
 path.c.named{fill:var(--tint,var(--named))}
 path.c.right{fill:var(--tint,var(--right))}
 path.c.told{fill:var(--told)}
@@ -294,13 +300,11 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
   <div id="bar">
     <div class="seg" id="modeseg" role="group" aria-label="Game">
       <button data-mode="world" class="caps">World</button>
-      <button data-mode="continent" class="caps">By continent</button>
       <button data-mode="continents" class="caps">Continents</button>
       <button data-mode="capitals" class="caps">Capitals</button>
       <button data-mode="counties" class="caps">Counties</button>
       <button data-mode="states" class="caps">US states</button>
     </div>
-    <div class="seg" id="contseg" role="group" aria-label="Continent"></div>
     <span class="barlabel caps">Suggest</span>
     <div class="seg" id="listseg" role="group" aria-label="Suggestions">
       <button data-list="1" class="caps">On</button>
@@ -322,7 +326,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
       <button data-check="auto" class="caps">As you go</button>
     </div>
     <button id="restart2" class="caps">Restart</button>
-    <span id="build" class="caps">build 4 aug · v14</span>
+    <span id="build" class="caps">build 4 aug · v15</span>
   </div>
 
   <main>
@@ -424,7 +428,7 @@ const store = (()=>{
 })();
 let saveTimer = 0;
 function snapshot(){
-  return JSON.stringify({v:1, ans:S.ans, mode:S.mode, continent:S.continent,
+  return JSON.stringify({v:1, ans:S.ans, mode:S.mode,
                          list:S.list, check:S.check, checked:S.checked,
                          adv:S.adv, motion:S.motion});
 }
@@ -441,8 +445,7 @@ function restore(){
   for(const [code,a] of Object.entries(o.ans || {}))
     if(BY_CODE[code] && a && typeof a.given === 'string') ans[code] = a;
   S.ans = ans;
-  if(['world','continent','continents','capitals','counties','states'].includes(o.mode)) S.mode = o.mode;
-  if(CONTINENTS.includes(o.continent)) S.continent = o.continent;
+  if(['world','continents','capitals','counties','states'].includes(o.mode)) S.mode = o.mode;
   if(typeof o.list === 'boolean') S.list = o.list;
   if(o.check === 'end' || o.check === 'auto') S.check = o.check;
   S.checked = !!o.checked;
@@ -517,7 +520,7 @@ const US_BOX = US_ENTRY.reduce((a,e)=>[Math.min(a[0],e.b[0]), Math.min(a[1],e.b[
                                [9e9,9e9,-9e9,-9e9]);
 const PAINTABLE = DATA.concat(CAP_ENTRY, CTY_ENTRY, US_ENTRY);
 
-const S = { mode:'world', continent:'Europe', list:true, check:'end',
+const S = { mode:'world', list:true, check:'end',
             ans:{}, sel:null, checked:false, cursor:0, streak:0, toldMode:false,
             adv:'manual', motion:!systemCalm };
 
@@ -526,7 +529,6 @@ function targets(){
   if(S.mode==='capitals') return CAP_ENTRY;
   if(S.mode==='counties') return CTY_ENTRY;
   if(S.mode==='states') return US_PLAY;
-  if(S.mode==='continent') return PLAYABLE.filter(e=>e.continent===S.continent);
   return PLAYABLE;
 }
 function entryForShape(e){
@@ -684,8 +686,10 @@ function paintMap(){
   const live = new Set(targets().map(e=>e.code));
   const tinted = S.mode === 'continents';       // continent colours only in that game
   const caps = S.mode === 'capitals';
-  svg.classList.toggle('counties', S.mode === 'counties');
-  svg.classList.toggle('states', S.mode === 'states');
+  /* boards of their own, drawn on paper rather than over the globe */
+  wrap.classList.toggle('counties', S.mode === 'counties');
+  wrap.classList.toggle('states', S.mode === 'states');
+  wrap.classList.toggle('board', S.mode === 'counties' || S.mode === 'states');
   /* in the capitals game the country the selected city belongs to is drawn a
      shade stronger, so you can see which country you are being asked about */
   const host = caps && S.sel ? (BY_CODE[S.sel] || {}).iso : null;
@@ -795,12 +799,7 @@ function frameOn(t, opts){
   clampView(); ease(); applyView();
 }
 function fitCurrent(){
-  if(S.mode === 'continent'){
-    const b = targets().filter(e=>e.mb||e.b).reduce((a,e)=>{ const q = e.mb||e.b;
-      return [Math.min(a[0],q[0]),Math.min(a[1],q[1]),Math.max(a[2],q[2]),Math.max(a[3],q[3])];
-    },[9e9,9e9,-9e9,-9e9]);
-    frameOn({mb:b});
-  } else if(S.mode === 'counties'){
+  if(S.mode === 'counties'){
     frameOn({mb:CTY_BOX}, {fill:true});   // England is squarer than the board - fill what there is
   } else if(S.mode === 'states'){
     frameOn({mb:US_BOX}, {fill:true});
@@ -1277,9 +1276,6 @@ function renderBar(){
   document.querySelectorAll('#modeseg button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.mode===S.mode)));
   document.querySelectorAll('#listseg button').forEach(b=>b.setAttribute('aria-pressed', String((b.dataset.list==='1')===S.list)));
   document.querySelectorAll('#checkseg button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.check===S.check)));
-  const cs = $('#contseg');
-  cs.style.display = S.mode==='continent' ? 'flex' : 'none';
-  cs.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.cont===S.continent)));
   document.querySelectorAll('#advseg button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.adv===S.adv)));
   document.querySelectorAll('#motionseg button').forEach(b=>b.setAttribute('aria-pressed', String((b.dataset.motion==='1')===S.motion)));
 }
@@ -1370,13 +1366,6 @@ document.querySelectorAll('#checkseg button').forEach(b=>b.onclick = ()=>{
   S.check = b.dataset.check;
   if(S.check === 'auto') S.checked = false;
   render();
-});
-CONTINENTS.filter(c=>c!=='Antarctica').forEach(c=>{
-  const b = document.createElement('button');
-  b.className = 'caps'; b.dataset.cont = c;
-  b.textContent = c.replace('North America','N. America').replace('South America','S. America');
-  b.onclick = ()=>{ S.continent = c; switchView(); };
-  $('#contseg').appendChild(b);
 });
 $('#gear').onclick = ()=>{
   const open = document.body.classList.toggle('setup');
