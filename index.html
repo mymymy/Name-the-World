@@ -537,7 +537,7 @@ function buildMap(){
     g.setAttribute('d', e.d);
     halo.appendChild(g);
   });
-  DATA.filter(e=>e.point || (e.play && e.px < 30)).forEach(e=>{
+  DATA.filter(e=>e.play && (e.point || e.px < 30)).forEach(e=>{
     const c = document.createElementNS(NS,'circle');
     c.setAttribute('cx',e.c[0]); c.setAttribute('cy',e.c[1]); c.setAttribute('r',4);
     c.setAttribute('class','dot'); c.dataset.code = e.code;
