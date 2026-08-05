@@ -484,7 +484,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 4 aug · v23</span>
+      <span id="build" class="caps">build 5 aug · v24</span>
     </div>
   </div>
 
@@ -910,10 +910,13 @@ function frameSize(fr){
   const la = fr[2] > 0 ? fr[2] : (fr[3] < 0 ? fr[3] : 0);
   return [PS*RAD*fr[1]*nl(la*RAD), wy(fr[2]) - wy(fr[3])];
 }
+/* the edge of the map is a curve, so it is drawn as short steps - short enough
+   that it still reads as a curve when zoomed right in */
+const limbStep = () => 1.5/Math.max(1, Math.min(10, k));
 function spherePath(){
-  const up=[], dn=[];
-  for(let la=-90; la<=90; la+=1.5) up.push([limbX(la,1), wy(la)]);
-  for(let la=90; la>=-90; la-=1.5) dn.push([limbX(la,-1), wy(la)]);
+  const st = limbStep(), up=[], dn=[];
+  for(let la=-90; la<=90; la+=st) up.push([limbX(la,1), wy(la)]);
+  for(let la=90; la>=-90; la-=st) dn.push([limbX(la,-1), wy(la)]);
   return dstr(up.concat(dn));
 }
 
@@ -974,7 +977,7 @@ function crossLat(a,b){
 /* cutting a country at the antimeridian leaves open ends; they close along the
    curved edge of the map, not straight across it */
 function walkLimb(out, from, to, side){
-  const n = Math.max(2, Math.ceil(Math.abs(to-from)/3));
+  const n = Math.max(2, Math.ceil(Math.abs(to-from)/(2*limbStep())));
   for(let i=1;i<=n;i++){ const la = from+(to-from)*i/n; out.push([limbX(la,side), wy(la)]); }
 }
 function ringPath(r, step){
