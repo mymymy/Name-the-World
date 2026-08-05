@@ -1219,8 +1219,22 @@ function applyView(){
   sizeLabels();
   if(layerLabels.classList.contains('hide') === (k >= LABEL_AT)) drawLabels();
 }
+/* The globe turns rather than slides, so there is no sideways limit - but
+   there is still a top and a bottom, and no reason to show empty sea past
+   either when the map is big enough to fill the screen. */
+function clampWorldY(){
+  const r = wrap.getBoundingClientRect(), m = svg.getScreenCTM();
+  if(!m || !m.d) return;
+  /* a little give, so a frame that is wide and shallow - Europe on a phone -
+     is not shoved hard against the top of the screen */
+  const slack = 0.1 * r.height / m.d;
+  const hi = slack + (r.top - m.f)/m.d;            // viewBox y at the top of the map area
+  const lo = (r.bottom - m.f)/m.d - 1000*k - slack;
+  ty = lo > hi ? (lo+hi)/2 : Math.min(hi, Math.max(lo, ty));
+}
 function clampView(){
-  if(!worldMap()) tx = Math.min(OVER_X, Math.max(2000*(1-k) - OVER_X, tx));
+  if(worldMap()) return clampWorldY();
+  tx = Math.min(OVER_X, Math.max(2000*(1-k) - OVER_X, tx));
   ty = Math.min(OVER_Y, Math.max(1000*(1-k) - OVER_Y, ty));
 }
 /* board x under a point on screen, allowing for the centring shift */
