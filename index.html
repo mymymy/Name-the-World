@@ -957,7 +957,14 @@ function decodeRing(str){
   if(use.polar) use.south = use.reduce((a,q)=>a+q[1],0)/use.length < 0;
   return use;
 }
-const dstr = pts => 'M'+pts.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join('L')+'Z';
+/* toFixed is the slowest part of drawing the world - six times dearer than
+   rounding by hand, and it is called twice for every one of 23,000 points */
+const f1 = v => '' + (Math.round(v*10)/10);
+function dstr(pts){
+  let s = 'M';
+  for(let i=0;i<pts.length;i++) s += (i?'L':'') + f1(pts[i][0]) + ',' + f1(pts[i][1]);
+  return s + 'Z';
+}
 function crossLat(a,b){
   const db = b[0] + (b[0]<a[0] ? 360 : -360);
   let t = ((a[0]>0?1:-1)*180 - a[0])/(db-a[0]);
@@ -998,6 +1005,27 @@ function ringPath(r, step){
     walkLimb(out, pole, laFirst, -dir);
     return dstr(out);
   }
+  /* Almost every ring is nowhere near the antimeridian, and those are worth
+     writing straight out: no arrays, one pass, which is most of the difference
+     between a smooth drag and a jerky one. Look for a cut first - comparing
+     longitudes costs nothing next to allocating a point for each of them. */
+  const n=r.length;
+  let cut=false, prev=wrapLon(r[0][0]-lam0);
+  const first=prev;
+  for(let i=step;i<n;i+=step){
+    const d=wrapLon(r[i][0]-lam0);
+    if(Math.abs(d-prev)>180){ cut=true; break; }
+    prev=d;
+  }
+  if(!cut && Math.abs(first-prev)>180) cut=true;
+  if(!cut){
+    let out='M', m=0;
+    for(let i=0;i<n;i+=step){
+      const la=r[i][1];
+      out += (m++ ? 'L' : '') + f1(wx(wrapLon(r[i][0]-lam0), la)) + ',' + f1(wy(la));
+    }
+    return m<3 ? '' : out+'Z';
+  }
   const P=[];
   for(let i=0;i<r.length;i+=step) P.push([wrapLon(r[i][0]-lam0), r[i][1]]);
   const m=P.length;
@@ -1031,17 +1059,12 @@ function drawGraticule(){
   if(!gratPath) return;
   let d='';
   for(let lon=-180; lon<180; lon+=20){
-    const pts=[];
-    for(let la=-90; la<=90; la+=3){
-      const dl = wrapLon(lon-lam0);
-      pts.push([wx(dl,la), wy(la)]);
-    }
-    d += 'M'+pts.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join('L');
+    const dl = wrapLon(lon-lam0);
+    for(let la=-90; la<=90; la+=3) d += (la===-90?'M':'L') + f1(wx(dl,la)) + ',' + f1(wy(la));
   }
   for(let la=-80; la<=80; la+=20){
-    const pts=[];
-    for(let i=0;i<=72;i++) pts.push([wx(-180+i*5, la), wy(la)]);
-    d += 'M'+pts.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join('L');
+    const y = f1(wy(la));
+    for(let i=0;i<=72;i++) d += (i?'L':'M') + f1(wx(-180+i*5, la)) + ',' + y;
   }
   gratPath.setAttribute('d', d);
 }
