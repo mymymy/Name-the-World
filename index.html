@@ -28,8 +28,6 @@
      everywhere - outside the globe, under the county and state boards, and
      behind a flag - so the frame reads as one surface whatever is in it. */
   --chart:#F6F4EF;
-  --rule:#E1DDD3;
-  --rule-major:#D0CABC;
   --named:#DCBB6E;
   --right:#7FA86A;
   --miss:#C25749;
@@ -183,20 +181,24 @@ main{flex:1 1 auto;min-height:0;display:flex;position:relative;z-index:1}
 #mapwrap{
   position:relative;flex:1 1 auto;overflow:hidden;touch-action:none;
   background-color:var(--chart);
-  /* fine squares with a heavier line every fifth, the way a chart is ruled.
-     It stays put as the map moves: the map has its own meridians to turn with,
-     and a grid turning with them would only fight them. */
-  background-image:
-    linear-gradient(var(--rule-major) 1px, transparent 1px),
-    linear-gradient(90deg, var(--rule-major) 1px, transparent 1px),
-    linear-gradient(var(--rule) 1px, transparent 1px),
-    linear-gradient(90deg, var(--rule) 1px, transparent 1px);
-  background-size:90px 90px, 90px 90px, 18px 18px, 18px 18px;
+  /* Ruled the way a chart is: a solid line every 90, a dashed one halfway
+     between. Quiet enough to read as the surface the map is drawn on rather
+     than a pattern in its own right. The tile carries its own two greys, being
+     a picture rather than a rule, so they cannot come from the variables above.
+     It stays put as the map moves - the map has its own meridians to turn with,
+     and a grid turning alongside them would only fight them. */
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90' shape-rendering='crispEdges'%3E%3Cg fill='none'%3E%3Cpath d='M0 .5H90M.5 0V90' stroke='%23DEDACE'/%3E%3Cpath d='M0 45.5H90M45.5 0V90' stroke='%23E6E2D7' stroke-dasharray='2 5'/%3E%3C/g%3E%3C/svg%3E");
 }
 svg#map{display:block;width:100%;height:100%;cursor:grab}
 svg#map.dragging{cursor:grabbing}
 
-#sphere{fill:var(--sea);stroke:var(--coast);stroke-width:1.2;vector-effect:non-scaling-stroke}
+#sphere{fill:var(--sea);stroke:none}
+/* The coast halo is a wide stroke, so on a country at the edge of the map it
+   spills past the edge and paints over the outline. Hold it inside the map,
+   and draw the outline last so nothing can cover it. */
+#halo{clip-path:url(#edge)}
+#rim{fill:none;stroke:var(--coast);stroke-width:1.2;vector-effect:non-scaling-stroke;
+  pointer-events:none}
 #grat path{fill:none;stroke:#7FA3B0;stroke-width:.6;vector-effect:non-scaling-stroke;opacity:.5}
 #grat path.fine{stroke-width:.4;opacity:.28}
 #halo path{fill:none;stroke:var(--sea-halo);stroke-width:7;stroke-linejoin:round;
@@ -239,7 +241,8 @@ path.c.ctx.host{stroke-width:2.2;stroke-opacity:1;stroke:#2E6A50}
 /* both carry a pointer aimed at a place on the map; here there is no place */
 #mapwrap.flags #ask:before,#mapwrap.flags #tip:before{display:none}
 #mapwrap.counties #counties,#mapwrap.states #states,#mapwrap.boroughs #boroughs{display:inline}
-#mapwrap.board #sphere,#mapwrap.board #grat,#mapwrap.board #halo,#mapwrap.board #land{display:none}
+#mapwrap.board #sphere,#mapwrap.board #grat,#mapwrap.board #halo,
+#mapwrap.board #land,#mapwrap.board #rim{display:none}
 /* a touch more weight on the coast, which has less to push against than sea did */
 #mapwrap.board path.c{stroke:var(--coast);stroke-opacity:.7}
 path.c.named{fill:var(--tint,var(--named))}
@@ -497,18 +500,22 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v25</span>
+      <span id="build" class="caps">build 6 aug · v26</span>
     </div>
   </div>
 
     <div id="mapwrap">
       <svg id="map" viewBox="0 0 2000 1000" preserveAspectRatio="xMidYMid meet" aria-label="World map">
         <g id="scene">
+          <defs>
+            <clipPath id="edge" clipPathUnits="userSpaceOnUse"><path id="edgep"></path></clipPath>
+          </defs>
           <g id="world">
             <path id="sphere"></path>
             <g id="grat"></g>
             <g id="halo"></g>
             <g id="land"></g>
+            <path id="rim"></path>
           </g>
           <g id="counties"></g>
           <g id="states"></g>
@@ -893,7 +900,12 @@ function drawWorld(){
     const q = project(e.cll[0], e.cll[1]);
     c.setAttribute('cx', q[0].toFixed(1)); c.setAttribute('cy', q[1].toFixed(1));
   }
-  $('#sphere').setAttribute('d', spherePath());
+  const edge = spherePath();
+  $('#sphere').setAttribute('d', edge); $('#rim').setAttribute('d', edge);
+  /* The clip only has to say where the halo stops, and a step or two of slack
+     there is invisible - whereas a clip as detailed as the outline costs real
+     frames, because every path it covers is re-clipped against it. */
+  $('#edgep').setAttribute('d', spherePath(limbStep()*4));
 }
 /* Turning the map means projecting it again, so everything that lives on the
    globe - the land, the outline, the grid and the names - is redrawn together. */
@@ -926,8 +938,9 @@ function frameSize(fr){
 /* the edge of the map is a curve, so it is drawn as short steps - short enough
    that it still reads as a curve when zoomed right in */
 const limbStep = () => 1.5/Math.max(1, Math.min(10, k));
-function spherePath(){
-  const st = limbStep(), up=[], dn=[];
+function spherePath(st){
+  st = st || limbStep();
+  const up=[], dn=[];
   for(let la=-90; la<=90; la+=st) up.push([limbX(la,1), wy(la)]);
   for(let la=90; la>=-90; la-=st) dn.push([limbX(la,-1), wy(la)]);
   return dstr(up.concat(dn));
