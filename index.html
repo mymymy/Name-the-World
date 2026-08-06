@@ -23,10 +23,13 @@
   --panel:#FBF7EC;
   --land:#EDE4D0;
   --land-out:#E2DAC7;
-  /* the counties and states boards are not the globe, so a sea colour behind
-     them reads as water that is not there - aged paper instead */
-  --board:#DACBA4;
-  --board-edge:#B9A87C;
+  /* Behind and around every map: not sea, not paper, but the ruled ground a
+     map is drawn on. Off-white so it sits back from the land, and the same
+     everywhere - outside the globe, under the county and state boards, and
+     behind a flag - so the frame reads as one surface whatever is in it. */
+  --chart:#F6F4EF;
+  --rule:#E1DDD3;
+  --rule-major:#D0CABC;
   --named:#DCBB6E;
   --right:#7FA86A;
   --miss:#C25749;
@@ -177,7 +180,19 @@ body.setup #bar{transform:none;visibility:visible;transition-delay:0s,0s}
 button:focus-visible{outline:2px solid var(--live);outline-offset:2px}
 
 main{flex:1 1 auto;min-height:0;display:flex;position:relative;z-index:1}
-#mapwrap{position:relative;flex:1 1 auto;background:var(--sea);overflow:hidden;touch-action:none}
+#mapwrap{
+  position:relative;flex:1 1 auto;overflow:hidden;touch-action:none;
+  background-color:var(--chart);
+  /* fine squares with a heavier line every fifth, the way a chart is ruled.
+     It stays put as the map moves: the map has its own meridians to turn with,
+     and a grid turning with them would only fight them. */
+  background-image:
+    linear-gradient(var(--rule-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--rule-major) 1px, transparent 1px),
+    linear-gradient(var(--rule) 1px, transparent 1px),
+    linear-gradient(90deg, var(--rule) 1px, transparent 1px);
+  background-size:90px 90px, 90px 90px, 18px 18px, 18px 18px;
+}
 svg#map{display:block;width:100%;height:100%;cursor:grab}
 svg#map.dragging{cursor:grabbing}
 
@@ -208,7 +223,7 @@ path.c.ctx.host{stroke-width:2.2;stroke-opacity:1;stroke:#2E6A50}
   position:absolute;inset:0;z-index:4;display:none;
   flex-direction:column;align-items:center;justify-content:center;padding:20px;
 }
-#mapwrap.flags{background:var(--board)}
+
 #mapwrap.flags #map,#mapwrap.flags #zoom{display:none}
 #mapwrap.flags #flagwrap{display:flex}
 #flagimg{
@@ -223,8 +238,6 @@ path.c.ctx.host{stroke-width:2.2;stroke-opacity:1;stroke:#2E6A50}
   transform:translate(-50%,0)!important}
 /* both carry a pointer aimed at a place on the map; here there is no place */
 #mapwrap.flags #ask:before,#mapwrap.flags #tip:before{display:none}
-/* the whole map surface, wrapper included, so no sea shows through at the edges */
-#mapwrap.board,#mapwrap.board #map{background:var(--board)}
 #mapwrap.counties #counties,#mapwrap.states #states,#mapwrap.boroughs #boroughs{display:inline}
 #mapwrap.board #sphere,#mapwrap.board #grat,#mapwrap.board #halo,#mapwrap.board #land{display:none}
 /* a touch more weight on the coast, which has less to push against than sea did */
@@ -484,7 +497,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 5 aug · v24</span>
+      <span id="build" class="caps">build 6 aug · v25</span>
     </div>
   </div>
 
