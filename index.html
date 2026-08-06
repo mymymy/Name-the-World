@@ -181,13 +181,16 @@ main{flex:1 1 auto;min-height:0;display:flex;position:relative;z-index:1}
 #mapwrap{
   position:relative;flex:1 1 auto;overflow:hidden;touch-action:none;
   background-color:var(--chart);
-  /* Ruled the way a chart is: a solid line every 90, a dashed one halfway
-     between. Quiet enough to read as the surface the map is drawn on rather
-     than a pattern in its own right. The tile carries its own two greys, being
-     a picture rather than a rule, so they cannot come from the variables above.
+  /* Ruled the way a chart is, not the way graph paper is. What separates the
+     two is graduation: a plain rule every 120, and halfway between it a rule
+     marked off in divisions - longer at the quarters, shorter between - which
+     is what makes a line read as measurement rather than decoration. The ink is
+     warm rather than grey, so it belongs to the same hand as the map's own
+     linework. The tile carries its own two colours, being a picture rather than
+     a rule, so they cannot come from the variables above.
      It stays put as the map moves - the map has its own meridians to turn with,
      and a grid turning alongside them would only fight them. */
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90' shape-rendering='crispEdges'%3E%3Cg fill='none'%3E%3Cpath d='M0 .5H90M.5 0V90' stroke='%23DEDACE'/%3E%3Cpath d='M0 45.5H90M45.5 0V90' stroke='%23E6E2D7' stroke-dasharray='2 5'/%3E%3C/g%3E%3C/svg%3E");
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' shape-rendering='crispEdges'%3E%3Cg fill='none'%3E%3Cpath d='M0 .5H120M.5 0V120' stroke='%23E4DFD1'/%3E%3Cpath d='M0 60.5H120M60.5 0V120M30.5 55V66M55 30.5H66M90.5 55V66M55 90.5H66M15.5 57V64M57 15.5H64M45.5 57V64M57 45.5H64M75.5 57V64M57 75.5H64M105.5 57V64M57 105.5H64' stroke='%23CAC1AC'/%3E%3C/g%3E%3C/svg%3E");
 }
 svg#map{display:block;width:100%;height:100%;cursor:grab}
 svg#map.dragging{cursor:grabbing}
@@ -500,7 +503,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v26</span>
+      <span id="build" class="caps">build 6 aug · v27</span>
     </div>
   </div>
 
