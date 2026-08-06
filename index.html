@@ -23,11 +23,11 @@
   --panel:#FBF7EC;
   --land:#EDE4D0;
   --land-out:#E2DAC7;
-  /* Behind and around every map: not sea, not paper, but the ruled ground a
-     map is drawn on. Off-white so it sits back from the land, and the same
-     everywhere - outside the globe, under the county and state boards, and
-     behind a flag - so the frame reads as one surface whatever is in it. */
-  --chart:#F6F4EF;
+  /* Behind and around every map: not sea, but the ruled paper a map is drawn
+     on. Tinted, so the land reads lighter against it, and the same everywhere -
+     outside the globe, under the county and state boards, and behind a flag -
+     so the frame is one surface whatever is in it. */
+  --chart:#E0D6BC;
   --named:#DCBB6E;
   --right:#7FA86A;
   --miss:#C25749;
@@ -184,13 +184,12 @@ main{flex:1 1 auto;min-height:0;display:flex;position:relative;z-index:1}
   /* Ruled the way a chart is, not the way graph paper is. What separates the
      two is graduation: a plain rule every 120, and halfway between it a rule
      marked off in divisions - longer at the quarters, shorter between - which
-     is what makes a line read as measurement rather than decoration. The ink is
-     warm rather than grey, so it belongs to the same hand as the map's own
-     linework. The tile carries its own two colours, being a picture rather than
-     a rule, so they cannot come from the variables above.
+     is what makes a line read as measurement rather than decoration.
+     The rules are knocked out of the tint rather than printed over it, so they
+     are white: the paper showing through where the ground was held back.
      It stays put as the map moves - the map has its own meridians to turn with,
      and a grid turning alongside them would only fight them. */
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' shape-rendering='crispEdges'%3E%3Cg fill='none'%3E%3Cpath d='M0 .5H120M.5 0V120' stroke='%23E4DFD1'/%3E%3Cpath d='M0 60.5H120M60.5 0V120M30.5 55V66M55 30.5H66M90.5 55V66M55 90.5H66M15.5 57V64M57 15.5H64M45.5 57V64M57 45.5H64M75.5 57V64M57 75.5H64M105.5 57V64M57 105.5H64' stroke='%23CAC1AC'/%3E%3C/g%3E%3C/svg%3E");
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' shape-rendering='crispEdges'%3E%3Cg fill='none' stroke='%23fff'%3E%3Cpath d='M0 .5H120M.5 0V120' stroke-opacity='.5'/%3E%3Cpath d='M0 60.5H120M60.5 0V120M30.5 55V66M55 30.5H66M90.5 55V66M55 90.5H66M15.5 57V64M57 15.5H64M45.5 57V64M57 45.5H64M75.5 57V64M57 75.5H64M105.5 57V64M57 105.5H64' stroke-opacity='.95'/%3E%3C/g%3E%3C/svg%3E");
 }
 svg#map{display:block;width:100%;height:100%;cursor:grab}
 svg#map.dragging{cursor:grabbing}
@@ -503,7 +502,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v27</span>
+      <span id="build" class="caps">build 6 aug · v28</span>
     </div>
   </div>
 
