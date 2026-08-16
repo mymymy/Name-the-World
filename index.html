@@ -23,11 +23,9 @@
   --panel:#FBF7EC;
   --land:#EDE4D0;
   --land-out:#E2DAC7;
-  /* Behind and around every map: not sea, but the ruled paper a map is drawn
-     on. Tinted, so the land reads lighter against it, and the same everywhere -
-     outside the globe, under the county and state boards, and behind a flag -
-     so the frame is one surface whatever is in it. */
-  --chart:#E0D6BC;
+  /* One paper, page and map alike. The tint that used to set the map area apart
+     was doing the job the plate's frame now does, and with no rule under the
+     header the two have to be the same sheet or the boundary simply moves. */
   --named:#DCBB6E;
   --right:#7FA86A;
   --miss:#C25749;
@@ -56,11 +54,13 @@ button{font:inherit;color:inherit;cursor:pointer}
 
 #app{display:flex;flex-direction:column;height:100%}
 
+/* No rule under the header. The map's own frame is a hard edge a little way
+   below it and fills nearly the whole screen, so the title and the buttons read
+   as sitting on the sheet above the map rather than floating loose - a second
+   line here would only compete with the one that matters. */
 header{
   display:flex;align-items:baseline;gap:9px;
-  padding:9px var(--pad) 8px;flex:0 0 auto;
-  background:var(--paper);
-  border-bottom:3px double var(--coast);
+  padding:10px var(--pad) 9px;flex:0 0 auto;
 }
 h1{margin:0;font-size:16px;font-weight:500;letter-spacing:.03em}
 #rose{width:19px;height:19px;flex:0 0 auto;align-self:center;fill:var(--coast)}
@@ -70,7 +70,11 @@ h1{margin:0;font-size:16px;font-weight:500;letter-spacing:.03em}
 #gear{background:none;border:1px solid var(--ink);border-radius:4px;padding:5px 9px;margin-left:4px}
 #gear[aria-expanded="true"]{background:var(--ink);color:var(--paper)}
 
-#prog{height:3px;background:rgba(34,40,43,.10);flex:0 0 auto}
+/* the progress track went too, for the same reason: an unfilled bar spanning
+   the whole width is a rule under the header whatever it is called. Only the
+   part that has been earned is drawn - the tally beside the title says how far
+   along you are anyway. */
+#prog{height:3px;background:none;flex:0 0 auto}
 #prog i{display:block;height:100%;width:0;background:var(--named);
   transition:width .55s cubic-bezier(.4,0,.2,1), background-color .3s ease}
 #prog.won i{background:var(--ok)}
@@ -125,7 +129,7 @@ body.playing #home{display:none}
 #menu h2:first-of-type{margin-top:4px}
 #menubtn{background:none;border:1px solid var(--ink);border-radius:4px;padding:5px 9px;margin-left:4px}
 
-#top{position:relative;z-index:3;flex:0 0 auto;background:var(--paper)}
+#top{position:relative;z-index:3;flex:0 0 auto}
 #bar{
   position:absolute;left:0;right:0;top:0;z-index:12;   /* over the map's own chrome, under the results sheet */
   max-height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
@@ -180,7 +184,7 @@ button:focus-visible{outline:2px solid var(--live);outline-offset:2px}
 main{flex:1 1 auto;min-height:0;display:flex;position:relative;z-index:1}
 #mapwrap{
   position:relative;flex:1 1 auto;overflow:hidden;touch-action:none;
-  background-color:var(--chart);
+  background-color:var(--paper);
   /* No grid: every map now has a frame of its own - the globe's outline, or a
      board's plate - and a ruled ground behind that was a second edge competing
      with the first. Flat paper instead, so the frame is the only line. */
@@ -506,7 +510,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v30</span>
+      <span id="build" class="caps">build 6 aug · v31</span>
     </div>
   </div>
 
