@@ -510,7 +510,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v31</span>
+      <span id="build" class="caps">build 6 aug · v32</span>
     </div>
   </div>
 
@@ -1265,6 +1265,18 @@ function sizeDots(){
   scene.querySelectorAll('circle.dot').forEach(c=>c.setAttribute('r', r));
 }
 
+/* On a screen taller than it is wide, the globe at its natural size is a narrow
+   band adrift in paper - it is two units across for one down, and a phone is
+   about one across for two down. So on those screens it opens filled to the
+   height instead. Most of the world is off the sides at that size, but the map
+   turns now, so reaching the rest is a drag rather than a zoom out. On a screen
+   wider than it is tall there is little slack to take up, and it opens whole. */
+function worldFill(){
+  const r = wrap.getBoundingClientRect(), u = unitPx();
+  if(!u || !r.height || r.height <= r.width*0.95) return 1;
+  return Math.max(1, Math.min(40, 0.97*usableBand()/(1000*u)));
+}
+
 /* --- the plate ---
 
    A plate is cut to the shape of the paper it is printed on, and here the paper
@@ -1314,12 +1326,16 @@ function applyView(){
 function clampWorldY(){
   const r = wrap.getBoundingClientRect(), m = svg.getScreenCTM();
   if(!m || !m.d) return;
+  const hi = (r.top - m.f)/m.d;                     // viewBox y at the top of the map area
+  const lo = (r.bottom - m.f)/m.d - 1000*k;         // ... and what the bottom edge allows
+  /* Whether the map fits has to be asked of the real bounds. Asking it of the
+     slackened ones says a map slightly shorter than the screen does not fit,
+     and pins it to one end instead of centring it. */
+  if(lo > hi){ ty = (lo+hi)/2; return; }
   /* a little give, so a frame that is wide and shallow - Europe on a phone -
      is not shoved hard against the top of the screen */
   const slack = 0.1 * r.height / m.d;
-  const hi = slack + (r.top - m.f)/m.d;            // viewBox y at the top of the map area
-  const lo = (r.bottom - m.f)/m.d - 1000*k - slack;
-  ty = lo > hi ? (lo+hi)/2 : Math.min(hi, Math.max(lo, ty));
+  ty = Math.min(hi + slack, Math.max(lo - slack, ty));
 }
 function clampView(){
   if(worldMap()) return clampWorldY();
@@ -1446,7 +1462,8 @@ function fitCurrent(){
       const fr = frameUnion(targets());
       if(fr){ frameWorld(fr, {fill:true, pad:0.85}); placeFloaters(); return; }
     }
-    k = 1; ty = 0; ease(); applyView(); turnTo(0, true); placeFloaters(); return;
+    k = worldFill(); ty = 0; clampView(); ease(); applyView();
+    turnTo(0, true); placeFloaters(); return;
   }
   if(S.mode === 'counties'){
     /* the plate is the canvas now, so bring it right up to the edges */
@@ -2128,6 +2145,7 @@ function showConts(){
 
 function startGame(mode, scope, cont){
   scope = scope || 'all';
+  const resuming = S.playing;
   const changed = mode !== S.mode || scope !== S.scope ||
                   (scope === 'continent' && cont !== S.continent);
   /* a round still in play is resumed; one already finished is dealt afresh, so
@@ -2137,7 +2155,10 @@ function startGame(mode, scope, cont){
   if(cont) S.continent = cont;
   if(scope === 'random' && (changed || !S.pick.length || finished)) rollRound();
   S.playing = true; document.body.classList.add('playing');
-  if(changed) switchView(); else render();   // same game: leave the map where you left it
+  /* a game picked up again keeps the view you left it at - but one begun from
+     the homepage is begun, even if it happens to be the game already loaded, so
+     it is fitted to the screen rather than left at whatever the last view was */
+  if(changed || !resuming) switchView(); else render();
   if(S.mode === 'flags' && !S.sel) advance();
   sizeCanvas(); placeFloaters();
   save();
