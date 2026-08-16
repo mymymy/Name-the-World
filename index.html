@@ -510,7 +510,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v34</span>
+      <span id="build" class="caps">build 6 aug · v35</span>
     </div>
   </div>
 
@@ -1367,14 +1367,19 @@ function clampView(){
   tx = Math.min(OVER_X, Math.max(2000*(1-k) - OVER_X, tx));
   ty = Math.min(OVER_Y, Math.max(1000*(1-k) - OVER_Y, ty));
 }
-/* The zoom keys belong on the map, not beside it. Where the map does not fill
-   the screen - the globe at its natural size in a wide window - they follow its
-   corner in rather than sitting out on the paper.
+/* The zoom keys go in the corner of the screen, which is the corner of the map
+   too now that a board is held over the screen rather than free to be dragged
+   off it. A board smaller than the screen - the states, the boroughs, which
+   have no plate yet - is the one case where the two differ, and there the keys
+   follow the map's corner in so they are not left out on the paper.
+
+   The globe is deliberately not treated that way. Its edge is a curve, so
+   following it means tucking the keys inside the bulge, away from the corner
+   they belong in; when the whole world is in view they stay put.
 
    Worked out from the view the map is moving to rather than measured off the
-   screen, because the scene eases into place and anything measured during that
-   is a position it is only passing through - which is how the keys ended up in
-   the middle of Africa. */
+   screen: the scene eases into place, and anything measured during that is a
+   position it is only passing through. */
 const ZOOM_PAD = 12;
 function placeZoom(){
   const el = $('#zoom'); if(!el) return;
@@ -1383,20 +1388,11 @@ function placeZoom(){
     el.style.right  = Math.max(ZOOM_PAD, r.right  - Math.min(r.right,  rt) + ZOOM_PAD) + 'px';
     el.style.bottom = Math.max(ZOOM_PAD, r.bottom - Math.min(r.bottom, bt) + ZOOM_PAD) + 'px';
   };
-  if(!m || !m.a || !m.d || S.mode === 'flags'){ set(r.right, r.bottom); return; }
-  const xOff = worldMap() ? 1000*(1-k) : tx;
-  const sx = bx => m.a*(xOff + k*bx) + m.e;
-  const sy = by => m.d*(ty + k*by) + m.f;
-  const box = boardBox();
-  if(box) return set(sx(box[2]), sy(box[3]));
-  /* the globe's edge is a curve, so its corner is not where a box would put it:
-     ask the projection where the edge is at the height of the keys */
-  const bottom = sy(1000);
-  /* sampled at the foot of the stack, where the curve has come furthest in, so
-     the lowest key clears it too */
-  const foot = Math.min(r.bottom, bottom) - ZOOM_PAD;
-  set(sx(limbX(latOfY(boardY((foot - m.f)/m.d)), 1)), bottom);
+  const box = m && m.a && m.d && boardBox();
+  if(!box) return set(r.right, r.bottom);
+  set(m.a*(tx + k*box[2]) + m.e, m.d*(ty + k*box[3]) + m.f);
 }
+
 
 /* board x under a point on screen, allowing for the centring shift */
 const boardX = sx => worldMap() ? (sx - 1000*(1-k))/k : (sx - tx)/k;
