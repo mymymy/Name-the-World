@@ -510,7 +510,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v33</span>
+      <span id="build" class="caps">build 6 aug · v34</span>
     </div>
   </div>
 
@@ -1322,6 +1322,7 @@ function applyView(){
   scene.setAttribute('transform', `translate(${x.toFixed(2)} ${ty.toFixed(2)}) scale(${k.toFixed(4)})`);
   sizeDots();
   sizeLabels();
+  placeZoom();
   if(layerLabels.classList.contains('hide') === (k >= LABEL_AT)) drawLabels();
 }
 /* The globe turns rather than slides, so there is no sideways limit - but
@@ -1341,11 +1342,62 @@ function clampWorldY(){
   const slack = 0.1 * r.height / m.d;
   ty = Math.min(hi + slack, Math.max(lo - slack, ty));
 }
+/* what a board covers, and so how far it may be moved */
+function boardBox(){
+  if(S.mode === 'counties') return plateBox || CTY_BOX;
+  if(S.mode === 'states')   return US_BOX;
+  if(S.mode === 'boroughs') return LB_BOX;
+  return null;
+}
+/* Hold a box over the screen: it may be moved about, but not off, so there is
+   never blank paper where the map should be. Smaller than the screen in either
+   direction and there is nothing to choose, so it is centred there instead. */
+function clampToBox(box){
+  const r = wrap.getBoundingClientRect(), m = svg.getScreenCTM();
+  if(!m || !m.a || !m.d) return;
+  const hiX = (r.left - m.e)/m.a - box[0]*k, loX = (r.right - m.e)/m.a - box[2]*k;
+  const hiY = (r.top - m.f)/m.d - box[1]*k,  loY = (r.bottom - m.f)/m.d - box[3]*k;
+  tx = loX > hiX ? (loX+hiX)/2 : Math.min(hiX, Math.max(loX, tx));
+  ty = loY > hiY ? (loY+hiY)/2 : Math.min(hiY, Math.max(loY, ty));
+}
 function clampView(){
   if(worldMap()) return clampWorldY();
+  const box = boardBox();
+  if(box) return clampToBox(box);
   tx = Math.min(OVER_X, Math.max(2000*(1-k) - OVER_X, tx));
   ty = Math.min(OVER_Y, Math.max(1000*(1-k) - OVER_Y, ty));
 }
+/* The zoom keys belong on the map, not beside it. Where the map does not fill
+   the screen - the globe at its natural size in a wide window - they follow its
+   corner in rather than sitting out on the paper.
+
+   Worked out from the view the map is moving to rather than measured off the
+   screen, because the scene eases into place and anything measured during that
+   is a position it is only passing through - which is how the keys ended up in
+   the middle of Africa. */
+const ZOOM_PAD = 12;
+function placeZoom(){
+  const el = $('#zoom'); if(!el) return;
+  const r = wrap.getBoundingClientRect(), m = svg.getScreenCTM();
+  const set = (rt, bt)=>{
+    el.style.right  = Math.max(ZOOM_PAD, r.right  - Math.min(r.right,  rt) + ZOOM_PAD) + 'px';
+    el.style.bottom = Math.max(ZOOM_PAD, r.bottom - Math.min(r.bottom, bt) + ZOOM_PAD) + 'px';
+  };
+  if(!m || !m.a || !m.d || S.mode === 'flags'){ set(r.right, r.bottom); return; }
+  const xOff = worldMap() ? 1000*(1-k) : tx;
+  const sx = bx => m.a*(xOff + k*bx) + m.e;
+  const sy = by => m.d*(ty + k*by) + m.f;
+  const box = boardBox();
+  if(box) return set(sx(box[2]), sy(box[3]));
+  /* the globe's edge is a curve, so its corner is not where a box would put it:
+     ask the projection where the edge is at the height of the keys */
+  const bottom = sy(1000);
+  /* sampled at the foot of the stack, where the curve has come furthest in, so
+     the lowest key clears it too */
+  const foot = Math.min(r.bottom, bottom) - ZOOM_PAD;
+  set(sx(limbX(latOfY(boardY((foot - m.f)/m.d)), 1)), bottom);
+}
+
 /* board x under a point on screen, allowing for the centring shift */
 const boardX = sx => worldMap() ? (sx - 1000*(1-k))/k : (sx - tx)/k;
 const boardY = sy => (sy - ty)/k;
@@ -1664,7 +1716,7 @@ window.addEventListener('resize', ()=>{
   unitCache = 0; if(!bits.length) sizeCanvas();
   /* the plate is cut to the screen, so a new screen means a new plate */
   if(S.mode === 'counties'){ layoutPlate(); if(!ask.classList.contains('on')) fitCurrent(); }
-  placeFloaters(); renderTally();
+  clampView(); applyView(); placeFloaters(); renderTally();
 });
 
 /* ============ the ask box ============ */
