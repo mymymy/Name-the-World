@@ -5,7 +5,7 @@
    itself is enough to make the whole game work with no connection.
 
    Bump VERSION to retire the old cache and publish a new one. */
-const VERSION = 'ntw-v10';
+const VERSION = 'ntw-v11';
 const SHELL = [
   './',
   './index.html',
