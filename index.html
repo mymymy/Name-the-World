@@ -510,7 +510,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v32</span>
+      <span id="build" class="caps">build 6 aug · v33</span>
     </div>
   </div>
 
@@ -1272,6 +1272,10 @@ function sizeDots(){
    turns now, so reaching the rest is a drag rather than a zoom out. On a screen
    wider than it is tall there is little slack to take up, and it opens whole. */
 function worldFill(){
+  /* Not in the continents game. There are only seven to find and they are the
+     whole of the map, so being able to see all of them at once is the game -
+     turning to look for Oceania is a different, worse one. */
+  if(S.mode === 'continents') return 1;
   const r = wrap.getBoundingClientRect(), u = unitPx();
   if(!u || !r.height || r.height <= r.width*0.95) return 1;
   return Math.max(1, Math.min(40, 0.97*usableBand()/(1000*u)));
