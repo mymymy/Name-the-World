@@ -510,7 +510,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v35</span>
+      <span id="build" class="caps">build 6 aug · v36</span>
     </div>
   </div>
 
@@ -1402,9 +1402,39 @@ function toView(cx, cy){
   const m = svg.getScreenCTM();
   return m ? pt.matrixTransform(m.inverse()) : {x:0,y:0};
 }
+/* How far out is worth going. Zooming out past the point where the map fills
+   most of the screen shows nothing but more paper, so that is where it stops -
+   with enough give to feel like something pulling back rather than a wall, and
+   a spring to return it when the fingers come off. */
+const ZOOM_FILL = 0.8, ZOOM_GIVE = 0.72;
+function zoomFloor(){
+  const box = BOARDS.includes(S.mode) && boardBox();
+  if(!box) return 1;                       // the globe stops at its natural size
+  const r = wrap.getBoundingClientRect(), u = unitPx();
+  if(!u || !r.width) return 1;
+  return ZOOM_FILL * Math.min(r.width/((box[2]-box[0])*u), r.height/((box[3]-box[1])*u));
+}
+let springRaf = 0, springTimer = 0;
+function springBack(delay){
+  clearTimeout(springTimer);
+  springTimer = setTimeout(()=>{
+    const lo = zoomFloor();
+    if(k >= lo - 1e-4) return;
+    cancelAnimationFrame(springRaf);
+    const from = k, t0 = performance.now(), dur = calm ? 0 : 260;
+    const step = now=>{
+      const u = dur ? Math.min(1, (now-t0)/dur) : 1;
+      k = from + (lo-from)*(1-Math.pow(1-u, 3));
+      clampView(); applyView(); placeFloaters();
+      if(u < 1) springRaf = requestAnimationFrame(step);
+    };
+    springRaf = requestAnimationFrame(step);
+  }, delay || 0);
+}
 function zoomAt(clientX, clientY, factor){
-  const nk = Math.min(40, Math.max(1, k*factor));
+  const nk = Math.min(40, Math.max(zoomFloor()*ZOOM_GIVE, k*factor));
   if(nk === k) return;
+  springBack(150);
   const v = toView(clientX, clientY);
   if(worldMap()){
     /* the globe has no sideways offset, so holding a place still under the
@@ -1489,7 +1519,7 @@ function frameOn(t, opts){
   const FILL = (opts && opts.pad) || (r.width <= 760 ? 0.82 : 0.72);   // less margin where space is scarce
   const kw = FILL * r.width / Math.max(0.5, w * unit);
   const kh = FILL * usable   / Math.max(0.5, h * unit);
-  k = Math.max(1, Math.min(40, Math.min(kw, kh)));
+  k = Math.max(zoomFloor(), Math.min(40, Math.min(kw, kh)));
 
   const cx = (b[0]+b[2])/2, cy = (b[1]+b[3])/2;
   if(m && m.a && m.d){
@@ -1579,6 +1609,7 @@ function endPointer(ev){
   if(pointers.size < 2) pinchDist = 0;
   drag = null; svg.classList.remove('dragging');
   if(coarse !== 1){ coarse = 1; turn(); }      // full detail once the map is still
+  if(!pointers.size) springBack(0);            // let go of a pinch and it pulls back
 }
 svg.addEventListener('pointerup', endPointer);
 svg.addEventListener('pointercancel', endPointer);
