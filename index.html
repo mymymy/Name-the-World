@@ -510,7 +510,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v36</span>
+      <span id="build" class="caps">build 6 aug · v37</span>
     </div>
   </div>
 
@@ -1402,11 +1402,12 @@ function toView(cx, cy){
   const m = svg.getScreenCTM();
   return m ? pt.matrixTransform(m.inverse()) : {x:0,y:0};
 }
-/* How far out is worth going. Zooming out past the point where the map fills
-   most of the screen shows nothing but more paper, so that is where it stops -
-   with enough give to feel like something pulling back rather than a wall, and
-   a spring to return it when the fingers come off. */
-const ZOOM_FILL = 0.8, ZOOM_GIVE = 0.72;
+/* How far in and out is worth going. Out past the point where the map fills
+   most of the screen shows nothing but more paper; in past forty times is more
+   magnification than the geometry has detail to fill. Both ends give before
+   they stop, and spring back when the fingers come off, so a limit reads as
+   something pulling against you rather than a wall you hit. */
+const ZOOM_FILL = 0.8, ZOOM_GIVE = 0.72, ZOOM_MAX = 40;
 function zoomFloor(){
   const box = BOARDS.includes(S.mode) && boardBox();
   if(!box) return 1;                       // the globe stops at its natural size
@@ -1419,12 +1420,13 @@ function springBack(delay){
   clearTimeout(springTimer);
   springTimer = setTimeout(()=>{
     const lo = zoomFloor();
-    if(k >= lo - 1e-4) return;
+    const to = k < lo - 1e-4 ? lo : (k > ZOOM_MAX + 1e-4 ? ZOOM_MAX : 0);
+    if(!to) return;
     cancelAnimationFrame(springRaf);
     const from = k, t0 = performance.now(), dur = calm ? 0 : 260;
     const step = now=>{
       const u = dur ? Math.min(1, (now-t0)/dur) : 1;
-      k = from + (lo-from)*(1-Math.pow(1-u, 3));
+      k = from + (to-from)*(1-Math.pow(1-u, 3));
       clampView(); applyView(); placeFloaters();
       if(u < 1) springRaf = requestAnimationFrame(step);
     };
@@ -1432,7 +1434,7 @@ function springBack(delay){
   }, delay || 0);
 }
 function zoomAt(clientX, clientY, factor){
-  const nk = Math.min(40, Math.max(zoomFloor()*ZOOM_GIVE, k*factor));
+  const nk = Math.min(ZOOM_MAX/ZOOM_GIVE, Math.max(zoomFloor()*ZOOM_GIVE, k*factor));
   if(nk === k) return;
   springBack(150);
   const v = toView(clientX, clientY);
@@ -1486,7 +1488,7 @@ function frameWorld(fr, opts){
   const FILL = (opts && opts.pad) || (r.width <= 760 ? 0.82 : 0.72);
   const kw = FILL * r.width / Math.max(0.5, w * unit);
   const kh = FILL * usable   / Math.max(0.5, h * unit);
-  k = Math.max(1, Math.min(40, Math.min(kw, kh)));
+  k = Math.max(1, Math.min(ZOOM_MAX, Math.min(kw, kh)));
 
   /* turning puts the frame's middle at board x 1000, and applyView keeps that
      in the centre of the screen, so only the vertical offset is left to set */
@@ -1519,7 +1521,7 @@ function frameOn(t, opts){
   const FILL = (opts && opts.pad) || (r.width <= 760 ? 0.82 : 0.72);   // less margin where space is scarce
   const kw = FILL * r.width / Math.max(0.5, w * unit);
   const kh = FILL * usable   / Math.max(0.5, h * unit);
-  k = Math.max(zoomFloor(), Math.min(40, Math.min(kw, kh)));
+  k = Math.max(zoomFloor(), Math.min(ZOOM_MAX, Math.min(kw, kh)));
 
   const cx = (b[0]+b[2])/2, cy = (b[1]+b[3])/2;
   if(m && m.a && m.d){
