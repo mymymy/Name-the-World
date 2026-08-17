@@ -335,7 +335,10 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
   width:36px;height:36px;line-height:1;font-size:16px;
   background:var(--panel);border:1px solid var(--ink);border-radius:999px;
   box-shadow:0 2px 6px rgba(20,26,28,.16);
+  transition:opacity .18s ease;
 }
+/* dim when there is nowhere further to go, rather than a key that does nothing */
+#zoom button:disabled{opacity:.35;box-shadow:none;cursor:default}
 #toast{
   position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:6;
   background:rgba(34,40,43,.92);color:#fff;padding:8px 14px;border-radius:999px;
@@ -510,7 +513,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v41</span>
+      <span id="build" class="caps">build 6 aug · v42</span>
     </div>
   </div>
 
@@ -1323,6 +1326,7 @@ function applyView(){
   sizeDots();
   sizeLabels();
   placeZoom();
+  syncZoomKeys();
   if(layerLabels.classList.contains('hide') === (k >= LABEL_AT)) drawLabels();
 }
 /* The globe turns rather than slides, so there is no sideways limit - but
@@ -1574,6 +1578,7 @@ function frameOn(t, opts){
 }
 function worldMap(){ return !BOARDS.includes(S.mode) && S.mode !== 'flags'; }
 function fitCurrent(){
+  keysAtK = -1;                     // a new game, or a new screen: work them out afresh
   /* a narrowed game on the world map should open on the part of it in play -
      turned so that part is in the middle, rather than cropped out of a fixed view */
   if(worldMap()){
@@ -1697,6 +1702,26 @@ function fitZoom(){
   }
   return worldFill();
 }
+/* A key that cannot do anything says so. The sums behind the limits read the
+   screen, so they are only redone when the zoom has actually moved - panning
+   does not change any of the three answers. */
+let keysAtK = -1;
+function syncZoomKeys(){
+  /* exactly, not nearly: the last frames of an ease move the zoom by less than
+     any tolerance worth naming, and those are the frames that reach the limit */
+  if(k === keysAtK) return;
+  keysAtK = k;
+  const zin = $('#zin'), zout = $('#zout'), zfit = $('#zfit');
+  if(!zin) return;
+  /* judged in proportion, not in absolute units: an ease can finish a
+     ten-thousandth short of its target, and a key that is a ten-thousandth
+     away from the limit is at the limit as far as anyone can see */
+  const fit = fitZoom(), floor = zoomFloor();
+  zin.disabled  = k >= ZOOM_MAX*0.999;
+  zout.disabled = k <= floor*1.001;
+  zfit.disabled = Math.abs(k - fit) < fit*0.005;
+}
+
 /* Fit pulls back to that zoom and no further: it does not carry you home as
    well. Where you had got to is the whole reason you are looking, and on a map
    that turns there is no home to go back to anyway. */
