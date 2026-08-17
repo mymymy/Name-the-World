@@ -513,7 +513,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v42</span>
+      <span id="build" class="caps">build 6 aug · v43</span>
     </div>
   </div>
 
@@ -912,9 +912,13 @@ const nodes = {};
 const worldPaths = [], worldDots = [];
 let lam0 = 0, coarse = 1;          // centre meridian, and detail while dragging
 function drawWorld(){
+  /* while the map is moving, snap to a grid a pixel and a half across - finer
+     than that is detail nobody can see at the speed it is going past */
+  const u = k * unitPx();
+  const q = (coarse > 1 && u) ? 1.5/u : 0;
   for(let i=0;i<worldPaths.length;i++){
     const [e,p,h] = worldPaths[i];
-    const d = e.rings.map(r=>ringPath(r, coarse)).join('');
+    const d = e.rings.map(r=>ringPath(r, q)).join('');
     p.setAttribute('d', d); h.setAttribute('d', d);
   }
   for(let i=0;i<worldDots.length;i++){
@@ -1028,10 +1032,14 @@ function walkLimb(out, from, to, side){
   const n = Math.max(2, Math.ceil(Math.abs(to-from)/(2*limbStep())));
   for(let i=1;i<=n;i++){ const la = from+(to-from)*i/n; out.push([limbX(la,side), wy(la)]); }
 }
-function ringPath(r, step){
-  /* thinning is for keeping a drag smooth, and only long rings have points to
-     spare - a small island thinned would lose its shape or vanish outright */
-  step = Math.max(1, Math.min(step, Math.floor(r.length/40)));
+/* q is a grid, in board units, that points are snapped to while the map is
+   moving. Dropping every third point instead was quicker to write and wrong:
+   two countries share a border as the same list of coordinates, but each ring
+   is walked from its own starting point, so each dropped a different third of
+   that list and the two edges no longer met - hence the sea showing through the
+   seams. Snapping is a function of the coordinate alone, so both sides of a
+   border land on the same vertices however they are walked. */
+function ringPath(r, q){
   if(r.polar){
     /* a ring round a pole never meets the side of the map: let its longitudes
        run on and close it along the pole. Start nearest the left edge, or the
@@ -1039,11 +1047,11 @@ function ringPath(r, step){
     let i0=0, best=1e9;
     for(let i=0;i<r.length;i++){ const d=wrapLon(r[i][0]-lam0); if(d<best){best=d;i0=i;} }
     const out=[]; let run=0, prev=null, laFirst=0, laLast=0;
-    for(let j=0;j<r.length;j+=step){
-      const q=r[(i0+j)%r.length], d=wrapLon(q[0]-lam0);
+    for(let j=0;j<r.length;j++){
+      const p=r[(i0+j)%r.length], d=wrapLon(p[0]-lam0);
       run = prev===null ? d : run + wrapLon(d-prev);
-      prev=d; laLast=q[1]; if(prev===d && out.length===0) laFirst=q[1];
-      out.push([wx(run,q[1]), wy(q[1])]);
+      prev=d; laLast=p[1]; if(out.length===0) laFirst=p[1];
+      out.push([wx(run,p[1]), wy(p[1])]);
     }
     /* The sweep ends where it began, a whole turn on. Close it round the back of
        the map: down one edge, across the pole - which on this projection is a
@@ -1063,22 +1071,30 @@ function ringPath(r, step){
   const n=r.length;
   let cut=false, prev=wrapLon(r[0][0]-lam0);
   const first=prev;
-  for(let i=step;i<n;i+=step){
+  for(let i=1;i<n;i++){
     const d=wrapLon(r[i][0]-lam0);
     if(Math.abs(d-prev)>180){ cut=true; break; }
     prev=d;
   }
   if(!cut && Math.abs(first-prev)>180) cut=true;
   if(!cut){
-    let out='M', m=0;
-    for(let i=0;i<n;i+=step){
+    let out='M', m=0, px=NaN, py=NaN;
+    for(let i=0;i<n;i++){
       const la=r[i][1];
-      out += (m++ ? 'L' : '') + f1(wx(wrapLon(r[i][0]-lam0), la)) + ',' + f1(wy(la));
+      let X = wx(wrapLon(r[i][0]-lam0), la), Y = wy(la);
+      if(q){
+        X = Math.round(X/q)*q; Y = Math.round(Y/q)*q;
+        if(X === px && Y === py) continue;      // still in the cell we just drew
+        px = X; py = Y;
+      }
+      out += (m++ ? 'L' : '') + f1(X) + ',' + f1(Y);
     }
     return m<3 ? '' : out+'Z';
   }
+  /* a ring cut at the antimeridian is closed along the edge of the map, where
+     there is no neighbour to disagree with, so it is left at full detail */
   const P=[];
-  for(let i=0;i<r.length;i+=step) P.push([wrapLon(r[i][0]-lam0), r[i][1]]);
+  for(let i=0;i<r.length;i++) P.push([wrapLon(r[i][0]-lam0), r[i][1]]);
   const m=P.length;
   if(m<3) return '';
   const cuts=[];
