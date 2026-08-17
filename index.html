@@ -510,7 +510,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v37</span>
+      <span id="build" class="caps">build 6 aug · v38</span>
     </div>
   </div>
 
@@ -1423,21 +1423,29 @@ function springBack(delay){
     const to = k < lo - 1e-4 ? lo : (k > ZOOM_MAX + 1e-4 ? ZOOM_MAX : 0);
     if(!to) return;
     cancelAnimationFrame(springRaf);
+    /* spring about the same point the zoom was about, so the map comes back to
+       where it was rather than somewhere else the same size */
+    const r = wrap.getBoundingClientRect();
+    const a = zoomAnchor || [];
+    const cx = Math.min(r.right, Math.max(r.left, a[0] !== undefined ? a[0] : r.left + r.width/2));
+    const cy = Math.min(r.bottom, Math.max(r.top, a[1] !== undefined ? a[1] : r.top + r.height/2));
     const from = k, t0 = performance.now(), dur = calm ? 0 : 260;
     const step = now=>{
       const u = dur ? Math.min(1, (now-t0)/dur) : 1;
-      k = from + (to-from)*(1-Math.pow(1-u, 3));
-      clampView(); applyView(); placeFloaters();
+      zoomTo(from + (to-from)*(1-Math.pow(1-u, 3)), cx, cy);
       if(u < 1) springRaf = requestAnimationFrame(step);
     };
     springRaf = requestAnimationFrame(step);
   }, delay || 0);
 }
-function zoomAt(clientX, clientY, factor){
-  const nk = Math.min(ZOOM_MAX/ZOOM_GIVE, Math.max(zoomFloor()*ZOOM_GIVE, k*factor));
+/* Change the zoom about a point on screen, holding whatever is under that point
+   still. Everything that zooms goes through here - the keys, the wheel, a pinch,
+   and the spring back from the ends - because scaling without moving the map to
+   match scales it about the corner of the board instead of about the place you
+   were looking at, which is what made the spring appear to recentre. */
+function zoomTo(nk, cx, cy){
   if(nk === k) return;
-  springBack(150);
-  const v = toView(clientX, clientY);
+  const v = toView(cx, cy);
   if(worldMap()){
     /* the globe has no sideways offset, so holding a place still under the
        fingers means turning the map back by however far zooming moved it */
@@ -1451,6 +1459,14 @@ function zoomAt(clientX, clientY, factor){
   tx = v.x - (v.x - tx) * (nk/k);
   ty = v.y - (v.y - ty) * (nk/k);
   k = nk; clampView(); applyView(); placeFloaters();
+}
+let zoomAnchor = null;                     // the point the last zoom was about
+function zoomAt(clientX, clientY, factor){
+  const nk = Math.min(ZOOM_MAX/ZOOM_GIVE, Math.max(zoomFloor()*ZOOM_GIVE, k*factor));
+  if(nk === k) return;
+  zoomAnchor = [clientX, clientY];
+  springBack(150);
+  zoomTo(nk, clientX, clientY);
 }
 let easeTimer = 0;
 function ease(){
