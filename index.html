@@ -510,7 +510,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v40</span>
+      <span id="build" class="caps">build 6 aug · v41</span>
     </div>
   </div>
 
@@ -1415,7 +1415,26 @@ function zoomFloor(){
   if(!u || !r.width) return 1;
   return ZOOM_FILL * Math.min(r.width/((box[2]-box[0])*u), r.height/((box[3]-box[1])*u));
 }
-let springRaf = 0, springTimer = 0;
+/* Run the zoom from where it is to where it is going, a frame at a time, about
+   a fixed point on screen. The keys and fit use it so the map travels rather
+   than jumps; the spring uses it to come back from a stretch. It cannot be a CSS
+   transition on the scene: on the globe every step reprojects the geometry, and
+   a transition would only interpolate the transform of paths drawn for the zoom
+   it started at. */
+let zoomRaf = 0;
+function easeZoom(to, cx, cy, ms){
+  cancelAnimationFrame(zoomRaf);
+  const from = k, dur = calm ? 0 : (ms || 260);
+  if(!dur || Math.abs(to-from) < 1e-4){ zoomTo(to, cx, cy); return; }
+  const t0 = performance.now();
+  const step = now=>{
+    const u = Math.min(1, (now-t0)/dur);
+    zoomTo(from + (to-from)*(1-Math.pow(1-u, 3)), cx, cy);
+    if(u < 1) zoomRaf = requestAnimationFrame(step);
+  };
+  zoomRaf = requestAnimationFrame(step);
+}
+let springTimer = 0;
 function springBack(delay){
   clearTimeout(springTimer);
   springTimer = setTimeout(()=>{
@@ -1426,20 +1445,13 @@ function springBack(delay){
     const lo = zoomFloor();
     const to = k < lo - 1e-4 ? lo : (k > ZOOM_MAX + 1e-4 ? ZOOM_MAX : 0);
     if(!to) return;
-    cancelAnimationFrame(springRaf);
     /* spring about the same point the zoom was about, so the map comes back to
        where it was rather than somewhere else the same size */
     const r = wrap.getBoundingClientRect();
     const a = zoomAnchor || [];
-    const cx = Math.min(r.right, Math.max(r.left, a[0] !== undefined ? a[0] : r.left + r.width/2));
-    const cy = Math.min(r.bottom, Math.max(r.top, a[1] !== undefined ? a[1] : r.top + r.height/2));
-    const from = k, t0 = performance.now(), dur = calm ? 0 : 260;
-    const step = now=>{
-      const u = dur ? Math.min(1, (now-t0)/dur) : 1;
-      zoomTo(from + (to-from)*(1-Math.pow(1-u, 3)), cx, cy);
-      if(u < 1) springRaf = requestAnimationFrame(step);
-    };
-    springRaf = requestAnimationFrame(step);
+    easeZoom(to,
+      Math.min(r.right,  Math.max(r.left, a[0] !== undefined ? a[0] : r.left + r.width/2)),
+      Math.min(r.bottom, Math.max(r.top,  a[1] !== undefined ? a[1] : r.top  + r.height/2)));
   }, delay || 0);
 }
 /* Change the zoom about a point on screen, holding whatever is under that point
@@ -1654,8 +1666,16 @@ svg.addEventListener('click', ev=>{
   const t = entryForShape(shape); if(!t) return;
   select(t.code);
 });
-$('#zin').onclick = ()=>{ const r = svg.getBoundingClientRect(); zoomAt(r.left+r.width/2, r.top+r.height/2, 1.5); };
-$('#zout').onclick = ()=>{ const r = svg.getBoundingClientRect(); zoomAt(r.left+r.width/2, r.top+r.height/2, 1/1.5); };
+/* The keys stop at the limits rather than stretching past them - there is no
+   gesture to give against, so there would be nothing to let go of. */
+function zoomStep(factor){
+  const r = wrap.getBoundingClientRect();
+  zoomAnchor = null;
+  easeZoom(Math.min(ZOOM_MAX, Math.max(zoomFloor(), k*factor)),
+           r.left + r.width/2, r.top + r.height/2);
+}
+$('#zin').onclick = ()=> zoomStep(1.6);
+$('#zout').onclick = ()=> zoomStep(1/1.6);
 /* The zoom the game opens at, whatever it happens to be looking at. */
 const CTY_PAD = 0.965;
 function fitZoom(){
@@ -1683,8 +1703,8 @@ function fitZoom(){
 $('#zfit').onclick = ()=>{
   closeAsk(); hideTip();
   const r = wrap.getBoundingClientRect();
-  ease();
-  zoomTo(fitZoom(), r.left + r.width/2, r.top + r.height/2);
+  zoomAnchor = null;
+  easeZoom(fitZoom(), r.left + r.width/2, r.top + r.height/2, 340);
   placeFloaters();
 };
 
