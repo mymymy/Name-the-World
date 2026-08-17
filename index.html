@@ -510,7 +510,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v38</span>
+      <span id="build" class="caps">build 6 aug · v39</span>
     </div>
   </div>
 
@@ -1419,6 +1419,10 @@ let springRaf = 0, springTimer = 0;
 function springBack(delay){
   clearTimeout(springTimer);
   springTimer = setTimeout(()=>{
+    /* never while the fingers are still down - a pinch that pauses at the end
+       of its travel would otherwise spring away underneath them. Letting go is
+       what releases it, and endPointer asks again then. */
+    if(pointers.size) return;
     const lo = zoomFloor();
     const to = k < lo - 1e-4 ? lo : (k > ZOOM_MAX + 1e-4 ? ZOOM_MAX : 0);
     if(!to) return;
@@ -1465,7 +1469,9 @@ function zoomAt(clientX, clientY, factor){
   const nk = Math.min(ZOOM_MAX/ZOOM_GIVE, Math.max(zoomFloor()*ZOOM_GIVE, k*factor));
   if(nk === k) return;
   zoomAnchor = [clientX, clientY];
-  springBack(150);
+  /* the wheel and the keys have no release to wait for, so they spring on a
+     pause; a pinch waits for the fingers to come off */
+  if(!pointers.size) springBack(150);
   zoomTo(nk, clientX, clientY);
 }
 let easeTimer = 0;
