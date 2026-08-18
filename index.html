@@ -513,7 +513,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v43</span>
+      <span id="build" class="caps">build 6 aug · v44</span>
     </div>
   </div>
 
@@ -1088,6 +1088,17 @@ function ringPath(r, q){
         px = X; py = Y;
       }
       out += (m++ ? 'L' : '') + f1(X) + ',' + f1(Y);
+    }
+    if(m >= 3) return out+'Z';
+    if(!q) return '';
+    /* An island smaller than a cell or two falls into one and vanishes, and an
+       island that is there when the map is still should be there when it moves.
+       Anything the grid swallows is drawn as it is instead - they are a handful
+       of points each, and having no neighbours they have no seam to keep. */
+    out='M'; m=0;
+    for(let i=0;i<n;i++){
+      const la=r[i][1];
+      out += (m++ ? 'L' : '') + f1(wx(wrapLon(r[i][0]-lam0), la)) + ',' + f1(wy(la));
     }
     return m<3 ? '' : out+'Z';
   }
