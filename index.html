@@ -513,7 +513,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v45</span>
+      <span id="build" class="caps">build 6 aug · v46</span>
     </div>
   </div>
 
@@ -914,10 +914,11 @@ let lam0 = 0, coarse = 1;          // centre meridian, and detail while dragging
 function drawWorld(){
   /* While the map is moving, snap to a grid two pixels across. The size is a
      matter of taste rather than of correctness - the seams were fixed by
-     snapping at all, not by any particular cell - and two is where the stepping
-     reads as deliberate while still saving a useful share of the frame. */
+     snapping at all, not by any particular cell - and three is where the
+     stepping reads as deliberate while still saving a useful share of the
+     frame. */
   const u = k * unitPx();
-  const q = (coarse > 1 && u) ? 2/u : 0;
+  const q = (coarse > 1 && u) ? 3/u : 0;
   for(let i=0;i<worldPaths.length;i++){
     const [e,p,h] = worldPaths[i];
     const d = e.rings.map(r=>ringPath(r, q)).join('');
