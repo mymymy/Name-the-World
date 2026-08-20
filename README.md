@@ -9,6 +9,17 @@ A map naming game. Click a country on the world map and name it.
 
 Everything — map geometry, styles, logic — is in `index.html`. No build step, no dependencies.
 
+## lab/
+
+Side experiments, not part of the game.
+
+- **`lab/stitch-atlas.html`** — the world with every vertex snapped to a grid, which
+  turns coastlines into something between pixel art and a needlework chart. Controls
+  for cell size, centre meridian, scale and palette; saves an SVG. The page also
+  explains the technique, including why snapping keeps neighbouring countries welded
+  along their shared borders where thinning by index does not. Self-contained: open
+  the file anywhere.
+
 ## Hosting
 
 Any static host will serve it. For GitHub Pages: **Settings → Pages → Deploy from a branch → `main` / root**.
