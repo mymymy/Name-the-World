@@ -513,7 +513,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v50</span>
+      <span id="build" class="caps">build 6 aug · v51</span>
     </div>
   </div>
 
@@ -1850,21 +1850,13 @@ function placeFloaters(){
     tip.style.top = (held ? Math.max(46, Math.min(r.height - 6, top.y)) : top.y) + 'px';
   }
   if(ask.classList.contains('on')){
-    const h = ask.offsetHeight || 150;
-    /* Without .below the box is translated up by its own height, so the top it
-       is given is where its bottom lands. The two cases are not the same
-       measurement and cannot share one number. */
-    const under = (bot ? bot.y : top.y) + 8;          // its top, sitting below
-    const above = (top ? top.y : bot.y) - 8;          // its bottom, sitting over
-    const room = under + h + 4 <= visibleBottom(r);
-    /* under the place if there is room for it above the keyboard, over the
-       place if not - a flip, rather than sliding up the screen away from it */
-    const below = !held || room || above - h < 8;
-    ask.classList.toggle('below', below);
+    /* Always under the place, never flipped over it and never slid up the
+       screen away from it. Room to sit there is made when the map is framed,
+       which reserves the box's own height above the keyboard before deciding
+       how much is left for the place itself. */
+    ask.classList.add('below');
     ask.style.left = (held ? edgeX(ask, x, r.width) : x) + 'px';
-    ask.style.top = (below
-      ? (held && !room ? Math.max(8, visibleBottom(r) - h - 4) : under)   // nowhere better
-      : above) + 'px';
+    ask.style.top = ((bot ? bot.y : top.y) + 8) + 'px';
   }
 }
 function trackFloaters(){
@@ -1922,6 +1914,10 @@ function openAsk(t){
   renderAskFoot();
   placeFloaters();
   find.focus({preventScroll:true});
+  /* Framed after the focus, not before it. Until the input has focus there is
+     no keyboard to allow for, so framing first put the place in the middle of
+     the whole screen and left nowhere underneath it for the box to go. */
+  frameOn(t, {forAsk:true});
   requestAnimationFrame(placeFloaters);
 }
 function closeAsk(){
@@ -2109,7 +2105,9 @@ function select(code){
   const a = S.ans[code];
   const settled = a && judged(code) && (a.ok || a.told);
   paintMap();
-  frameOn(t, {forAsk: !settled});
+  /* an answered place is framed here; one still to name is framed by openAsk,
+     which does it once the input has focus and the keyboard is accounted for */
+  if(settled) frameOn(t, {forAsk:false});
 
   if(a && judged(code) && a.ok){          // already right - just say so
     closeAsk();
