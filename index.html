@@ -513,7 +513,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v48</span>
+      <span id="build" class="caps">build 6 aug · v49</span>
     </div>
   </div>
 
@@ -1523,6 +1523,13 @@ function ease(){
   clearTimeout(easeTimer);
   easeTimer = setTimeout(()=>scene.classList.remove('ease'), 420);
 }
+/* How much of the screen a place being asked about may fill. Filling it leaves
+   nowhere for the eye to put the thing: you want the shape, and enough round it
+   to know where it is. Fitting a whole board or a continent asks for its own
+   share and passes one in. */
+const TARGET_FILL = 0.55;
+const BOARD_PAD = 0.9;      // fitting the whole of a board is a different request
+
 /* The zoom at which something w by h board units across fills the screen, less
    whatever fraction is asked for as margin. Three places need this answer - the
    two that frame a place, and the fit key, which needs the number without the
@@ -1559,7 +1566,7 @@ function frameWorld(fr, opts){
   if(!(opts && opts.fill) && (w > 900 || h > 500)){
     k = 1; ty = 0; turnTo(fr[0], true); ease(); applyView(); return;
   }
-  const FILL = (opts && opts.pad) || (r.width <= 760 ? 0.82 : 0.72);
+  const FILL = (opts && opts.pad) || TARGET_FILL;
   k = Math.max(1, Math.min(ZOOM_MAX, zoomForSize(w, h, FILL, opts)));
 
   /* turning puts the frame's middle at board x 1000, and applyView keeps that
@@ -1589,7 +1596,7 @@ function frameOn(t, opts){
 
   /* sized against real screen pixels, not viewBox units - on a tall phone the
      viewBox is a fraction of the element and the old sum zoomed far too little */
-  const FILL = (opts && opts.pad) || (r.width <= 760 ? 0.82 : 0.72);   // less margin where space is scarce
+  const FILL = (opts && opts.pad) || TARGET_FILL;
   k = Math.max(zoomFloor(), Math.min(ZOOM_MAX, zoomForSize(w, h, FILL, opts)));
 
   const cx = (b[0]+b[2])/2, cy = (b[1]+b[3])/2;
@@ -1624,9 +1631,9 @@ function fitCurrent(){
     layoutPlate();
     frameOn({mb:plateBox || CTY_BOX}, {fill:true, pad:CTY_PAD});
   } else if(S.mode === 'states'){
-    frameOn({mb:US_BOX}, {fill:true});
+    frameOn({mb:US_BOX}, {fill:true, pad:BOARD_PAD});
   } else if(S.mode === 'boroughs'){
-    frameOn({mb:LB_BOX}, {fill:true});
+    frameOn({mb:LB_BOX}, {fill:true, pad:BOARD_PAD});
   } else { k=1; tx=0; ty=0; ease(); applyView(); }
   placeFloaters();
 }
@@ -1711,7 +1718,7 @@ function fitZoom(){
   const r = wrap.getBoundingClientRect();
   const box = boardBox();
   if(box){
-    const pad = S.mode === 'counties' ? CTY_PAD : (r.width <= 760 ? 0.82 : 0.72);
+    const pad = S.mode === 'counties' ? CTY_PAD : BOARD_PAD;
     return Math.max(zoomFloor(), Math.min(ZOOM_MAX,
       zoomForSize(box[2]-box[0], box[3]-box[1], pad)));
   }
@@ -1784,12 +1791,19 @@ function screenPoint(x, y){
 let lastInset = 0;
 const IOS = /iP(hone|od|ad)/.test(navigator.userAgent) ||
             (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const TOUCH = (navigator.maxTouchPoints || 0) > 0;
 const ACCESSORY = 64;   // iOS floats a form bar above the keyboard and no viewport API reports it
 
 /* screen y where the keyboard - and anything iOS stacks on top of it - begins */
 function kbTop(){
+  const full = window.innerHeight;
   const vv = window.visualViewport;
-  let limit = vv ? Math.min(vv.offsetTop + vv.height, window.innerHeight) : window.innerHeight;
+  let limit = vv ? Math.min(vv.offsetTop + vv.height, full) : full;
+  /* Nothing has shrunk, yet the input has focus on a device that types with a
+     keyboard on the glass. Some hosts never report one - a page inside a frame
+     on iOS is the usual case - and taking their word for it puts the box under
+     it. Assume the usual share of the screen instead, form bar included. */
+  if(TOUCH && document.activeElement === find && limit > full - 40) return full * 0.55;
   /* some browsers shrink the page for the keyboard, others only the visual viewport -
      either way iOS floats its form bar on top, so reserve for it whenever we ask for input */
   if(IOS && ask.classList.contains('on')) limit -= ACCESSORY;
