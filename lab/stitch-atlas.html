@@ -105,7 +105,8 @@ hr{border:0;border-top:1px solid var(--edge);margin:6px 0}
     </div>
     <hr>
     <div class="row">
-      <button id="save">Save SVG</button>
+      <button id="svg">Save SVG</button>
+      <button id="png">Save PNG</button>
       <button id="copy">Copy SVG</button>
     </div>
     <p class="note" style="font-size:12px;margin:0" id="savenote"></p>
@@ -198,6 +199,9 @@ hr{border:0;border-top:1px solid var(--edge);margin:6px 0}
   <p>Self-contained: the world outlines are embedded as longitude and latitude, delta
      encoded to hundredths of a degree, and projected with Natural&nbsp;Earth. Save the
      file and open it anywhere &mdash; no network, no build.</p>
+  <p class="note">Saved straight from the browser when the file is opened directly. In a
+     hosted viewer the host does the saving and may decline a type, which is why PNG is
+     offered beside SVG rather than only SVG.</p>
   <p class="note">Geometry from Natural Earth via the Name the World map data. Public
      domain.</p>
 </section>
@@ -422,23 +426,61 @@ const svgText = ()=>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`
   + svg.innerHTML + '</svg>';
 
-$('#save').onclick = ()=>{
-  const blob = new Blob([svgText()], {type:'image/svg+xml'});
+/* Two ways to hand over a file, because there are two ways to open this page.
+   Opened as a plain file, the browser saves it itself. Opened in the artifact
+   viewer, only the host may save, and SVG is a type it can decline - so PNG is
+   there as the always-allowed alternative rather than a dead button. */
+const HOSTED = !!(window.claude && typeof window.claude.use === 'function');
+const note = $('#savenote');
+async function offer(filename, data, mime, btn, label){
+  btn.textContent = 'Saving…';
+  const done = (msg, ms=1800)=>{ btn.textContent = msg; setTimeout(()=>btn.textContent = label, ms); };
+  if(HOSTED){
+    const dl = await window.claude.use('downloads');
+    if(!dl){ done('Unavailable'); note.textContent = 'Saving is not available in this view. Use Copy SVG.'; return; }
+    try{ await dl.save({filename, data}); done('Saved'); note.textContent = ''; }
+    catch(err){
+      const code = (err && err.code) || 'unavailable';
+      done(code === 'declined' ? 'Cancelled' : 'Blocked');
+      note.textContent =
+        code === 'extension_not_enabled' ? 'SVG is not enabled for this view — Save PNG works.' :
+        code === 'declined'              ? '' :
+        code === 'too_large'             ? 'Too big to save. Try a smaller scale.' :
+                                           'Saving was blocked. Use Copy SVG instead.';
+    }
+    return;
+  }
+  const blob = data instanceof Blob ? data : new Blob([data], {type:mime});
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `stitch-atlas-${cell}px-${lam0}.svg`;
+  a.href = URL.createObjectURL(blob); a.download = filename;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  done('Saved');
+}
+const stem = ()=> `stitch-atlas-${cell}px-${lam0}`;
+
+$('#svg').onclick = ()=> offer(stem()+'.svg', svgText(), 'image/svg+xml', $('#svg'), 'Save SVG');
+
+$('#png').onclick = ()=>{
+  const btn = $('#png');
+  btn.textContent = 'Rendering…';
+  const SCALE = 2;
+  const img = new Image();
+  img.onload = ()=>{
+    const c = document.createElement('canvas');
+    c.width = W*SCALE; c.height = H*SCALE;
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    c.toBlob(b => offer(stem()+'.png', b, 'image/png', btn, 'Save PNG'), 'image/png');
+  };
+  img.onerror = ()=>{ btn.textContent = 'Failed'; setTimeout(()=>btn.textContent='Save PNG', 1800); };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgText());
 };
+
 $('#copy').onclick = async ()=>{
   try{ await navigator.clipboard.writeText(svgText()); $('#copy').textContent = 'Copied'; }
   catch(e){ $('#copy').textContent = 'Copy blocked'; }
   setTimeout(()=>$('#copy').textContent = 'Copy SVG', 1600);
 };
-/* saving is blocked inside a sandboxed viewer; say so rather than fail quietly */
-if(window.self !== window.top){
-  $('#savenote').textContent = 'Saving works when this file is opened directly. In an embedded viewer, use Copy SVG.';
-}
 
 draw();
 </script>
