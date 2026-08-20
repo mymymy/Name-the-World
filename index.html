@@ -513,7 +513,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v49</span>
+      <span id="build" class="caps">build 6 aug · v50</span>
     </div>
   </div>
 
@@ -1827,25 +1827,44 @@ function edgeX(el, x, w){
   if(half*2 + 16 >= w) return w/2;      // too wide to fit either way - centre it
   return Math.max(half + 8, Math.min(w - half - 8, x));
 }
+/* The box hangs off the place it is asking about, and travels with it. Nudging
+   it back on screen is right while that place is on screen too - a country at
+   the edge should not have half the box over the side - but once the map has
+   been panned far enough to carry the place away, holding the box back leaves
+   it pointing at nothing. So the nudge only applies while the anchor is in
+   view; past that the box goes where the anchor went. */
+function onScreen(p, r){
+  return p && p.x > -40 && p.x < r.width + 40 && p.y > -60 && p.y < r.height + 60;
+}
 function placeFloaters(){
   if(!anchorTarget) return;
   const a = anchorFor(anchorTarget); if(!a) return;
   const r = wrap.getBoundingClientRect();
   const top = screenPoint(a.x, a.top), bot = screenPoint(a.x, a.bottom);
   if(!top) return;
-  const x = Math.max(12, Math.min(r.width - 12, top.x));
+  const held = onScreen(top, r) || onScreen(bot, r);
+  const x = held ? Math.max(12, Math.min(r.width - 12, top.x)) : top.x;
 
   if(tip.classList.contains('on')){
-    tip.style.left = edgeX(tip, x, r.width) + 'px';
-    tip.style.top = Math.max(46, Math.min(r.height - 6, top.y)) + 'px';
+    tip.style.left = (held ? edgeX(tip, x, r.width) : x) + 'px';
+    tip.style.top = (held ? Math.max(46, Math.min(r.height - 6, top.y)) : top.y) + 'px';
   }
   if(ask.classList.contains('on')){
     const h = ask.offsetHeight || 150;
-    const maxY = visibleBottom(r);
-    const y = Math.max(8, Math.min((bot ? bot.y : top.y) + 8, maxY - h - 4));
-    ask.classList.add('below');
-    ask.style.left = edgeX(ask, x, r.width) + 'px';
-    ask.style.top = y + 'px';
+    /* Without .below the box is translated up by its own height, so the top it
+       is given is where its bottom lands. The two cases are not the same
+       measurement and cannot share one number. */
+    const under = (bot ? bot.y : top.y) + 8;          // its top, sitting below
+    const above = (top ? top.y : bot.y) - 8;          // its bottom, sitting over
+    const room = under + h + 4 <= visibleBottom(r);
+    /* under the place if there is room for it above the keyboard, over the
+       place if not - a flip, rather than sliding up the screen away from it */
+    const below = !held || room || above - h < 8;
+    ask.classList.toggle('below', below);
+    ask.style.left = (held ? edgeX(ask, x, r.width) : x) + 'px';
+    ask.style.top = (below
+      ? (held && !room ? Math.max(8, visibleBottom(r) - h - 4) : under)   // nowhere better
+      : above) + 'px';
   }
 }
 function trackFloaters(){
@@ -1855,7 +1874,11 @@ function trackFloaters(){
 }
 function startTracking(t){
   anchorTarget = t;
-  if(!floatRaf) trackFloaters();
+  /* Next frame, not this one. Both callers turn their panel on immediately
+     after calling here, so running the loop's first pass now finds nothing
+     showing, stops, and never starts again - which is why the box would sit
+     wherever it was last put and not follow the map. */
+  if(!floatRaf) floatRaf = requestAnimationFrame(trackFloaters);
 }
 function showTip(t, kind, text){
   startTracking(t);
