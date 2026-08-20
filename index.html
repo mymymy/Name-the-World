@@ -513,7 +513,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v47</span>
+      <span id="build" class="caps">build 6 aug · v48</span>
     </div>
   </div>
 
@@ -910,19 +910,15 @@ const scene = $('#scene'), svg = $('#map'), wrap = $('#mapwrap');
 let k=1, tx=0, ty=0;
 const nodes = {};
 const worldPaths = [], worldDots = [];
-let lam0 = 0, coarse = 1;          // centre meridian, and detail while dragging
+let lam0 = 0;                      // the meridian the map is turned to
 function drawWorld(){
-  /* While the map is moving, snap to a grid two pixels across. The size is a
-     matter of taste rather than of correctness - the seams were fixed by
-     snapping at all, not by any particular cell. A pixel and a half is a
-     shimmer you notice and then stop noticing, which is what a map you are
-     trying to read wants; the size where it becomes a pattern in its own right
-     is a fine thing but a distraction here. */
-  const u = k * unitPx();
-  const q = (coarse > 1 && u) ? 1.5/u : 0;
+  /* Full detail whether the map is still or moving. ringPath will snap its
+     points to a grid if given one, which is quicker and gives the coastlines a
+     stepped, stitched look while they travel; lab/stitch-atlas.html is built
+     round that. Here it is off - the map is for reading. */
   for(let i=0;i<worldPaths.length;i++){
     const [e,p,h] = worldPaths[i];
-    const d = e.rings.map(r=>ringPath(r, q)).join('');
+    const d = e.rings.map(r=>ringPath(r, 0)).join('');
     p.setAttribute('d', d); h.setAttribute('d', d);
   }
   for(let i=0;i<worldDots.length;i++){
@@ -945,16 +941,15 @@ function turnTo(target, animate){
   target = lam0 + wrapLon(target - lam0);         // turn the short way round
   cancelAnimationFrame(turnRaf); turnRaf = 0;
   if(!animate || calm || Math.abs(target-lam0) < 0.5){
-    lam0 = wrapLon(target); coarse = 1; turn(); return;
+    lam0 = wrapLon(target); turn(); return;
   }
   const from = lam0, t0 = performance.now(), dur = 420;
-  coarse = 3;                                     // detail costs frames mid-turn
   const step = now=>{
     const u = Math.min(1, (now-t0)/dur);
     const e = u<0.5 ? 2*u*u : 1-Math.pow(-2*u+2,2)/2;
     lam0 = wrapLon(from + (target-from)*e);
     if(u<1){ turn(); turnRaf = requestAnimationFrame(step); }
-    else { coarse = 1; turn(); }
+    else turn();
   };
   turnRaf = requestAnimationFrame(step);
 }
@@ -1672,7 +1667,6 @@ svg.addEventListener('pointermove', ev=>{
   if(Math.abs(dx) > 6 || Math.abs(dy) > 6) moved = true;
   ty = drag.ty + dy;
   if(worldMap()){
-    coarse = 3;      // detail can wait until the map is still again
     /* dragging east turns the map west, and it never runs out: the world just
        keeps coming round, so there is no edge to be stopped at */
     lam0 = wrapLon(drag.lam0 - (dx/k)/drag.scale);
@@ -1685,7 +1679,6 @@ function endPointer(ev){
   pointers.delete(ev.pointerId);
   if(pointers.size < 2) pinchDist = 0;
   drag = null; svg.classList.remove('dragging');
-  if(coarse !== 1){ coarse = 1; turn(); }      // full detail once the map is still
   if(!pointers.size) springBack(0);            // let go of a pinch and it pulls back
 }
 svg.addEventListener('pointerup', endPointer);
