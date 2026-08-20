@@ -513,7 +513,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v51</span>
+      <span id="build" class="caps">build 6 aug · v52</span>
     </div>
   </div>
 
@@ -1358,18 +1358,28 @@ function applyView(){
 /* The globe turns rather than slides, so there is no sideways limit - but
    there is still a top and a bottom, and no reason to show empty sea past
    either when the map is big enough to fill the screen. */
+/* Where the screen effectively ends for the map. While the box is up, the
+   keyboard covers the bottom of the screen and the box covers what is left
+   above it, so the map only has to reach the top of the box - and holding it to
+   the whole height instead is what stopped a place at the foot of the map, like
+   Cornwall, from being brought up above the keyboard at all. */
+function viewBottom(){
+  const r = wrap.getBoundingClientRect();
+  if(!ask.classList.contains('on')) return r.bottom;
+  return Math.min(r.bottom, kbTop() - (ask.offsetHeight || 150) - 16);
+}
 function clampWorldY(){
   const r = wrap.getBoundingClientRect(), m = svg.getScreenCTM();
   if(!m || !m.d) return;
   const hi = (r.top - m.f)/m.d;                     // viewBox y at the top of the map area
-  const lo = (r.bottom - m.f)/m.d - 1000*k;         // ... and what the bottom edge allows
+  const lo = (viewBottom() - m.f)/m.d - 1000*k;     // ... and what the bottom edge allows
   /* Whether the map fits has to be asked of the real bounds. Asking it of the
      slackened ones says a map slightly shorter than the screen does not fit,
      and pins it to one end instead of centring it. */
   if(lo > hi){ ty = (lo+hi)/2; return; }
   /* a little give, so a frame that is wide and shallow - Europe on a phone -
      is not shoved hard against the top of the screen */
-  const slack = 0.1 * r.height / m.d;
+  const slack = 0.1 * (viewBottom() - r.top) / m.d;
   ty = Math.min(hi + slack, Math.max(lo - slack, ty));
 }
 /* what a board covers, and so how far it may be moved */
@@ -1386,7 +1396,7 @@ function clampToBox(box){
   const r = wrap.getBoundingClientRect(), m = svg.getScreenCTM();
   if(!m || !m.a || !m.d) return;
   const hiX = (r.left - m.e)/m.a - box[0]*k, loX = (r.right - m.e)/m.a - box[2]*k;
-  const hiY = (r.top - m.f)/m.d - box[1]*k,  loY = (r.bottom - m.f)/m.d - box[3]*k;
+  const hiY = (r.top - m.f)/m.d - box[1]*k,  loY = (viewBottom() - m.f)/m.d - box[3]*k;
   tx = loX > hiX ? (loX+hiX)/2 : Math.min(hiX, Math.max(loX, tx));
   ty = loY > hiY ? (loY+hiY)/2 : Math.min(hiY, Math.max(loY, ty));
 }
@@ -1562,9 +1572,12 @@ function frameWorld(fr, opts){
   const usable = usableBand(opts);
   const [w, h] = frameSize(fr);
 
-  /* anything this big is best seen whole, turned so it sits in the middle */
+  /* anything this big is best seen whole, turned so it sits in the middle -
+     but still within whatever band is going spare, so the box has somewhere */
   if(!(opts && opts.fill) && (w > 900 || h > 500)){
-    k = 1; ty = 0; turnTo(fr[0], true); ease(); applyView(); return;
+    k = 1;
+    ty = (m && m.d) ? ((r.top + usable/2) - m.f)/m.d - 500 : 0;
+    clampView(); turnTo(fr[0], true); ease(); applyView(); return;
   }
   const FILL = (opts && opts.pad) || TARGET_FILL;
   k = Math.max(1, Math.min(ZOOM_MAX, zoomForSize(w, h, FILL, opts)));
@@ -1923,6 +1936,8 @@ function openAsk(t){
 function closeAsk(){
   ask.classList.remove('on');
   find.blur();
+  /* the screen is the whole screen again, so the map has to cover it again */
+  clampView(); applyView(); placeFloaters();
 }
 function renderAskFoot(){
   const t = S.sel && BY_CODE[S.sel];
