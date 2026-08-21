@@ -519,7 +519,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v57</span>
+      <span id="build" class="caps">build 6 aug · v58</span>
     </div>
   </div>
 
@@ -1363,9 +1363,28 @@ function paintMap(){
   syncSelRing();
   drawLabels();
 }
+/* A marker on a country too small to make out is an aid, not the thing being
+   asked about. It should hold its size on screen however far in you go, and
+   give way once the country is big enough to be seen on its own - otherwise
+   it ends up a blob sitting on the island it was there to point at. The old
+   sum did neither: it held its screen size only up to about twice the natural
+   zoom, and grew with the map after that, reaching fifteen pixels across at
+   the far end while Cyprus underneath it was ninety.
+   A city in the capitals game is the thing being asked about, so its dot
+   stays whatever the zoom, and so does a place held as a point with no shape
+   to fall back on. */
+const DOT_PX = 3.6;                          // radius on screen, in pixels
 function sizeDots(){
-  const r = Math.max(1.8, 4/k);
-  scene.querySelectorAll('circle.dot').forEach(c=>c.setAttribute('r', r));
+  const u = k * unitPx();                    // one board unit, in screen pixels
+  if(!u) return;
+  const r = (DOT_PX/u).toFixed(2);
+  scene.querySelectorAll('circle.dot').forEach(c=>{
+    c.setAttribute('r', r);
+    const e = BY_CODE[c.dataset.code];
+    if(!e || e.isCap || e.point || !e.px) return;
+    const w = Math.sqrt(e.px) * u;           // roughly how wide the country is on screen
+    c.style.opacity = Math.min(1, Math.max(0, (DOT_PX*7 - w)/(DOT_PX*4)));
+  });
 }
 
 /* On a screen taller than it is wide, the globe at its natural size is a narrow
