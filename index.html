@@ -260,6 +260,12 @@ path.c.right{fill:var(--tint,var(--right))}
 path.c.told{fill:var(--told)}
 path.c.miss{fill:var(--miss)}
 path.c.sel{stroke:var(--live);stroke-width:2.6;stroke-opacity:1}
+/* The same outline again, over every other shape. A stroke straddles the line
+   it is drawn on, so half of it lies on the neighbour's side - and a neighbour
+   drawn later paints over that half, leaving the border looking half as thick
+   as the coast. Drawn last, it cannot be covered by anything. */
+#selring{fill:none;stroke:var(--live);stroke-width:2.6;stroke-opacity:1;
+  stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none}
 circle.dot{fill:#B9B4A6;stroke:#6E7269;stroke-width:.5;cursor:pointer;vector-effect:non-scaling-stroke}
 circle.dot.out{fill:#DEDCD3;stroke:#B2B6AD;pointer-events:none}
 circle.dot.named{fill:var(--tint,var(--named))}
@@ -513,7 +519,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v52</span>
+      <span id="build" class="caps">build 6 aug · v53</span>
     </div>
   </div>
 
@@ -537,6 +543,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
           </g>
           <g id="states"></g>
           <g id="boroughs"></g>
+          <path id="selring"></path>
           <g id="labels" class="hide"></g>
         </g>
       </svg>
@@ -920,6 +927,7 @@ function drawWorld(){
     const [e,p,h] = worldPaths[i];
     const d = e.rings.map(r=>ringPath(r, 0)).join('');
     p.setAttribute('d', d); h.setAttribute('d', d);
+    if(e.code === S.sel) setSelRing(d);      // it moves with the map like the rest
   }
   for(let i=0;i<worldDots.length;i++){
     const [e,c] = worldDots[i];
@@ -1145,6 +1153,14 @@ function drawGraticule(){
   }
   gratPath.setAttribute('d', d);
 }
+const selRing = $('#selring');
+const setSelRing = d => selRing.setAttribute('d', d || '');
+/* the selected shape's own outline, copied out so it can be drawn on top */
+function syncSelRing(){
+  if(!S.sel) return setSelRing('');
+  const el = scene.querySelector(`path.c[data-code="${S.sel}"]`);
+  setSelRing(el && el.getAttribute('d'));
+}
 const layerCounties = $('#counties'), layerStates = $('#states'), layerBoroughs = $('#boroughs');
 function buildMap(){
   /* the graticule is generated rather than stored, so it turns with the map */
@@ -1287,6 +1303,7 @@ function paintMap(){
     }
   }
   sizeDots();
+  syncSelRing();
   drawLabels();
 }
 function sizeDots(){
