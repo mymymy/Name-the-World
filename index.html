@@ -519,7 +519,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v56</span>
+      <span id="build" class="caps">build 6 aug · v57</span>
     </div>
   </div>
 
@@ -926,7 +926,17 @@ function drawWorld(){
   const win = viewWindow();
   for(let i=0;i<worldPaths.length;i++){
     const [e,p,h] = worldPaths[i];
-    if(win && !onScreenBox(e.box, win)) continue;
+    if(win && !onScreenBox(e.box, win)){
+      /* Cleared, not just skipped. What a shape holds was projected for the
+         meridian it was last drawn at; leave it there while the map turns away
+         and it stops being off the edge and starts being a ghost of a country
+         sitting somewhere it is not. */
+      if(p.hasAttribute('d')){
+        p.removeAttribute('d'); h.removeAttribute('d');
+        if(e.code === S.sel) setSelRing('');
+      }
+      continue;
+    }
     const d = e.rings.map(r=>ringPath(r, 0)).join('');
     p.setAttribute('d', d); h.setAttribute('d', d);
     if(e.code === S.sel) setSelRing(d);      // it moves with the map like the rest
