@@ -519,7 +519,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v54</span>
+      <span id="build" class="caps">build 6 aug · v55</span>
     </div>
   </div>
 
@@ -923,8 +923,10 @@ function drawWorld(){
      points to a grid if given one, which is quicker and gives the coastlines a
      stepped, stitched look while they travel; lab/stitch-atlas.html is built
      round that. Here it is off - the map is for reading. */
+  const win = viewWindow();
   for(let i=0;i<worldPaths.length;i++){
     const [e,p,h] = worldPaths[i];
+    if(win && !onScreenBox(e.box, win)) continue;
     const d = e.rings.map(r=>ringPath(r, 0)).join('');
     p.setAttribute('d', d); h.setAttribute('d', d);
     if(e.code === S.sel) setSelRing(d);      // it moves with the map like the rest
@@ -999,6 +1001,50 @@ function latOfY(y){
   let lo=-Math.PI/2, hi=Math.PI/2;
   for(let i=0;i<36;i++){ const m=(lo+hi)/2; if(nfy(m)<t) lo=m; else hi=m; }
   return ((lo+hi)/2)/RAD;
+}
+/* The longitude and latitude a shape covers, worked out once when it is built.
+   A shape that straddles the 180th meridian comes out spanning the world; there
+   are only a handful, and saying "always on screen" of them is harmless. */
+function lonLatBox(rings){
+  let lo = 180, hi = -180, la = 90, lb = -90;
+  for(const r of rings) for(const [x,y] of r){
+    if(x < lo) lo = x; if(x > hi) hi = x;
+    if(y < la) la = y; if(y > lb) lb = y;
+  }
+  return [lo, hi, la, lb];
+}
+/* How much of the globe the screen is showing: half its width across the board,
+   and the band of latitude it covers. Turning the map reprojects every ring,
+   and past its natural size most of them are nowhere near the screen - so this
+   says which are worth the work. Null means look at all of them. */
+function viewWindow(){
+  if(k <= 1.05) return null;                // the whole map is on screen anyway
+  /* Only safe while the map is being moved a frame at a time, when what is on
+     screen is what k says. A CSS transition on the scene shows a scale the
+     script has already moved past, so a shape the window has written off may
+     still be in view - and would sit there with the geometry it had before. */
+  if(scene.classList.contains('ease')) return null;
+  const r = wrap.getBoundingClientRect(), m = svg.getScreenCTM();
+  if(!m || !m.a || !m.d) return null;
+  const vx = sx => (sx - m.e)/m.a, vy = sy => (sy - m.f)/m.d;
+  return [Math.abs(boardX(vx(r.right)) - boardX(vx(r.left)))/2 + 24,   // room for the halo
+          latOfY(boardY(vy(r.bottom))) - 2,
+          latOfY(boardY(vy(r.top   ))) + 2];
+}
+/* Is any of this shape inside that window? Longitude is asked relative to the
+   centre meridian, so a place on the 180th is judged the same as one on the
+   Greenwich meridian - and it is asked in board units rather than in degrees,
+   because a degree is worth less of the board towards the poles. Measuring it
+   at the shape's own furthest latitude, where its own meridians are closest
+   together, keeps the answer on the safe side. */
+function onScreenBox(box, win){
+  if(!box) return true;
+  if(box[3] < win[1] || box[2] > win[2]) return false;
+  if(box[1] - box[0] >= 180) return true;             // straddles the cut
+  const c = wrapLon((box[0] + box[1])/2 - lam0);
+  const near = Math.max(0, Math.abs(c) - (box[1] - box[0])/2);
+  const lat = Math.max(Math.abs(box[2]), Math.abs(box[3]));
+  return near * PS*RAD*nl(lat*RAD) <= win[0];
 }
 function decodeRing(str){
   const out=[]; let x=0, y=0;
@@ -1170,6 +1216,7 @@ function buildMap(){
   const land = document.createDocumentFragment(), halo = document.createDocumentFragment();
   DATA.filter(e=>e.g).forEach(e=>{
     e.rings = e.g.map(decodeRing);
+    e.box = lonLatBox(e.rings);
     const p = document.createElementNS(NS,'path');
     p.setAttribute('class','c'); p.dataset.code = e.code;
     land.appendChild(p); (nodes[e.code] = nodes[e.code]||[]).push(p);
