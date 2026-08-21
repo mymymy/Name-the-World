@@ -519,7 +519,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v59</span>
+      <span id="build" class="caps">build 6 aug · v60</span>
     </div>
   </div>
 
@@ -1104,28 +1104,43 @@ function walkLimb(out, from, to, side){
    border land on the same vertices however they are walked. */
 function ringPath(r, q){
   if(r.polar){
-    /* a ring round a pole never meets the side of the map: let its longitudes
-       run on and close it along the pole. Start nearest the left edge, or the
-       sweep begins mid-map and runs off the side. */
-    let i0=0, best=1e9;
-    for(let i=0;i<r.length;i++){ const d=wrapLon(r[i][0]-lam0); if(d<best){best=d;i0=i;} }
-    const out=[]; let run=0, prev=null, laFirst=0, laLast=0;
-    for(let j=0;j<r.length;j++){
-      const p=r[(i0+j)%r.length], d=wrapLon(p[0]-lam0);
-      run = prev===null ? d : run + wrapLon(d-prev);
-      prev=d; laLast=p[1]; if(out.length===0) laFirst=p[1];
-      out.push([wx(run,p[1]), wy(p[1])]);
+    /* A ring round a pole is the one shape that has no outside edge: it wraps
+       the map rather than sitting on it. It used to be drawn by letting its
+       longitudes run on for a whole turn and closing along the pole, which
+       assumes the coast marches steadily one way round. Antarctica's does not.
+       Its ring winds 361 degrees, not 360 - the peninsula doubles back, and the
+       coast crosses the far meridian five times, not once. Every point after
+       the last of those got carried a full turn past the edge it belonged to,
+       and out of the frame. Which edge, and how far, changed as the map turned,
+       so it came and went while panning.
+       So cut it where it actually crosses, every time. Between crossings the
+       coast is inside the map and drawn as it is; at each one the path drops
+       down that edge to the pole - a line on this projection, not a point -
+       runs across, and climbs the far edge to the same latitude, which is
+       exactly where the coast picks up again. */
+    const n = r.length, d = new Array(n);
+    for(let i=0;i<n;i++) d[i] = wrapLon(r[i][0]-lam0);
+    let s = -1;
+    for(let i=0;i<n;i++) if(Math.abs(d[(i+1)%n]-d[i]) > 180){ s = (i+1)%n; break; }
+    if(s >= 0){
+      const pole = r.south===false ? 90 : -90;
+      const p0 = (s-1+n)%n;
+      const laIn = crossLat([d[p0], r[p0][1]], [d[s], r[s][1]]);
+      const out = [[limbX(laIn, d[p0] > 0 ? -1 : 1), wy(laIn)]];
+      for(let j=0;j<n;j++){
+        const i = (s+j)%n, i2 = (s+j+1)%n;
+        out.push([wx(d[i], r[i][1]), wy(r[i][1])]);
+        if(Math.abs(d[i2]-d[i]) > 180){
+          const la = crossLat([d[i], r[i][1]], [d[i2], r[i2][1]]);
+          const e = d[i] > 0 ? 1 : -1;        // the edge it leaves by
+          out.push([limbX(la, e), wy(la)]);
+          walkLimb(out, la, pole, e);
+          out.push([limbX(pole, -e), wy(pole)]);
+          walkLimb(out, pole, la, -e);
+        }
+      }
+      return dstr(out);
     }
-    /* The sweep ends where it began, a whole turn on. Close it round the back of
-       the map: down one edge, across the pole - which on this projection is a
-       line, not a point - and up the other. Closing straight across instead
-       would spill the fill out past the edge of the world. */
-    const pole = r.south===false ? 90 : -90;
-    const dir = out.length>1 && out[out.length-1][0]>=out[0][0] ? 1 : -1;
-    walkLimb(out, laLast, pole, dir);
-    out.push([limbX(pole,-dir), wy(pole)]);
-    walkLimb(out, pole, laFirst, -dir);
-    return dstr(out);
   }
   /* Almost every ring is nowhere near the antimeridian, and those are worth
      writing straight out: no arrays, one pass, which is most of the difference
