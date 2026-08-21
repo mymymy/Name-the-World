@@ -519,7 +519,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v53</span>
+      <span id="build" class="caps">build 6 aug · v54</span>
     </div>
   </div>
 
@@ -1491,6 +1491,65 @@ function easeZoom(to, cx, cy, ms){
   };
   zoomRaf = requestAnimationFrame(step);
 }
+/* Moving from one place to the next means changing the zoom, the offset and,
+   on the globe, the meridian - and the eye reads them as one movement, so they
+   have to be driven off one clock. Left to a CSS transition for the zoom and a
+   script loop for the turn, as this was, the two run to their own durations and
+   their own easings: the scale lands about a tenth of a second before the turn
+   does, and the move ends with the map sliding sideways under a zoom that has
+   already stopped. That is the jump. */
+let flyRaf = 0;
+const viewNow = () => ({k, tx, ty, lam0});
+function cancelFly(){ if(flyRaf){ cancelAnimationFrame(flyRaf); flyRaf = 0; } }
+/* Zoom is multiplicative, so it is stepped by ratio rather than by difference:
+   halfway from 9 to 4 is a little over 6, not 6.5. Stepping it by difference
+   spends most of the move at the near end and then rushes the rest, which on
+   its own looks like a lurch. And the offset follows from the zoom rather than
+   being eased beside it - what is interpolated is the board point held at the
+   middle of the screen, so the place you are travelling to moves steadily while
+   the scale changes underneath it. */
+function flyTo(to, ms){
+  cancelFly();
+  cancelAnimationFrame(turnRaf); turnRaf = 0;
+  scene.classList.remove('ease');            // this is driven by hand, frame by frame
+  const from = viewNow();
+  const dur = calm ? 0 : (ms || 460);
+  const dl = wrapLon(to.lam0 - from.lam0);   // the short way round
+  /* any fixed screen point does as the reference; its board coordinates at each
+     end are what the flight carries between */
+  const REF = 500;
+  const cyA = (REF - from.ty)/from.k, cyB = (REF - to.ty)/to.k;
+  const cxA = (REF - from.tx)/from.k, cxB = (REF - to.tx)/to.k;
+  const set = u => {
+    const e = u<0.5 ? 4*u*u*u : 1-Math.pow(-2*u+2,3)/2;
+    k  = from.k * Math.pow(to.k/from.k, e);
+    tx = REF - (cxA + (cxB-cxA)*e) * k;
+    ty = REF - (cyA + (cyB-cyA)*e) * k;
+    lam0 = wrapLon(from.lam0 + dl*e);
+    applyView();
+    if(worldMap()) turn(); else placeFloaters();
+  };
+  if(!dur || (Math.abs(to.k-from.k) < 1e-4 && Math.abs(dl) < 0.5
+              && Math.abs(to.ty-from.ty) < 0.5 && Math.abs(to.tx-from.tx) < 0.5)){
+    k = to.k; tx = to.tx; ty = to.ty; lam0 = wrapLon(to.lam0);
+    applyView(); if(worldMap()) turn(); else placeFloaters();
+    return;
+  }
+  const t0 = performance.now();
+  const step = now=>{
+    const u = Math.min(1, (now-t0)/dur);
+    set(u);
+    flyRaf = u < 1 ? requestAnimationFrame(step) : 0;
+  };
+  flyRaf = requestAnimationFrame(step);
+}
+/* The framing functions work out where the map should end up by putting it
+   there. Take that answer, wind the view back to where it started, and travel. */
+function flyFrom(from, ms){
+  const to = viewNow();
+  k = from.k; tx = from.tx; ty = from.ty; lam0 = from.lam0;
+  flyTo(to, ms);
+}
 let springTimer = 0;
 function springBack(delay){
   clearTimeout(springTimer);
@@ -1518,6 +1577,7 @@ function springBack(delay){
    were looking at, which is what made the spring appear to recentre. */
 function zoomTo(nk, cx, cy){
   if(nk === k) return;
+  cancelFly();                    // a zoom of your own beats one the game started
   const v = toView(cx, cy);
   if(worldMap()){
     /* the globe has no sideways offset, so holding a place still under the
@@ -1584,6 +1644,8 @@ function usableBand(opts){
    the longitude the place covers, and its latitude range. */
 function frameWorld(fr, opts){
   if(!fr) return;
+  const fly = !!(opts && opts.fly);
+  const from = viewNow();
   const r = wrap.getBoundingClientRect();
   const m = svg.getScreenCTM();
   const usable = usableBand(opts);
@@ -1594,7 +1656,9 @@ function frameWorld(fr, opts){
   if(!(opts && opts.fill) && (w > 900 || h > 500)){
     k = 1;
     ty = (m && m.d) ? ((r.top + usable/2) - m.f)/m.d - 500 : 0;
-    clampView(); turnTo(fr[0], true); ease(); applyView(); return;
+    clampView();
+    if(fly){ lam0 = wrapLon(fr[0]); flyFrom(from, opts.ms); return; }
+    turnTo(fr[0], true); ease(); applyView(); return;
   }
   const FILL = (opts && opts.pad) || TARGET_FILL;
   k = Math.max(1, Math.min(ZOOM_MAX, zoomForSize(w, h, FILL, opts)));
@@ -1604,7 +1668,11 @@ function frameWorld(fr, opts){
   const cy = (wy(fr[2]) + wy(fr[3]))/2;
   if(m && m.a && m.d) ty = ((r.top + usable/2) - m.f)/m.d - cy*k;
   else ty = 500 - cy*k;
-  clampView(); ease(); applyView();
+  clampView();
+  /* the turn is part of the same movement, so it is handed over with the rest
+     rather than run alongside on a clock of its own */
+  if(fly){ lam0 = wrapLon(fr[0]); flyFrom(from, opts.ms); return; }
+  ease(); applyView();
   turnTo(fr[0], true);
 }
 function frameOn(t, opts){
@@ -1613,6 +1681,8 @@ function frameOn(t, opts){
   if(worldMap()) return frameWorld(t.fr, opts);
   const b = t.frame || t.mb || t.b;
   if(!b || b[0] > b[2]) return;
+  const fly = !!(opts && opts.fly);
+  const from = viewNow();
   const forAsk = !!(opts && opts.forAsk);
   const w = b[2]-b[0], h = b[3]-b[1];
   const r = wrap.getBoundingClientRect();
@@ -1622,7 +1692,11 @@ function frameOn(t, opts){
 
   /* on the world board anything this size is best shown whole; the counties board
      is its own map, where filling the screen is exactly what is wanted */
-  if(!(opts && opts.fill) && (w > 900 || h > 500)){ k = 1; tx = 0; ty = 0; ease(); applyView(); return; }
+  if(!(opts && opts.fill) && (w > 900 || h > 500)){
+    k = 1; tx = 0; ty = 0;
+    if(fly) return flyFrom(from, opts.ms);
+    ease(); applyView(); return;
+  }
 
   /* sized against real screen pixels, not viewBox units - on a tall phone the
      viewBox is a fraction of the element and the old sum zoomed far too little */
@@ -1637,7 +1711,9 @@ function frameOn(t, opts){
   } else {
     tx = 1000 - cx*k; ty = 500 - cy*k;
   }
-  clampView(); ease(); applyView();
+  clampView();
+  if(fly) return flyFrom(from, opts.ms);
+  ease(); applyView();
 }
 function worldMap(){ return !BOARDS.includes(S.mode) && S.mode !== 'flags'; }
 function fitCurrent(){
@@ -1680,6 +1756,7 @@ svg.addEventListener('pointerdown', ev=>{
     pinchDist = Math.hypot(a.x-b.x, a.y-b.y); drag = null; return;
   }
   scene.classList.remove('ease');
+  cancelFly();
   cancelHold();
   const v = toView(ev.clientX, ev.clientY);
   drag = {vx:v.x, vy:v.y, tx, ty, lam0,
@@ -1923,7 +2000,11 @@ function showToast(text, ms){
 if(window.visualViewport){
   window.visualViewport.addEventListener('resize', ()=>{
     placeFloaters();
-    if(ask.classList.contains('on') && S.sel) frameOn(BY_CODE[S.sel], {forAsk:true});
+    /* the keyboard slides in over several resizes; each one re-aims the flight
+       from wherever it has got to, so the map keeps moving rather than snapping
+       to each new answer in turn */
+    if(ask.classList.contains('on') && S.sel)
+      frameOn(BY_CODE[S.sel], {forAsk:true, fly:true, ms:200});
   });
 }
 window.addEventListener('resize', ()=>{
@@ -1947,7 +2028,7 @@ function openAsk(t){
   /* Framed after the focus, not before it. Until the input has focus there is
      no keyboard to allow for, so framing first put the place in the middle of
      the whole screen and left nowhere underneath it for the box to go. */
-  frameOn(t, {forAsk:true});
+  frameOn(t, {forAsk:true, fly:true});
   requestAnimationFrame(placeFloaters);
 }
 function closeAsk(){
@@ -2139,7 +2220,7 @@ function select(code){
   paintMap();
   /* an answered place is framed here; one still to name is framed by openAsk,
      which does it once the input has focus and the keyboard is accounted for */
-  if(settled) frameOn(t, {forAsk:false});
+  if(settled) frameOn(t, {forAsk:false, fly:true});
 
   if(a && judged(code) && a.ok){          // already right - just say so
     closeAsk();
