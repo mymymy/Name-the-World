@@ -5,7 +5,7 @@
    itself is enough to make the whole game work with no connection.
 
    Bump VERSION to retire the old cache and publish a new one. */
-const VERSION = 'ntw-v46';
+const VERSION = 'ntw-v47';
 const SHELL = [
   './',
   './index.html',
@@ -53,7 +53,14 @@ function fromNetwork(req, ms){
 self.addEventListener('fetch', ev=>{
   const req = ev.request;
   if(req.method !== 'GET') return;
-  if(new URL(req.url).origin !== location.origin) return;
+  const url = new URL(req.url);
+  if(url.origin !== location.origin) return;
+  /* The leaderboard answers at /api on this origin, and it is the one thing
+     here that is not a file. A cached board is a wrong board: the page would
+     show one player's hour-old copy as though it were everyone's, and never
+     reach the code that admits to being offline. So it is left to the network,
+     which knows how to fail. */
+  if(url.pathname === '/api' || url.pathname.startsWith('/api/')) return;
 
   const page = req.mode === 'navigate';
   ev.respondWith((async ()=>{

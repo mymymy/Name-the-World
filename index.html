@@ -565,7 +565,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v65</span>
+      <span id="build" class="caps">build 6 aug · v66</span>
     </div>
   </div>
 
@@ -834,8 +834,17 @@ function clockText(ms){
    them. server/leaderboard.js is a worker that will, and the README says how to
    put it up - fill in the line below and the board is shared from then on.
    Until then it shows this device's own runs, and says as much rather than
-   pretending to be a board with one player on it. */
-const BOARD_URL = 'https://name-the-world-board.mwatsonyoung.workers.dev';
+   pretending to be a board with one player on it.
+
+   On namethe.world the worker answers at /api on the very same origin, which
+   costs a player one request rather than two: a cross-origin POST is asked for
+   permission first, in a request of its own, before it is allowed to be sent.
+   Anywhere else - the pages.dev address, github.io, a file opened off disk -
+   there is no /api to ask, so those fall back to the worker's own address. */
+const BOARD_HOME = ['namethe.world', 'www.namethe.world'];
+const BOARD_URL = BOARD_HOME.includes(location.hostname)
+  ? '/api'
+  : 'https://name-the-world-board.mwatsonyoung.workers.dev';
 const BOARD_KEY = 'name-the-world/board/v1';
 const NAME_KEY  = 'name-the-world/name/v1';
 const BOARD_MAX = 200;                      // runs kept on this device
