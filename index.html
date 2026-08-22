@@ -565,7 +565,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v64</span>
+      <span id="build" class="caps">build 6 aug · v65</span>
     </div>
   </div>
 
@@ -2653,6 +2653,7 @@ function answer(text){
 /* highlight Next so it is obvious where to go, without moving the map */
 function waiting(){
   const b = $('#skip');
+  if(b.classList.contains('result')) return;     // it is offering the result, not a next one
   if(!b.disabled){ b.classList.add('waiting'); b.textContent = 'Next →'; }
 }
 function clearWaiting(){
@@ -2732,8 +2733,16 @@ function renderTally(){
   btn.style.display = S.check === 'auto' ? 'none' : '';
   btn.disabled = !all;
   btn.textContent = all ? 'Check answers' : `${t.length-named} to go`;
-  $('#skip').disabled = !unnamed().length;
-  if($('#skip').disabled) clearWaiting();
+  /* A finished game had nowhere to go. The result comes up the moment you name
+     the last one and never again - so closing it, or coming back to a game
+     already finished, left the run with no way to be seen or put a name to.
+     Next has nothing to advance to at that point, so it offers the result. */
+  const done = all && shown;
+  const skip = $('#skip');
+  if(!unnamed().length) clearWaiting();      // before the label, since it sets one
+  skip.classList.toggle('result', done);
+  skip.disabled = done ? false : !unnamed().length;
+  skip.textContent = done ? 'Result' : 'Next';
 }
 /* clockTick here as well as on its own timer: it anchors the clock the moment
    anything changes rather than up to a second later, which is otherwise lost
@@ -3048,7 +3057,7 @@ document.querySelectorAll('#bar .info').forEach(b=>{
 });
 $('#restart2').onclick = ()=>{ reset(); setSetup(false); };
 $('#check').onclick = checkAll;
-$('#skip').onclick = advance;
+$('#skip').onclick = ()=> $('#skip').classList.contains('result') ? openSheet() : advance();
 
 /* ============ go ============ */
 buildMap();
