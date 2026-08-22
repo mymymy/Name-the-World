@@ -1,0 +1,10 @@
+name = "name-the-world-board"
+main = "leaderboard.js"
+compatibility_date = "2024-11-01"
+
+# The board lives in one KV namespace. Create it with
+#     npx wrangler kv namespace create BOARD
+# and paste the id it prints in below, then `npx wrangler deploy`.
+[[kv_namespaces]]
+binding = "BOARD"
+id = "PASTE_THE_ID_HERE"
