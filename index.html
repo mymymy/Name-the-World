@@ -22,7 +22,15 @@
   --paper:#F2EDE0;
   --panel:#FBF7EC;
   --land:#EDE4D0;
-  --land-out:#E2DAC7;
+  /* Land that is not in play - the country around a board, and anywhere outside
+     the game you are playing. It is told apart from land that is in play by
+     being cooler rather than darker: the paper, the land and the colour of a
+     state you were told are four warm tones inside a narrow band, and darkening
+     this one only walked it into the last of them. A grey has the field to
+     itself, and can sit at much the same weight without being mistaken for
+     anything. */
+  --land-out:#DFDDD4;
+  --tap:#E2DAC7;          /* a pressed key in the menu, which is not a map */
   /* One paper, page and map alike. The tint that used to set the map area apart
      was doing the job the plate's frame now does, and with no rule under the
      header the two have to be the same sheet or the boundary simply moves. */
@@ -107,9 +115,9 @@ body.playing #home{display:none}
   display:block;margin-top:3px;color:var(--ink-2);font-size:13px;
   font-family:inherit;letter-spacing:0;
 }
-#menu button:active{background:var(--land-out)}
+#menu button:active{background:var(--tap)}
 /* the game you were last in, so coming back to the menu shows where you were */
-#menu .game[aria-current]{border-width:2px;background:var(--land-out)}
+#menu .game[aria-current]{border-width:2px;background:var(--tap)}
 #menu .game[aria-current]::after{
   content:'in progress';position:absolute;right:15px;top:17px;
   font:600 9.5px/1 "Helvetica Neue",sans-serif;letter-spacing:.13em;
@@ -565,7 +573,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v74</span>
+      <span id="build" class="caps">build 6 aug · v75</span>
     </div>
   </div>
 
