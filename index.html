@@ -573,7 +573,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v75</span>
+      <span id="build" class="caps">build 6 aug · v76</span>
     </div>
   </div>
 
@@ -3084,6 +3084,50 @@ const SCOPED = {
 };
 let pending = null;                 // the game chosen, before its scope is picked
 
+/* ============ the game in the address ============
+   Every game here has a name, and the address bar is where a name belongs if
+   anyone is going to pass it on. namethe.world/#capitals opens the capitals;
+   #capitals/europe opens that corner of them; #world/ten deals a random ten.
+
+   A random ten is the one that cannot be shared exactly, and should not be: the
+   ten are rolled fresh each time, so the link carries the game rather than the
+   deal. Anything unrecognised falls back to the whole of that game, and
+   anything not a game at all is ignored - a stray fragment should not strand
+   somebody on a blank page. */
+const slug = s => s.toLowerCase().replace(/[^a-z]+/g, '-');
+function gameHash(){
+  if(!S.playing) return '';
+  if(S.scope === 'continent') return '#' + S.mode + '/' + slug(S.continent);
+  if(S.scope === 'random')    return '#' + S.mode + '/ten';
+  return '#' + S.mode;
+}
+function readHash(){
+  let raw = '';
+  try{ raw = decodeURIComponent(location.hash.replace(/^#/, '')); }catch(e){ return null; }
+  const [mode, rest] = raw.toLowerCase().split('/');
+  if(!MODES.includes(mode)) return null;
+  const can = SCOPED[mode] || {};
+  if(!rest) return {mode, scope:'all'};
+  if(rest === 'ten' && can.random) return {mode, scope:'random'};
+  const cont = CONTINENTS.find(c => slug(c) === rest);
+  if(cont && can.conts) return {mode, scope:'continent', cont};
+  return {mode, scope:'all'};
+}
+function syncHash(){
+  const want = gameHash();
+  if(want === (location.hash || '')) return;
+  /* replaced, not pushed: the address should say which game you are in, but
+     every game you try should not become another step to walk back through */
+  try{ history.replaceState(null, '', want || location.pathname + location.search); }
+  catch(e){ /* file:// and the like - the game is what matters, not the address */ }
+}
+/* somebody following a link while the page is already open */
+window.addEventListener('hashchange', ()=>{
+  if((location.hash || '') === gameHash()) return;
+  const g = readHash();
+  if(g) startGame(g.mode, g.scope, g.cont); else openHome();
+});
+
 function showMenu(which){
   document.querySelectorAll('.menupanel').forEach(p=>
     p.toggleAttribute('hidden', p.dataset.menu !== which));
@@ -3101,6 +3145,7 @@ function openHome(){
   setSetup(false); closeAsk(); hideTip();
   $('#sheet').classList.remove('on');
   showMenu(panelFor(S.mode));
+  syncHash();
   save();
 }
 
@@ -3147,6 +3192,7 @@ function startGame(mode, scope, cont){
   if(changed || !resuming) switchView(); else render();
   if(S.mode === 'flags' && !S.sel) advance();
   sizeCanvas(); placeFloaters();
+  syncHash();
   save();
 }
 
@@ -3206,6 +3252,13 @@ if(S.playing){
     if(done) showToast(`Picked up where you left off — ${done} named.`, 3600);
   }
 }
+/* A game named in the address wins over the one you left: somebody arriving on
+   a link asked for that game, whatever this browser was last doing. What they
+   had already named in it is still theirs - answers are kept per place, not per
+   visit, so a link opens the game rather than wiping it. */
+const linked = readHash();
+if(linked) startGame(linked.mode, linked.scope, linked.cont);
+else syncHash();
 window.addEventListener('pagehide', ()=>{
   clearTimeout(saveTimer);
   try{ store && store.setItem(KEY, snapshot()); }catch(e){}
