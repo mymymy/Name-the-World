@@ -565,7 +565,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v62</span>
+      <span id="build" class="caps">build 6 aug · v63</span>
     </div>
   </div>
 
@@ -871,8 +871,13 @@ async function reach(path, init){
   const stop = new AbortController();
   const timer = setTimeout(()=>stop.abort(), 6000);
   try{
+    /* Content-type only where there is a body to describe. Sending it on a
+       read makes the request non-simple, and the browser then asks the server's
+       permission first - a second round trip, and a second billable call to a
+       worker, every time anyone so much as looks at the board. */
     const res = await fetch(BOARD_URL.replace(/\/$/,'') + path,
-                            {...init, signal:stop.signal, headers:{'content-type':'application/json'}});
+      {...init, signal:stop.signal,
+       headers: init && init.body ? {'content-type':'application/json'} : undefined});
     if(!res.ok){
       /* carry the status up: a run the board turned away is a different thing
          to a board that could not be reached, and they need different words */
