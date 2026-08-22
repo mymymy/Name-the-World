@@ -565,7 +565,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v71</span>
+      <span id="build" class="caps">build 6 aug · v72</span>
     </div>
   </div>
 
@@ -1688,7 +1688,9 @@ const PLATES = {
      shoved against the right-hand edge with the Atlantic pinched out. The east
      margin is given the room instead. */
   states:   {box: ()=>US_BOX,  focus: ()=>US48_BOX,  sea:'ussea',  frame:'usframe',  rule:'usrule',
-             tight: {w:0.03, e:0.10, n:0.03, s:0.03}}
+             tight: {w:0.03, e:0.10, n:0.03, s:0.03},
+             /* two things worth fitting, so fit offers both in turn */
+             fits: ()=>[US48_BOX, plateBox || US_BOX]}
 };
 const isPlate = () => !!PLATES[S.mode];
 function layoutPlate(){
@@ -2190,14 +2192,26 @@ $('#zin').onclick = ()=> zoomStep(1.6);
 $('#zout').onclick = ()=> zoomStep(1/1.6);
 /* The zoom the game opens at, whatever it happens to be looking at. */
 const PLATE_PAD = 0.965;
+function zoomForBox(box){
+  const pad = isPlate() ? PLATE_PAD : BOARD_PAD;
+  return Math.max(zoomFloor(), Math.min(ZOOM_MAX,
+    zoomForSize(box[2]-box[0], box[3]-box[1], pad)));
+}
+/* What fit has to offer, in the order it offers it.
+   Usually one thing: the board, pulled back until all of it shows. The states
+   have two, because the fifty are not one picture - forty-eight of them are the
+   map the game is mostly played on, and the other two are an ocean away. So the
+   first stop is the lower 48 and the second is all fifty. */
+function fitBoxes(){
+  const P = PLATES[S.mode];
+  if(P) return P.fits ? P.fits() : [P.focus()];
+  const box = boardBox();
+  return box ? [box] : null;
+}
 function fitZoom(){
   const r = wrap.getBoundingClientRect();
-  const box = boardBox();
-  if(box){
-    const pad = isPlate() ? PLATE_PAD : BOARD_PAD;
-    return Math.max(zoomFloor(), Math.min(ZOOM_MAX,
-      zoomForSize(box[2]-box[0], box[3]-box[1], pad)));
-  }
+  const boxes = fitBoxes();
+  if(boxes) return zoomForBox(boxes[0]);
   if(worldMap() && S.scope !== 'all'){
     const fr = S.scope === 'continent' ? (BY_CODE['CONT-'+S.continent]||{}).fr
                                        : frameUnion(targets());
@@ -2226,7 +2240,10 @@ function syncZoomKeys(){
   const fit = fitZoom(), floor = zoomFloor();
   zin.disabled  = k >= ZOOM_MAX*0.999;
   zout.disabled = k <= floor*1.001;
-  zfit.disabled = Math.abs(k - fit) < fit*0.005;
+  /* a board with a second thing to fit always has somewhere to go, so the key
+     is only ever dead where there is one fit and the map is already at it */
+  zfit.disabled = (fitBoxes() || []).length > 1
+    ? false : Math.abs(k - fit) < fit*0.005;
 }
 
 /* Fit pulls back to that zoom and no further: it does not carry you home as
@@ -2236,6 +2253,25 @@ $('#zfit').onclick = ()=>{
   closeAsk(); hideTip();
   const r = wrap.getBoundingClientRect();
   zoomAnchor = null;
+  const boxes = fitBoxes() || [];
+  if(boxes.length > 1){
+    /* Where a board has more than one thing worth fitting, each tap takes the
+       next, and the last comes back round to the first rather than leaving the
+       key dead. Being at none of them - part way out, or zoomed in on a state -
+       counts as before the first, so a tap does the expected thing.
+
+       These taps move the map as well as the zoom, unlike the single-stop fit
+       below, and they have to: asking to see the lower 48 while you are down in
+       Florida is asking to be taken to them. Pulling back to their size and
+       staying put leaves the east half off the edge of the screen, which is not
+       fitting anything. */
+    const zooms = boxes.map(zoomForBox);
+    const at = zooms.findIndex(z => Math.abs(k - z) < z*0.02);
+    frameOn({mb: boxes[(at + 1) % boxes.length]},
+            {fill:true, pad:PLATE_PAD, fly:true, ms:340});
+    placeFloaters();
+    return;
+  }
   easeZoom(fitZoom(), r.left + r.width/2, r.top + r.height/2, 340);
   placeFloaters();
 };
