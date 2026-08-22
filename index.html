@@ -565,7 +565,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v72</span>
+      <span id="build" class="caps">build 6 aug · v73</span>
     </div>
   </div>
 
@@ -2208,6 +2208,13 @@ function fitBoxes(){
   const box = boardBox();
   return box ? [box] : null;
 }
+/* Which of fit's stops the map is standing at, or -1 for none of them. Judged
+   exactly rather than nearly, for the reason the keys are: an ease lands on its
+   target, and anything that merely looks like a stop is not one. */
+function fitStage(){
+  const zooms = (fitBoxes() || []).map(zoomForBox);
+  return zooms.findIndex(z => Math.abs(k - z) < z*0.005);
+}
 function fitZoom(){
   const r = wrap.getBoundingClientRect();
   const boxes = fitBoxes();
@@ -2240,10 +2247,12 @@ function syncZoomKeys(){
   const fit = fitZoom(), floor = zoomFloor();
   zin.disabled  = k >= ZOOM_MAX*0.999;
   zout.disabled = k <= floor*1.001;
-  /* a board with a second thing to fit always has somewhere to go, so the key
-     is only ever dead where there is one fit and the map is already at it */
-  zfit.disabled = (fitBoxes() || []).length > 1
-    ? false : Math.abs(k - fit) < fit*0.005;
+  /* dead once there is no further stop to take: the last of a board's fits, or
+     the only one. The globe has no box to fit and is judged against its zoom. */
+  const boxes = fitBoxes();
+  zfit.disabled = boxes && boxes.length
+    ? fitStage() === boxes.length - 1
+    : Math.abs(k - fit) < fit*0.005;
 }
 
 /* Fit pulls back to that zoom and no further: it does not carry you home as
@@ -2256,19 +2265,19 @@ $('#zfit').onclick = ()=>{
   const boxes = fitBoxes() || [];
   if(boxes.length > 1){
     /* Where a board has more than one thing worth fitting, each tap takes the
-       next, and the last comes back round to the first rather than leaving the
-       key dead. Being at none of them - part way out, or zoomed in on a state -
-       counts as before the first, so a tap does the expected thing.
+       next one out, and the last is the end of it: the key goes dead there
+       rather than wrapping round, since a key that pulls back is not one that
+       should suddenly dive in. Being at none of the stops - part way out, or
+       zoomed in on a state - counts as before the first.
 
        These taps move the map as well as the zoom, unlike the single-stop fit
        below, and they have to: asking to see the lower 48 while you are down in
        Florida is asking to be taken to them. Pulling back to their size and
        staying put leaves the east half off the edge of the screen, which is not
        fitting anything. */
-    const zooms = boxes.map(zoomForBox);
-    const at = zooms.findIndex(z => Math.abs(k - z) < z*0.02);
-    frameOn({mb: boxes[(at + 1) % boxes.length]},
-            {fill:true, pad:PLATE_PAD, fly:true, ms:340});
+    const next = fitStage() + 1;
+    if(next >= boxes.length) return;
+    frameOn({mb: boxes[next]}, {fill:true, pad:PLATE_PAD, fly:true, ms:340});
     placeFloaters();
     return;
   }
