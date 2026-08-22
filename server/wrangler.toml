@@ -2,9 +2,21 @@ name = "name-the-world-board"
 main = "leaderboard.js"
 compatibility_date = "2024-11-01"
 
-# The board lives in one KV namespace. Create it with
-#     npx wrangler kv namespace create BOARD
-# and paste the id it prints in below, then `npx wrangler deploy`.
-[[kv_namespaces]]
-binding = "BOARD"
-id = "PASTE_THE_ID_HERE"
+# The board lives in one D1 database - D1 is SQLite. Create it with
+#     npx wrangler d1 create name-the-world-board
+# and paste the database_id it prints in below.
+[[d1_databases]]
+binding = "DB"
+database_name = "name-the-world-board"
+database_id = "PASTE_THE_DATABASE_ID_HERE"
+
+# Two secrets, which do not belong in this file - it is in a public repository.
+# Set them with `npx wrangler secret put NAME` and paste the value when asked:
+#
+#   ADMIN_KEY   any long random string. It is what lets you delete a row:
+#               curl -X DELETE https://YOUR-WORKER/runs/42 \
+#                    -H "Authorization: Bearer YOUR-ADMIN-KEY"
+#
+#   IP_SALT     any long random string. Addresses are hashed with it before
+#               being stored, so the table can count what one person has posted
+#               in the last hour without keeping a record of who played.

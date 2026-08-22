@@ -565,7 +565,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v61</span>
+      <span id="build" class="caps">build 6 aug · v62</span>
     </div>
   </div>
 
@@ -873,7 +873,11 @@ async function reach(path, init){
   try{
     const res = await fetch(BOARD_URL.replace(/\/$/,'') + path,
                             {...init, signal:stop.signal, headers:{'content-type':'application/json'}});
-    if(!res.ok) throw new Error('HTTP ' + res.status);
+    if(!res.ok){
+      /* carry the status up: a run the board turned away is a different thing
+         to a board that could not be reached, and they need different words */
+      const err = new Error('HTTP ' + res.status); err.status = res.status; throw err;
+    }
     return await res.json();
   } finally { clearTimeout(timer); }
 }
@@ -895,8 +899,11 @@ const Board = {
   async add(rec){
     putLocalRun(rec);
     if(!BOARD_URL) return {shared:false};
-    try{ await reach('/runs', {method:'POST', body:JSON.stringify(rec)}); return {shared:true}; }
-    catch(e){ return {shared:false, offline:true}; }
+    try{
+      const got = await reach('/runs', {method:'POST', body:JSON.stringify(rec)});
+      return {shared:true, best:got && got.run, kept:!!(got && got.kept)};
+    }
+    catch(e){ return {shared:false, status:e.status}; }
   }
 };
 
@@ -2796,13 +2803,20 @@ $('#claim').addEventListener('submit', async ev=>{
   rememberName(name);
   $('#claimgo').disabled = true;
   $('#claimnote').textContent = 'Saving…';
-  const res = await Board.add({...claiming, n:name, at:Date.now()});
-  $('#claimrow').style.display = 'none';
-  $('#claimnote').textContent = res.shared
-    ? `Added as ${name}.`
-    : (BOARD_URL ? `Saved on this device — the leaderboard could not be reached.`
-                 : `Saved as ${name}, on this device.`);
-  claiming = null;
+  const sent = {...claiming, n:name, at:Date.now()};
+  const res = await Board.add(sent);
+  const note = $('#claimnote');
+  if(res.shared && res.kept === false && res.best)
+    note.textContent = `Added — though your best there is still ` +
+                       `${res.best.s} of ${res.best.t} in ${clockText(res.best.ms)}.`;
+  else if(res.shared) note.textContent = `Added as ${name}.`;
+  else if(res.status === 400) note.textContent = 'The board would not take that name. Try another.';
+  else if(res.status === 429) note.textContent = 'That is a lot of runs from here. Saved on this device; try the board again later.';
+  else if(BOARD_URL) note.textContent = 'Saved on this device — the leaderboard could not be reached.';
+  else note.textContent = `Saved as ${name}, on this device.`;
+  /* a name it would not take is worth another go at */
+  if(res.status === 400){ $('#claimrow').style.display = ''; $('#claimgo').disabled = false; $('#claimname').select(); }
+  else { $('#claimrow').style.display = 'none'; claiming = null; }
 });
 $('#close').onclick = ()=>{ $('#sheet').classList.remove('on'); clockTick(); };
 
