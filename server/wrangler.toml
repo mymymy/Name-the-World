@@ -2,16 +2,17 @@ name = "name-the-world-board"
 main = "leaderboard.js"
 compatibility_date = "2024-11-01"
 
-# The board lives in one D1 database - D1 is SQLite. Create it with
-#     npx wrangler d1 create name-the-world-board
-# and paste the database_id it prints in below.
+# The board lives in one D1 database - D1 is SQLite. This id is the one made
+# for it; a new one comes from `npx wrangler d1 create name-the-world-board`,
+# or from the Cloudflare dashboard under Storage & Databases.
 [[d1_databases]]
 binding = "DB"
 database_name = "name-the-world-board"
-database_id = "PASTE_THE_DATABASE_ID_HERE"
+database_id = "cfc0e1ec-8e56-416f-ba48-dcc1865cbdae"
 
 # Two secrets, which do not belong in this file - it is in a public repository.
-# Set them with `npx wrangler secret put NAME` and paste the value when asked:
+# Set them with `npx wrangler secret put NAME`, or in the dashboard under the
+# worker's Settings, Variables and Secrets - as Secret, not Text:
 #
 #   ADMIN_KEY   any long random string. It is what lets you delete a row:
 #               curl -X DELETE https://YOUR-WORKER/runs/42 \
