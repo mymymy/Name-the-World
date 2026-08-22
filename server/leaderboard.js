@@ -119,11 +119,17 @@ const row = r => ({g: r.game, n: r.name, s: r.score, t: r.total, ms: r.ms, at: r
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    /* Answer at /runs and at /api/runs alike. On its own workers.dev address
+       the first is the natural shape; routed under a domain that also serves
+       the game - namethe.world/api/* - the second means the page is asking its
+       own origin, so the browser has nothing to check and no permission to ask
+       for first. Same worker either way. */
+    const path = url.pathname.replace(/^\/api(?=\/|$)/, '') || '/';
     if (request.method === 'OPTIONS') return new Response(null, {status: 204, headers: cors});
     if (!env.DB) return json({error: 'no D1 database bound as DB'}, 500);
 
     /* ---- the board ---- */
-    if (request.method === 'GET' && url.pathname === '/runs') {
+    if (request.method === 'GET' && path === '/runs') {
       const game = url.searchParams.get('g') || '';
       if (!GAMES[game]) return json([]);
 
@@ -147,7 +153,7 @@ export default {
     }
 
     /* ---- adding one ---- */
-    if (request.method === 'POST' && url.pathname === '/runs') {
+    if (request.method === 'POST' && path === '/runs') {
       let body;
       try { body = await request.json(); } catch (e) { return json({error: 'bad json'}, 400); }
       const run = cleanRun(body);
@@ -192,10 +198,10 @@ export default {
     }
 
     /* ---- taking one off ---- */
-    if (request.method === 'DELETE' && url.pathname.startsWith('/runs/')) {
+    if (request.method === 'DELETE' && path.startsWith('/runs/')) {
       const given = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
       if (!env.ADMIN_KEY || given !== env.ADMIN_KEY) return json({error: 'no'}, 401);
-      const id = Number(url.pathname.slice(6));
+      const id = Number(path.slice(6));
       if (!Number.isInteger(id)) return json({error: 'bad id'}, 400);
       const gone = await env.DB.prepare('SELECT game FROM runs WHERE id = ?1').bind(id).first();
       await env.DB.prepare('DELETE FROM runs WHERE id = ?1').bind(id).run();
