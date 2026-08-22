@@ -565,7 +565,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v73</span>
+      <span id="build" class="caps">build 6 aug · v74</span>
     </div>
   </div>
 
@@ -1591,9 +1591,14 @@ function paintMap(){
                      : (live.has(e.code) ? e : null);
     const a = t ? S.ans[t.code] : null;
     const seen = t && judged(t.code);
-    /* context, not out of play: the backdrop in the capitals game, and the
-       District of Columbia, which is drawn so the map has no hole in it */
-    let cls = t ? ' play' : ((caps || e.isCtx) ? ' ctx' : ' out');
+    /* Context, not out of play: in the capitals game the countries are the
+       backdrop you read the map from, so they keep their ordinary colour.
+       The District of Columbia used to ride on that rule, and it should not.
+       It is drawn so the map has no hole between Maryland and Virginia, but
+       wearing the colour of land in play it reads as a state nobody has got to
+       yet - a gap, once the states around it are coloured in. It is land that
+       is not in play, and takes that colour like anywhere else out of play. */
+    let cls = t ? ' play' : (caps ? ' ctx' : ' out');
     if(a){
       if(!seen) cls += ' named';
       else if(a.told) cls += ' told';
