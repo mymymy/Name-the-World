@@ -166,16 +166,14 @@ body.setup #bar{transform:none;visibility:visible;transition-delay:0s,0s}
 #bar .row:last-of-type{border-bottom:0}
 .rowtop{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .rowlabel{flex:1 1 auto;color:var(--ink-2)}
-.info{
-  flex:0 0 auto;width:22px;height:22px;border-radius:999px;padding:0;
-  border:1px solid var(--ink-3);background:none;color:var(--ink-2);
-  font:italic 600 12px/1 "Iowan Old Style",Palatino,serif;
-}
-.info[aria-expanded="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
 .note{
   margin:9px 0 0;max-width:62ch;color:var(--ink-2);font-size:13.5px;line-height:1.5;
   border-left:2px solid var(--rule);padding-left:10px;
 }
+/* In the setup panel a note is not an aside any more but the row's own
+   explanation, so it reads before the switch rather than after it, and without
+   the rule down its side that marked it as something extra. */
+#bar .note{margin:0 0 9px;border-left:0;padding-left:0;font-size:13px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 #barfoot{display:flex;align-items:center;gap:10px;padding:12px var(--pad) 16px}
 #done{background:var(--ink);color:var(--paper);border:1px solid var(--ink);
@@ -397,7 +395,12 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
 #board.on{display:flex}
 #boardbox{background:var(--panel);border:1px solid var(--ink);border-radius:8px;overflow:hidden;
   max-width:460px;width:100%;max-height:84vh;display:flex;flex-direction:column}
-#boardhead{padding:16px var(--pad) 0;border-bottom:1px solid var(--ink)}
+/* The tabs scroll sideways when there are more games than fit. Cut off square
+   they read as a mistake, so the row fades out at the edge it runs past - which
+   also says there is more that way. */
+#boardhead{padding:16px var(--pad) 0;border-bottom:1px solid var(--ink);position:relative}
+#boardhead::after{content:'';position:absolute;right:0;bottom:10px;width:34px;height:30px;
+  pointer-events:none;background:linear-gradient(to right, rgba(251,247,236,0), var(--panel))}
 #boardgame{font-size:24px;line-height:1.1;margin:6px 0 10px}
 #boardtabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;scrollbar-width:none}
 #boardtabs::-webkit-scrollbar{display:none}
@@ -506,76 +509,66 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     <div class="row">
       <div class="rowtop">
         <span class="rowlabel caps">Suggestions</span>
-        <button class="info" type="button" aria-expanded="false" aria-controls="i-list">
-          <span aria-hidden="true">i</span><span class="sr">What is Suggestions?</span></button>
       </div>
+      <p class="note" id="i-list">Offer a list of matching names as you type, to pick from.
+        Turn it off to type every answer out in full, which is harder.</p>
       <div class="seg" id="listseg" role="group" aria-label="Suggestions">
         <button data-list="1" class="caps">On</button>
         <button data-list="0" class="caps">Off</button>
       </div>
-      <p class="note" id="i-list" hidden>Offer a list of matching names as you type, to pick from.
-        Turn it off to type every answer out in full, which is harder.</p>
     </div>
 
     <div class="row">
       <div class="rowtop">
         <span class="rowlabel caps">Moving on</span>
-        <button class="info" type="button" aria-expanded="false" aria-controls="i-adv">
-          <span aria-hidden="true">i</span><span class="sr">What is Moving on?</span></button>
       </div>
+      <p class="note" id="i-adv">What happens once you have named a place. On tap waits for
+        you to choose where to go next; Automatic moves straight on to the nearest place still
+        unnamed.</p>
       <div class="seg" id="advseg" role="group" aria-label="Moving on">
         <button data-adv="manual" class="caps">On tap</button>
         <button data-adv="auto" class="caps">Automatic</button>
       </div>
-      <p class="note" id="i-adv" hidden>What happens once you have named a place. On tap waits for
-        you to choose where to go next; Automatic moves straight on to the nearest place still
-        unnamed.</p>
     </div>
 
     <div class="row">
       <div class="rowtop">
         <span class="rowlabel caps">Marking</span>
-        <button class="info" type="button" aria-expanded="false" aria-controls="i-check">
-          <span aria-hidden="true">i</span><span class="sr">What is Marking?</span></button>
       </div>
+      <p class="note" id="i-check">When answers are marked right or wrong. At the end holds
+        everything back until you tap Check answers, so nothing gives the game away; As you go
+        marks each answer the moment you give it.</p>
       <div class="seg" id="checkseg" role="group" aria-label="When to check">
         <button data-check="end" class="caps">At the end</button>
         <button data-check="auto" class="caps">As you go</button>
       </div>
-      <p class="note" id="i-check" hidden>When answers are marked right or wrong. At the end holds
-        everything back until you tap Check answers, so nothing gives the game away; As you go
-        marks each answer the moment you give it.</p>
     </div>
 
     <div class="row">
       <div class="rowtop">
         <span class="rowlabel caps">Motion</span>
-        <button class="info" type="button" aria-expanded="false" aria-controls="i-motion">
-          <span aria-hidden="true">i</span><span class="sr">What is Motion?</span></button>
       </div>
+      <p class="note" id="i-motion">Gliding between places, confetti and the other
+        movement. Turn it off for a map that changes without animating. It starts off if your
+        device asks for reduced motion.</p>
       <div class="seg" id="motionseg" role="group" aria-label="Motion">
         <button data-motion="1" class="caps">On</button>
         <button data-motion="0" class="caps">Off</button>
       </div>
-      <p class="note" id="i-motion" hidden>Gliding between places, confetti and the other
-        movement. Turn it off for a map that changes without animating. It starts off if your
-        device asks for reduced motion.</p>
     </div>
 
     <div class="row">
       <div class="rowtop">
         <span class="rowlabel caps">Start again</span>
-        <button class="info" type="button" aria-expanded="false" aria-controls="i-restart">
-          <span aria-hidden="true">i</span><span class="sr">What is Start again?</span></button>
       </div>
-      <button id="restart2" class="caps">Restart</button>
-      <p class="note" id="i-restart" hidden>Forget every answer in every game and begin from an
+      <p class="note" id="i-restart">Forget every answer in every game and begin from an
         empty map. This cannot be undone.</p>
+      <button id="restart2" class="caps">Restart</button>
     </div>
 
     <div id="barfoot">
       <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v82</span>
+      <span id="build" class="caps">build 6 aug · v83</span>
     </div>
   </div>
 
@@ -695,6 +688,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
       <button id="another" class="key caps">Another ten</button>
       <button id="retry" class="caps">Try the misses again</button>
       <button id="revealall" class="caps">Show all answers</button>
+      <button id="share" class="caps">Share</button>
       <button id="seeboard" class="caps">Leaderboard</button>
       <button id="close" class="caps">Close</button>
     </div>
@@ -2967,9 +2961,10 @@ function openSheet(){
   $('#sheettime').innerHTML = `in <b>${clockText(ms)}</b>`;
   const list = $('#sheetlist');
   list.innerHTML = '';
-  if(!misses.length){
-    list.innerHTML = '<p style="padding:16px;color:var(--ink-2)" class="serif">A clean sheet — every one right.</p>';
-  } else {
+  /* nothing to list when nothing was missed: the score says it, and the line
+     above the name box says it again, so a third telling is just a grey band */
+  list.hidden = !misses.length;
+  if(misses.length){
     misses.forEach(e=>{
       const a = S.ans[e.code];
       const r = document.createElement('div'); r.className = 'r';
@@ -3015,6 +3010,44 @@ function openClaim(key, score, total, ms){
     ? 'A clean sheet — put your name to it'
     : 'Put this run on the leaderboard';
 }
+/* ============ passing it on ============
+   A score is worth telling somebody, and now that a game has a name in the
+   address there is somewhere for them to land. The phone's own share sheet does
+   the work where there is one; where there is not, the line goes to the
+   clipboard, which is what a desktop browser can offer.
+
+   The address is built from the game rather than read off the page, so it is
+   the tidy form - namethe.world/#capitals - and not whatever the player got
+   here by. A preview deployment shares its own address, though, since a link to
+   the live site would show something other than what was played. */
+const SHARE_HOME = 'https://namethe.world/';
+function shareLine(){
+  const t = targets();
+  const right = t.filter(e=>S.ans[e.code] && S.ans[e.code].ok).length;
+  const ms = elapsed(gameKey());
+  const what = boardLabel(gameKey(S.mode, S.scope === 'random' ? 'all' : S.scope));
+  return `${what}: ${right} of ${t.length} in ${clockText(ms)}`;
+}
+function shareUrl(){
+  const here = location.origin + location.pathname;
+  const base = BOARD_HOME.includes(location.hostname) ? SHARE_HOME
+             : (location.protocol === 'file:' ? SHARE_HOME : here);
+  return base.replace(/\/+$/, '/') + (gameHash() || '');
+}
+$('#share').onclick = async ()=>{
+  const text = shareLine(), url = shareUrl(), note = $('#claimnote');
+  const say = m => { if(!$('#claim').hidden) note.textContent = m; else showToast(m, 2600); };
+  try{
+    if(navigator.share){ await navigator.share({title:'Name the World', text, url}); return; }
+    await navigator.clipboard.writeText(`${text}\n${url}`);
+    say('Copied — paste it wherever you like.');
+  }catch(e){
+    /* a share the player backed out of is not a failure and should say nothing */
+    if(e && e.name === 'AbortError') return;
+    say('Could not share it. ' + text + ' ' + url);
+  }
+};
+
 $('#claim').addEventListener('submit', async ev=>{
   ev.preventDefault();
   if(!claiming) return;
@@ -3057,10 +3090,15 @@ function boardLabel(key){
   const [mode, scope, cont] = key.split('/');
   return (LABEL[mode] || mode) + (scope === 'continent' ? ' · ' + cont : '');
 }
+let boardCameFromSheet = false;
 function openBoard(key){
   /* whichever game is in hand, unless it is a round of ten - those are never
      the same ten twice, so there is nothing to compare */
   boardAt = key || (S.scope === 'random' ? gameKey(S.mode, 'all') : gameKey());
+  /* one card at a time: the result behind the leaderboard showed as an edge of
+     panel down either side, which reads as a mistake rather than as depth */
+  boardCameFromSheet = $('#sheet').classList.contains('on');
+  if(boardCameFromSheet) $('#sheet').classList.remove('on');
   $('#board').classList.add('on');
   renderBoard();
 }
@@ -3092,7 +3130,12 @@ async function renderBoard(){
     : (BOARD_URL ? (offline ? 'Offline — showing this device.' : 'Showing this device.')
                  : 'This device only — no leaderboard server is set up yet.');
 }
-$('#boardclose').onclick = ()=> $('#board').classList.remove('on');
+$('#boardclose').onclick = ()=>{
+  $('#board').classList.remove('on');
+  /* back to the result if that is where you came from, rather than dropping you
+     on the map with the run you just finished nowhere to be seen */
+  if(boardCameFromSheet){ boardCameFromSheet = false; $('#sheet').classList.add('on'); }
+};
 $('#board').addEventListener('click', ev=>{ if(ev.target.id === 'board') $('#board').classList.remove('on'); });
 $('#boardbtn').onclick = ()=> openBoard();
 $('#seeboard').onclick = ()=> openBoard(S.scope === 'random' ? gameKey(S.mode, 'all') : gameKey());
@@ -3297,15 +3340,6 @@ $('#done').onclick = ()=> setSetup(false);
 document.addEventListener('keydown', ev=>{
   if(ev.key === 'Escape' && $('#board').classList.contains('on')) $('#board').classList.remove('on');
   if(ev.key === 'Escape' && document.body.classList.contains('setup')) setSetup(false);
-});
-/* each row can explain itself */
-document.querySelectorAll('#bar .info').forEach(b=>{
-  b.onclick = ()=>{
-    const note = document.getElementById(b.getAttribute('aria-controls'));
-    const show = note.hasAttribute('hidden');
-    note.toggleAttribute('hidden', !show);
-    b.setAttribute('aria-expanded', String(show));
-  };
 });
 $('#restart2').onclick = ()=>{ reset(); setSetup(false); };
 $('#check').onclick = checkAll;
