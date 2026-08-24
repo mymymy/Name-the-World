@@ -134,15 +134,16 @@ body.playing #home{display:none}
 #menubtn{background:none;border:1px solid var(--ink);border-radius:4px;padding:5px 9px;margin-left:4px}
 
 /* Everything the game used to ask you to decide is decided: suggestions are on,
-   marking is instant, and you choose where to go next. Nothing is left to set
-   but the one destructive button, which has to live somewhere - so it sits at
-   the foot of the homepage rather than behind a panel of its own. */
-#homefoot{
-  margin-top:26px;padding-top:16px;border-top:1px solid var(--rule);
-  display:flex;flex-wrap:wrap;align-items:center;gap:10px;
-}
-#homefoot .note{flex:1 0 100%;margin:0;border-left:0;padding-left:0;font-size:12.5px}
-#homefoot #build{flex:0 0 auto}
+   marking is instant, you choose where to go next, and the device says whether
+   to animate. Nothing is left down here but which build you are looking at. */
+#homefoot{margin-top:24px;padding-top:14px;border-top:1px solid var(--rule);text-align:right}
+
+/* Starting a game over is that game's business, so it lives on that game's
+   panel and is drawn quieter than the ways in - it is not one of them. Armed,
+   it takes the colour of a wrong answer, which is the only red here. */
+#menu .wipe{border-color:var(--ink-3);color:var(--ink-2)}
+#menu .wipe.armed{background:var(--miss);border-color:var(--miss);color:#fff}
+#menu .wipe.armed small{color:rgba(255,255,255,.85)}
 
 #top{position:relative;z-index:3;flex:0 0 auto}
 .note{
@@ -150,9 +151,7 @@ body.playing #home{display:none}
   border-left:2px solid var(--rule);padding-left:10px;
 }
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-#restart2{background:none;border:1px solid var(--ink);border-radius:4px;padding:6px 10px}
-#restart2.armed{background:var(--miss);border-color:var(--miss);color:#fff}
-#build{color:var(--ink-3);margin-left:auto;align-self:center}
+#build{color:var(--ink-3)}
 button:focus-visible{outline:2px solid var(--live);outline-offset:2px}
 
 main{flex:1 1 auto;min-height:0;display:flex;position:relative;z-index:1}
@@ -561,9 +560,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <button id="restart2" class="caps">Start again</button>
       <span id="build" class="caps">build 24 aug · v84</span>
-      <p class="note">Start again forgets every answer in every game. This cannot be undone.</p>
     </div>
   </div>
 </div>
@@ -698,7 +695,6 @@ function restore(){
   if(S.scope === 'random' && !S.pick.length) S.scope = 'all';
   return Object.keys(ans).length > 0;
 }
-function forget(){ try{ store && store.removeItem(KEY); }catch(e){} }
 
 /* ============ the clock ============
    A run is timed only while it is actually being played: the clock stops when
@@ -3033,13 +3029,25 @@ function switchView(){
   $('#sheet').classList.remove('on');
   render(); fitCurrent();
 }
-function reset(){
-  forget(); cancelHold();
-  S.ans = {}; S.sel = null; S.cursor = 0;
-  S.times = {}; S.hailed = {}; clockAt = 0;
-  closeAsk(); hideTip();
+/* how much of a game has been answered, in whatever scope it was answered in */
+function playedIn(mode){ return basis(mode).filter(e=>S.ans[e.code]).length; }
+/* Forget one game, and only that game.
+
+   Answers used to go all at once, from a button at the foot of the homepage.
+   That was wrong twice over: it was nowhere anybody would look for it, and
+   starting the boroughs over cost you the two hundred countries as well. No
+   two games share a code - the boroughs are LB-, the states US-, the flags
+   FL- - so a game's answers are exactly its own, and can go on their own. */
+function wipe(mode){
+  clockTick();                       // bank what is owed before the clocks go
+  cancelHold();
+  for(const e of basis(mode)) delete S.ans[e.code];
+  for(const k of Object.keys(S.times))  if(k.split('/')[0] === mode) delete S.times[k];
+  for(const k of Object.keys(S.hailed)) if(k.split('/')[0] === mode) delete S.hailed[k];
+  if(mode === S.mode){ S.sel = null; S.cursor = 0; closeAsk(); hideTip(); }
   $('#sheet').classList.remove('on');
-  render(); fitCurrent();
+  render();
+  if(mode === S.mode) fitCurrent();
 }
 /* ============ menu ============
    Games are chosen from the homepage, and the map keeps running underneath, so
@@ -3130,11 +3138,20 @@ function showScope(mode){
   pending = mode;
   const opt = SCOPED[mode] || {};
   const total = basis(mode).length;
+  const done = playedIn(mode);
   let h = `<button class="back" data-open="${panelFor(mode)}"><span class="chev" aria-hidden="true">‹</span> All games</button>`
         + `<h2 class="caps">${esc(LABEL[mode] || mode)}</h2>`
-        + `<button class="go" data-scope="all">Every one<small>All ${total} of them.</small></button>`;
+        /* the same button either way - it is the whole game - but it is picking
+           up where you left off rather than starting, and should say so */
+        + (done ? `<button class="go" data-scope="all">Carry on<small>${done} of ${total} named so far.</small></button>`
+                : `<button class="go" data-scope="all">Every one<small>All ${total} of them.</small></button>`);
   if(opt.conts)  h += `<button class="more" data-open="conts">One continent<span class="chev" aria-hidden="true">›</span><small>A part of the world at a time.</small></button>`;
   if(opt.random) h += `<button class="go" data-scope="random">Random ten<small>Ten at a time, then ten more.</small></button>`;
+  /* Restarting a game belongs with that game, not in a drawer of settings: this
+     is where you came looking for it, and it can only touch what it is under. */
+  if(done) h += `<button class="wipe" data-wipe="${mode}">Start again`
+              + `<small>Forget ${done === 1 ? 'the one answer' : `all ${done} answers`} in `
+              + `${esc(LABEL[mode] || mode)} and begin from an empty map.</small></button>`;
   const p = document.querySelector('.menupanel[data-menu="scope"]');
   p.innerHTML = h; wireMenu(); showMenu('scope');
 }
@@ -3175,8 +3192,26 @@ function startGame(mode, scope, cont){
 
 function wireMenu(){
   document.querySelectorAll('#menu .game').forEach(b=>
-    b.onclick = ()=> SCOPED[b.dataset.mode] ? showScope(b.dataset.mode)
-                                            : startGame(b.dataset.mode, 'all'));
+    /* Continents has nothing to narrow, so it is normally gone straight into.
+       Once there are answers in it there is something to decide, and it gets
+       the same panel as everything else. */
+    b.onclick = ()=> (SCOPED[b.dataset.mode] || playedIn(b.dataset.mode))
+                       ? showScope(b.dataset.mode)
+                       : startGame(b.dataset.mode, 'all'));
+  /* one tap arms it and says what it will forget, a second inside a few
+     seconds goes through with it - it is sitting among the ordinary buttons */
+  document.querySelectorAll('#menu .wipe').forEach(b=>{
+    const said = b.querySelector('small').textContent;
+    let armed = 0;
+    const rest = ()=>{ armed = 0; b.classList.remove('armed');
+                       b.querySelector('small').textContent = said; };
+    b.onclick = ()=>{
+      if(armed){ clearTimeout(armed); wipe(b.dataset.wipe); showScope(b.dataset.wipe); return; }
+      b.classList.add('armed');
+      b.querySelector('small').textContent = 'Tap again to forget them. This cannot be undone.';
+      armed = setTimeout(rest, 5000);
+    };
+  });
   document.querySelectorAll('#menu .go').forEach(b=>
     b.onclick = ()=> startGame(pending, b.dataset.scope, b.dataset.cont));
   document.querySelectorAll('#menu [data-open]').forEach(b=>
@@ -3188,21 +3223,6 @@ $('#menubtn').onclick = openHome;
 document.addEventListener('keydown', ev=>{
   if(ev.key === 'Escape' && $('#board').classList.contains('on')) $('#board').classList.remove('on');
 });
-/* Start again throws away every answer in every game, and it now sits on the
-   homepage among the games rather than behind a panel, where a thumb can find
-   it by accident. So it asks: the first tap arms it and says what it will do,
-   and only a second tap inside a few seconds goes through with it. */
-let armed = 0;
-const restart = $('#restart2');
-function disarm(){
-  clearTimeout(armed); armed = 0;
-  restart.classList.remove('armed'); restart.textContent = 'Start again';
-}
-restart.onclick = ()=>{
-  if(armed){ disarm(); reset(); return; }
-  restart.classList.add('armed'); restart.textContent = 'Tap again to forget everything';
-  armed = setTimeout(disarm, 5000);
-};
 $('#skip').onclick = ()=> $('#skip').classList.contains('result') ? openSheet() : advance();
 
 /* ============ go ============ */
