@@ -134,15 +134,13 @@ body.playing #home{display:none}
 #menubtn{background:none;border:1px solid var(--ink);border-radius:4px;padding:5px 9px;margin-left:4px}
 
 /* Everything the game used to ask you to decide is decided: suggestions are on,
-   marking is instant, and you choose where to go next. What is left is one
-   accessibility switch and one destructive button, and neither of those is a
-   game setting - so they sit quietly at the foot of the homepage rather than
-   behind a panel of their own. */
+   marking is instant, and you choose where to go next. Nothing is left to set
+   but the one destructive button, which has to live somewhere - so it sits at
+   the foot of the homepage rather than behind a panel of its own. */
 #homefoot{
   margin-top:26px;padding-top:16px;border-top:1px solid var(--rule);
   display:flex;flex-wrap:wrap;align-items:center;gap:10px;
 }
-#homefoot .foothead{color:var(--ink-3)}
 #homefoot .note{flex:1 0 100%;margin:0;border-left:0;padding-left:0;font-size:12.5px}
 #homefoot #build{flex:0 0 auto}
 
@@ -152,11 +150,6 @@ body.playing #home{display:none}
   border-left:2px solid var(--rule);padding-left:10px;
 }
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-/* wraps rather than clipping, on a narrow phone */
-.seg{display:flex;flex-wrap:wrap;border:1px solid var(--ink);border-radius:4px;overflow:hidden;width:fit-content;max-width:100%}
-.seg button{background:none;border:0;padding:7px 10px;border-right:1px solid var(--ink)}
-.seg button:last-child{border-right:0}
-.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
 #restart2{background:none;border:1px solid var(--ink);border-radius:4px;padding:6px 10px}
 #restart2.armed{background:var(--miss);border-color:var(--miss);color:#fff}
 #build{color:var(--ink-3);margin-left:auto;align-self:center}
@@ -568,16 +561,9 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span class="foothead caps">Motion</span>
-      <div class="seg" id="motionseg" role="group" aria-label="Motion">
-        <button data-motion="1" class="caps">On</button>
-        <button data-motion="0" class="caps">Off</button>
-      </div>
       <button id="restart2" class="caps">Start again</button>
       <span id="build" class="caps">build 24 aug · v84</span>
-      <p class="note">Motion is the gliding between places, the confetti and the rest; it starts off
-        if your device asks for reduced motion. Start again forgets every answer in every game, and
-        cannot be undone.</p>
+      <p class="note">Start again forgets every answer in every game. This cannot be undone.</p>
     </div>
   </div>
 </div>
@@ -654,8 +640,14 @@ const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''
   .replace(/\s+/g,' ').trim();
 const collator = new Intl.Collator('en-GB');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const systemCalm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-let calm = systemCalm;
+/* Whether to animate anything is the device's business, not the game's. There
+   was a switch here for a while, which was a copy of a setting the reader had
+   already made once and expects to hold everywhere - so the system is asked
+   instead, and asked continuously: someone who turns it on partway through a
+   game is asking for the confetti to stop now, not at the next reload. */
+const quiet = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+let calm = !!(quiet && quiet.matches);
+if(quiet && quiet.addEventListener) quiet.addEventListener('change', e=>{ calm = e.matches; });
 
 function lev(a,b){
   if(Math.abs(a.length-b.length) > 2) return 9;
@@ -677,7 +669,7 @@ let saveTimer = 0;
 function snapshot(){
   return JSON.stringify({v:1, ans:S.ans, mode:S.mode, playing:S.playing,
                          scope:S.scope, continent:S.continent, pick:S.pick, round:S.round,
-                         motion:S.motion, times:S.times, hailed:S.hailed});
+                         times:S.times, hailed:S.hailed});
 }
 function save(){
   if(!store) return;
@@ -693,7 +685,6 @@ function restore(){
     if(BY_CODE[code] && a && typeof a.given === 'string') ans[code] = a;
   S.ans = ans;
   if(MODES.includes(o.mode)) S.mode = o.mode;
-  if(typeof o.motion === 'boolean') S.motion = o.motion;
   if(o.times && typeof o.times === 'object')
     for(const [key, ms] of Object.entries(o.times))
       if(typeof ms === 'number' && ms >= 0 && ms < 864e5) S.times[key] = ms;
@@ -705,7 +696,6 @@ function restore(){
   if(Array.isArray(o.pick)) S.pick = o.pick.filter(c=>BY_CODE[c]);
   if(typeof o.round === 'number') S.round = o.round;
   if(S.scope === 'random' && !S.pick.length) S.scope = 'all';
-  calm = !S.motion;
   return Object.keys(ans).length > 0;
 }
 function forget(){ try{ store && store.removeItem(KEY); }catch(e){} }
@@ -980,7 +970,7 @@ const MODES = ['world','continents','capitals','counties','states','boroughs','f
    one place to the next by association; and the list of names is what keeps a
    spelling from costing you a country. So none of them are choices any more. */
 const S = { mode:'world', scope:'all', continent:'Europe', pick:[], round:0, playing:false,
-            ans:{}, sel:null, cursor:0, streak:0, motion:!systemCalm,
+            ans:{}, sel:null, cursor:0, streak:0,
             /* how long each game has been played for, in milliseconds, kept per
                game so switching between them does not run one clock for another */
             times:{}, hailed:{} };
@@ -2797,10 +2787,9 @@ function bumpTally(){
   setTimeout(()=>el.classList.remove('bump'), 500);
 }
 /* ============ chrome ============ */
-function renderBar(){
+function renderMenu(){
   document.querySelectorAll('#menu .game').forEach(b=>
     b.toggleAttribute('aria-current', b.dataset.mode === S.mode));
-  document.querySelectorAll('#motionseg button').forEach(b=>b.setAttribute('aria-pressed', String((b.dataset.motion==='1')===S.motion)));
 }
 function renderTally(){
   const t = targets();
@@ -2825,7 +2814,7 @@ function renderTally(){
 /* clockTick here as well as on its own timer: it anchors the clock the moment
    anything changes rather than up to a second later, which is otherwise lost
    from the run every time the result closes or you come back from the menu. */
-function render(){ clockTick(); renderBar(); renderTally(); paintMap(); save(); }
+function render(){ clockTick(); renderMenu(); renderTally(); paintMap(); save(); }
 
 /* ============ results ============ */
 function openSheet(){
@@ -3052,9 +3041,6 @@ function reset(){
   $('#sheet').classList.remove('on');
   render(); fitCurrent();
 }
-document.querySelectorAll('#motionseg button').forEach(b=>b.onclick = ()=>{
-  S.motion = b.dataset.motion === '1'; calm = !S.motion; render();
-});
 /* ============ menu ============
    Games are chosen from the homepage, and the map keeps running underneath, so
    coming back to the menu and picking the same game again lands you exactly
