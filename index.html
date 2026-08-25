@@ -19,6 +19,9 @@
 :root{
   --sea:#A3C0CB;
   --sea-halo:#C3DAE1;
+  /* One paper, page and map alike. The tint that used to set the map area apart
+     was doing the job the plate's frame now does, and with no rule under the
+     header the two have to be the same sheet or the boundary simply moves. */
   --paper:#F2EDE0;
   --panel:#FBF7EC;
   --land:#EDE4D0;
@@ -31,10 +34,6 @@
      anything. */
   --land-out:#DFDDD4;
   --tap:#E2DAC7;          /* a pressed key in the menu, which is not a map */
-  /* One paper, page and map alike. The tint that used to set the map area apart
-     was doing the job the plate's frame now does, and with no rule under the
-     header the two have to be the same sheet or the boundary simply moves. */
-  --named:#DCBB6E;
   --right:#7FA86A;
   --miss:#C25749;
   --told:#B3AA94;
@@ -75,21 +74,18 @@ h1{margin:0;font-size:16px;font-weight:500;letter-spacing:.03em}
 #rose .thin{opacity:.45}
 #tally{margin-left:auto;color:var(--ink-2);white-space:nowrap}
 #tally b{color:var(--ink);font-weight:600}
-#gear{background:none;border:1px solid var(--ink);border-radius:4px;padding:5px 9px;margin-left:4px}
-#gear[aria-expanded="true"]{background:var(--ink);color:var(--paper)}
 
 /* the progress track went too, for the same reason: an unfilled bar spanning
    the whole width is a rule under the header whatever it is called. Only the
    part that has been earned is drawn - the tally beside the title says how far
    along you are anyway. */
 #prog{height:3px;background:none;flex:0 0 auto}
-#prog i{display:block;height:100%;width:0;background:var(--named);
-  transition:width .55s cubic-bezier(.4,0,.2,1), background-color .3s ease}
-#prog.won i{background:var(--ok)}
+/* One colour now. The bar used to run gold for names given and turn green once
+   they were marked; with marking instant there is only ever the marked count to
+   draw, so the two-tone was a distinction with nothing left on either side. */
+#prog i{display:block;height:100%;width:0;background:var(--ok);
+  transition:width .55s cubic-bezier(.4,0,.2,1)}
 
-/* the setup panel slides out from under the header and may take the whole
-   screen; it lives inside main so its height is exactly what is left below the
-   header, and hides behind the header when closed rather than being clipped */
 /* ============ homepage ============ */
 #home{
   position:fixed;inset:0;z-index:30;background:var(--paper);
@@ -137,56 +133,25 @@ body.playing #home{display:none}
 #menu h2:first-of-type{margin-top:4px}
 #menubtn{background:none;border:1px solid var(--ink);border-radius:4px;padding:5px 9px;margin-left:4px}
 
-#top{position:relative;z-index:3;flex:0 0 auto}
-#bar{
-  position:absolute;left:0;right:0;top:0;z-index:12;   /* over the map's own chrome, under the results sheet */
-  max-height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
-  background:var(--panel);border-bottom:1px solid var(--rule);
-  box-shadow:0 12px 24px rgba(20,26,28,.16);
-  transform:translateY(-100%);visibility:hidden;
-  transition:transform .3s cubic-bezier(.4,0,.2,1), visibility 0s linear .3s;
-}
-body.setup #bar{transform:none;visibility:visible;transition-delay:0s,0s}
-@media (prefers-reduced-motion: reduce){ #bar{transition:none} }
+/* Everything the game used to ask you to decide is decided: suggestions are on,
+   marking is instant, you choose where to go next, and the device says whether
+   to animate. Nothing is left down here but which build you are looking at. */
+#homefoot{margin-top:24px;padding-top:14px;border-top:1px solid var(--rule);text-align:right}
 
-/* in a row of its own a segment would stretch the full width and leave dead
-   space inside its border, so let it hug its buttons instead */
-#bar .seg{width:fit-content;max-width:100%}
-/* the games are too many, and too unalike, to sit in one segmented control -
-   five names wrapped badly and shared a single explanation. One per line, each
-   able to explain itself. */
-.mode{display:flex;align-items:center;gap:8px;margin-top:7px}
-.modebtn{
-  flex:1 1 auto;text-align:left;background:none;color:inherit;
-  border:1px solid var(--ink);border-radius:4px;padding:10px 12px;
-}
-.modebtn[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
-#modeseg .note{margin-top:7px}
-#bar .row{padding:13px var(--pad);border-bottom:1px solid var(--rule)}
-#bar .row:last-of-type{border-bottom:0}
-.rowtop{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-.rowlabel{flex:1 1 auto;color:var(--ink-2)}
-.info{
-  flex:0 0 auto;width:22px;height:22px;border-radius:999px;padding:0;
-  border:1px solid var(--ink-3);background:none;color:var(--ink-2);
-  font:italic 600 12px/1 "Iowan Old Style",Palatino,serif;
-}
-.info[aria-expanded="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+/* Starting a game over is that game's business, so it lives on that game's
+   panel and is drawn quieter than the ways in - it is not one of them. Armed,
+   it takes the colour of a wrong answer, which is the only red here. */
+#menu .wipe{border-color:var(--ink-3);color:var(--ink-2)}
+#menu .wipe.armed{background:var(--miss);border-color:var(--miss);color:#fff}
+#menu .wipe.armed small{color:rgba(255,255,255,.85)}
+
+#top{position:relative;z-index:3;flex:0 0 auto}
 .note{
   margin:9px 0 0;max-width:62ch;color:var(--ink-2);font-size:13.5px;line-height:1.5;
   border-left:2px solid var(--rule);padding-left:10px;
 }
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-#barfoot{display:flex;align-items:center;gap:10px;padding:12px var(--pad) 16px}
-#done{background:var(--ink);color:var(--paper);border:1px solid var(--ink);
-  border-radius:4px;padding:8px 16px}
-/* wraps rather than clipping - the mode row outgrew one line on a phone */
-.seg{display:flex;flex-wrap:wrap;border:1px solid var(--ink);border-radius:4px;overflow:hidden}
-.seg button{background:none;border:0;padding:7px 10px;border-right:1px solid var(--ink)}
-.seg button:last-child{border-right:0}
-.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
-#restart2{background:none;border:1px solid var(--ink);border-radius:4px;padding:6px 10px}
-#build{color:var(--ink-3);margin-left:auto;align-self:center}
+#build{color:var(--ink-3)}
 button:focus-visible{outline:2px solid var(--live);outline-offset:2px}
 
 main{flex:1 1 auto;min-height:0;display:flex;position:relative;z-index:1}
@@ -265,7 +230,6 @@ path.c.ctx.host{stroke-width:2.2;stroke-opacity:1;stroke:#2E6A50}
 #mapwrap.board #land,#mapwrap.board #rim{display:none}
 /* a touch more weight on the coast, which has less to push against than sea did */
 #mapwrap.board path.c{stroke:var(--coast);stroke-opacity:.7}
-path.c.named{fill:var(--tint,var(--named))}
 path.c.right{fill:var(--tint,var(--right))}
 path.c.told{fill:var(--told)}
 path.c.miss{fill:var(--miss)}
@@ -278,7 +242,6 @@ path.c.sel{stroke:var(--live);stroke-width:2.6;stroke-opacity:1}
   stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none}
 circle.dot{fill:#B9B4A6;stroke:#6E7269;stroke-width:.5;cursor:pointer;vector-effect:non-scaling-stroke}
 circle.dot.out{fill:#DEDCD3;stroke:#B2B6AD;pointer-events:none}
-circle.dot.named{fill:var(--tint,var(--named))}
 circle.dot.right{fill:var(--tint,var(--right))}
 circle.dot.told{fill:var(--told)}
 circle.dot.miss{fill:var(--miss)}
@@ -343,7 +306,6 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
   background:var(--panel);border:1px solid var(--ink);border-radius:999px;padding:8px 13px;
   box-shadow:0 2px 6px rgba(20,26,28,.16);
 }
-#tools button.key{background:var(--live);border-color:var(--live);color:#fff}
 #tools button.waiting{background:var(--ok);border-color:var(--ok);color:#fff}
 #tools button:disabled{opacity:.45;cursor:default}
 #zoom{position:absolute;right:10px;bottom:10px;z-index:5;display:flex;flex-direction:column;gap:5px}
@@ -397,7 +359,12 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
 #board.on{display:flex}
 #boardbox{background:var(--panel);border:1px solid var(--ink);border-radius:8px;overflow:hidden;
   max-width:460px;width:100%;max-height:84vh;display:flex;flex-direction:column}
-#boardhead{padding:16px var(--pad) 0;border-bottom:1px solid var(--ink)}
+/* The tabs scroll sideways when there are more games than fit. Cut off square
+   they read as a mistake, so the row fades out at the edge it runs past - which
+   also says there is more that way. */
+#boardhead{padding:16px var(--pad) 0;border-bottom:1px solid var(--ink);position:relative}
+#boardhead::after{content:'';position:absolute;right:0;bottom:10px;width:34px;height:30px;
+  pointer-events:none;background:linear-gradient(to right, rgba(251,247,236,0), var(--panel))}
 #boardgame{font-size:24px;line-height:1.1;margin:6px 0 10px}
 #boardtabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:10px;scrollbar-width:none}
 #boardtabs::-webkit-scrollbar{display:none}
@@ -482,7 +449,6 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
   #ask{width:min(330px, calc(100vw - 20px))}
   header{padding:7px var(--pad) 6px}
   h1{font-size:14px}
-  #bar{gap:5px;padding:8px var(--pad)}
   #tools{left:8px;bottom:8px}
 }
 </style>
@@ -495,90 +461,12 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     <h1 class="serif">Name the World</h1>
     <div id="tally" class="caps"></div>
     <button id="menubtn" class="caps">Menu</button>
-    <button id="gear" class="caps" aria-expanded="false" aria-controls="bar">Setup</button>
   </header>
 
     <div id="prog"><i></i></div>
   </div>
 
   <main>
-  <div id="bar">
-    <div class="row">
-      <div class="rowtop">
-        <span class="rowlabel caps">Suggestions</span>
-        <button class="info" type="button" aria-expanded="false" aria-controls="i-list">
-          <span aria-hidden="true">i</span><span class="sr">What is Suggestions?</span></button>
-      </div>
-      <div class="seg" id="listseg" role="group" aria-label="Suggestions">
-        <button data-list="1" class="caps">On</button>
-        <button data-list="0" class="caps">Off</button>
-      </div>
-      <p class="note" id="i-list" hidden>Offer a list of matching names as you type, to pick from.
-        Turn it off to type every answer out in full, which is harder.</p>
-    </div>
-
-    <div class="row">
-      <div class="rowtop">
-        <span class="rowlabel caps">Moving on</span>
-        <button class="info" type="button" aria-expanded="false" aria-controls="i-adv">
-          <span aria-hidden="true">i</span><span class="sr">What is Moving on?</span></button>
-      </div>
-      <div class="seg" id="advseg" role="group" aria-label="Moving on">
-        <button data-adv="manual" class="caps">On tap</button>
-        <button data-adv="auto" class="caps">Automatic</button>
-      </div>
-      <p class="note" id="i-adv" hidden>What happens once you have named a place. On tap waits for
-        you to choose where to go next; Automatic moves straight on to the nearest place still
-        unnamed.</p>
-    </div>
-
-    <div class="row">
-      <div class="rowtop">
-        <span class="rowlabel caps">Marking</span>
-        <button class="info" type="button" aria-expanded="false" aria-controls="i-check">
-          <span aria-hidden="true">i</span><span class="sr">What is Marking?</span></button>
-      </div>
-      <div class="seg" id="checkseg" role="group" aria-label="When to check">
-        <button data-check="end" class="caps">At the end</button>
-        <button data-check="auto" class="caps">As you go</button>
-      </div>
-      <p class="note" id="i-check" hidden>When answers are marked right or wrong. At the end holds
-        everything back until you tap Check answers, so nothing gives the game away; As you go
-        marks each answer the moment you give it.</p>
-    </div>
-
-    <div class="row">
-      <div class="rowtop">
-        <span class="rowlabel caps">Motion</span>
-        <button class="info" type="button" aria-expanded="false" aria-controls="i-motion">
-          <span aria-hidden="true">i</span><span class="sr">What is Motion?</span></button>
-      </div>
-      <div class="seg" id="motionseg" role="group" aria-label="Motion">
-        <button data-motion="1" class="caps">On</button>
-        <button data-motion="0" class="caps">Off</button>
-      </div>
-      <p class="note" id="i-motion" hidden>Gliding between places, confetti and the other
-        movement. Turn it off for a map that changes without animating. It starts off if your
-        device asks for reduced motion.</p>
-    </div>
-
-    <div class="row">
-      <div class="rowtop">
-        <span class="rowlabel caps">Start again</span>
-        <button class="info" type="button" aria-expanded="false" aria-controls="i-restart">
-          <span aria-hidden="true">i</span><span class="sr">What is Start again?</span></button>
-      </div>
-      <button id="restart2" class="caps">Restart</button>
-      <p class="note" id="i-restart" hidden>Forget every answer in every game and begin from an
-        empty map. This cannot be undone.</p>
-    </div>
-
-    <div id="barfoot">
-      <button id="done" class="caps">Done</button>
-      <span id="build" class="caps">build 6 aug · v82</span>
-    </div>
-  </div>
-
     <div id="mapwrap">
       <svg id="map" viewBox="0 0 2000 1000" preserveAspectRatio="xMidYMid meet" aria-label="World map">
         <g id="scene">
@@ -628,7 +516,6 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
       </div>
 
       <div id="tools">
-        <button id="check" class="key caps">Check answers</button>
         <button id="skip" class="caps">Next</button>
       </div>
       <div id="zoom">
@@ -665,12 +552,16 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
         <button class="game" data-mode="counties">English counties<small>The 48 ceremonial counties.</small></button>
         <button class="game" data-mode="boroughs">London boroughs<small>All 33, the City included.</small></button>
         <h2 class="caps">United States</h2>
-        <button class="game" data-mode="states">States<small>All 50, Alaska and Hawaii inset.</small></button>
+        <button class="game" data-mode="states">States<small>All 50, Alaska and Hawaii included.</small></button>
       </div>
 
       <div class="menupanel" data-menu="scope" hidden></div>
       <div class="menupanel" data-menu="conts" hidden></div>
     </nav>
+
+    <div id="homefoot">
+      <span id="build" class="caps">build 24 aug · v84</span>
+    </div>
   </div>
 </div>
 
@@ -695,6 +586,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
       <button id="another" class="key caps">Another ten</button>
       <button id="retry" class="caps">Try the misses again</button>
       <button id="revealall" class="caps">Show all answers</button>
+      <button id="share" class="caps">Share</button>
       <button id="seeboard" class="caps">Leaderboard</button>
       <button id="close" class="caps">Close</button>
     </div>
@@ -745,8 +637,14 @@ const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''
   .replace(/\s+/g,' ').trim();
 const collator = new Intl.Collator('en-GB');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const systemCalm = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-let calm = systemCalm;
+/* Whether to animate anything is the device's business, not the game's. There
+   was a switch here for a while, which was a copy of a setting the reader had
+   already made once and expects to hold everywhere - so the system is asked
+   instead, and asked continuously: someone who turns it on partway through a
+   game is asking for the confetti to stop now, not at the next reload. */
+const quiet = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+let calm = !!(quiet && quiet.matches);
+if(quiet && quiet.addEventListener) quiet.addEventListener('change', e=>{ calm = e.matches; });
 
 function lev(a,b){
   if(Math.abs(a.length-b.length) > 2) return 9;
@@ -768,8 +666,7 @@ let saveTimer = 0;
 function snapshot(){
   return JSON.stringify({v:1, ans:S.ans, mode:S.mode, playing:S.playing,
                          scope:S.scope, continent:S.continent, pick:S.pick, round:S.round,
-                         list:S.list, check:S.check, checked:S.checked,
-                         adv:S.adv, motion:S.motion, times:S.times, hailed:S.hailed});
+                         times:S.times, hailed:S.hailed});
 }
 function save(){
   if(!store) return;
@@ -785,11 +682,6 @@ function restore(){
     if(BY_CODE[code] && a && typeof a.given === 'string') ans[code] = a;
   S.ans = ans;
   if(MODES.includes(o.mode)) S.mode = o.mode;
-  if(typeof o.list === 'boolean') S.list = o.list;
-  if(o.check === 'end' || o.check === 'auto') S.check = o.check;
-  S.checked = !!o.checked;
-  if(o.adv === 'auto' || o.adv === 'manual') S.adv = o.adv;
-  if(typeof o.motion === 'boolean') S.motion = o.motion;
   if(o.times && typeof o.times === 'object')
     for(const [key, ms] of Object.entries(o.times))
       if(typeof ms === 'number' && ms >= 0 && ms < 864e5) S.times[key] = ms;
@@ -801,10 +693,8 @@ function restore(){
   if(Array.isArray(o.pick)) S.pick = o.pick.filter(c=>BY_CODE[c]);
   if(typeof o.round === 'number') S.round = o.round;
   if(S.scope === 'random' && !S.pick.length) S.scope = 'all';
-  calm = !S.motion;
   return Object.keys(ans).length > 0;
 }
-function forget(){ try{ store && store.removeItem(KEY); }catch(e){} }
 
 /* ============ the clock ============
    A run is timed only while it is actually being played: the clock stops when
@@ -819,7 +709,6 @@ let clockAt = 0;
 function clockOn(){
   return S.playing && !document.hidden
       && !$('#sheet').classList.contains('on')
-      && !document.body.classList.contains('setup')
       && !!unnamed().length;
 }
 /* Called on a tick and before anything reads the time, so the answer is never
@@ -1070,9 +959,14 @@ const PAINTABLE = DATA.concat(CAP_ENTRY, CTY_ENTRY, US_ENTRY, LB_ENTRY);
 
 const BOARDS = ['counties','states','boroughs'];   // their own map, not the globe
 const MODES = ['world','continents','capitals','counties','states','boroughs','flags'];
-const S = { mode:'world', scope:'all', continent:'Europe', pick:[], round:0, playing:false, list:true, check:'end',
-            ans:{}, sel:null, checked:false, cursor:0, streak:0, toldMode:false,
-            adv:'manual', motion:!systemCalm,
+/* The game used to be adjustable: suggestions on or off, marking now or at the
+   end, the next place chosen for you or by you. Every one of those was a way of
+   making it worse. Marking as you go is what makes it a game rather than a form
+   to fill in; choosing where to go next is how anyone actually plays, following
+   one place to the next by association; and the list of names is what keeps a
+   spelling from costing you a country. So none of them are choices any more. */
+const S = { mode:'world', scope:'all', continent:'Europe', pick:[], round:0, playing:false,
+            ans:{}, sel:null, cursor:0, streak:0,
             /* how long each game has been played for, in milliseconds, kept per
                game so switching between them does not run one clock for another */
             times:{}, hailed:{} };
@@ -1108,24 +1002,20 @@ function rollRound(){
     out.push(draw.splice(Math.floor(Math.random()*draw.length), 1)[0].code);
   S.pick = out;
   out.forEach(c=>{ delete S.ans[c]; });    // a fresh round starts clean
-  S.checked = false; S.sel = null; S.cursor = 0;
+  S.sel = null; S.cursor = 0;
   S.round = (S.round || 0) + 1;
 }
 function entryForShape(e){
   if(S.mode==='continents') return e.continent ? BY_CODE['CONT-'+e.continent] : null;
   return targets().includes(e) ? e : null;
 }
-function judged(code){
-  const a = S.ans[code];
-  return !!a && (S.check==='auto' || S.checked || a.told);
-}
 function unnamed(){ return targets().filter(e=>!S.ans[e.code]); }
+/* Names already used up, so the list cannot offer the same one twice. A wrong
+   guess is not one of them: it was marked wrong the moment it was given, so the
+   name is free again and belongs to whoever it really is. */
 function spentNames(){
   const out = new Set();
-  for(const [code,a] of Object.entries(S.ans)){
-    if(a.told) continue;
-    if(a.ok || !judged(code)) out.add(a.given);
-  }
+  for(const [code,a] of Object.entries(S.ans)) if(a.ok) out.add(a.given);
   return out;
 }
 
@@ -1585,7 +1475,7 @@ function drawLabels(){
   if(!on){ layerLabels.textContent = ''; return; }
   const want = targets().filter(e=>{
     const a = S.ans[e.code];
-    return a && judged(e.code) && (a.ok || a.told) && (e.c || e.cll);
+    return a && (a.ok || a.told) && (e.c || e.cll);
   });
   layerLabels.textContent = '';
   const frag = document.createDocumentFragment();
@@ -1630,7 +1520,6 @@ function paintMap(){
     const t = tinted ? (e.continent ? BY_CODE['CONT-'+e.continent] : null)
                      : (live.has(e.code) ? e : null);
     const a = t ? S.ans[t.code] : null;
-    const seen = t && judged(t.code);
     /* Context, not out of play: in the capitals game the countries are the
        backdrop you read the map from, so they keep their ordinary colour.
        The District of Columbia used to ride on that rule, and it should not.
@@ -1639,12 +1528,9 @@ function paintMap(){
        yet - a gap, once the states around it are coloured in. It is land that
        is not in play, and takes that colour like anywhere else out of play. */
     let cls = t ? ' play' : (caps ? ' ctx' : ' out');
-    if(a){
-      if(!seen) cls += ' named';
-      else if(a.told) cls += ' told';
-      else if(a.ok) cls += ' right';
-      else cls += ' miss';
-    }
+    /* Every answer is marked the moment it is given, so a shape is right, wrong
+       or given away - there is no longer a fourth state of named-but-unmarked. */
+    if(a) cls += a.told ? ' told' : (a.ok ? ' right' : ' miss');
     if(t && S.sel === t.code) cls += ' sel';
     if(!t && host && e.code === host) cls += ' host';
     for(const el of els){
@@ -1653,7 +1539,7 @@ function paintMap(){
          shapes stay on show either way, as the backdrop you read the map from */
       const hide = dot && (!!e.isCap !== caps);
       el.setAttribute('class', (dot ? 'dot' : 'c') + cls + (hide ? ' gone' : ''));
-      if(tinted && a && (!seen || a.ok)) el.style.setProperty('--tint', HUE[t.continent]);
+      if(tinted && a && a.ok) el.style.setProperty('--tint', HUE[t.continent]);
       else el.style.removeProperty('--tint');
     }
   }
@@ -2543,15 +2429,11 @@ function closeAsk(){
 function renderAskFoot(){
   const t = S.sel && BY_CODE[S.sel];
   const a = t && S.ans[t.code];
-  const showTell = !!t && S.check === 'auto' && a && !a.ok && !a.told;
+  const showTell = !!(t && a && !a.ok && !a.told);
   $('#askfoot').className = showTell || $('#asknote').textContent ? 'on' : '';
 }
 function renderSuggestions(){
   sug.innerHTML = '';
-  if(!S.list){
-    sug.innerHTML = '<p class="note">Suggestions are off — type the name and press return.</p>';
-    return;
-  }
   const q = norm(find.value);
   if(!q){
     sug.innerHTML = '<p class="note">Start typing a name.</p>';
@@ -2579,7 +2461,7 @@ find.addEventListener('keydown', ev=>{
   const rows = [...sug.querySelectorAll('.row:not(.used)')];
   if(ev.key === 'Enter'){
     ev.preventDefault();
-    if(S.list && rows.length){ (rows[S.cursor] || rows[0]).click(); }
+    if(rows.length) (rows[S.cursor] || rows[0]).click();
     else answer(find.value);
     return;
   }
@@ -2788,7 +2670,7 @@ function cancelHold(){ clearTimeout(holdTimer); holdTimer = 0; }
 function showFlag(t){
   const img = $('#flagimg');
   img.src = 'flags/' + t.iso + '.webp';
-  img.alt = judged(t.code) ? ('Flag of ' + t.name) : 'Flag to name';
+  img.alt = S.ans[t.code] ? ('Flag of ' + t.name) : 'Flag to name';
 }
 function select(code){
   cancelHold(); clearWaiting();
@@ -2796,32 +2678,31 @@ function select(code){
   const t = BY_CODE[code];
   if(t.isFlag) showFlag(t);
   const a = S.ans[code];
-  const settled = a && judged(code) && (a.ok || a.told);
+  const settled = !!(a && (a.ok || a.told));
   paintMap();
   /* an answered place is framed here; one still to name is framed by openAsk,
      which does it once the input has focus and the keyboard is accounted for */
   if(settled) frameOn(t, {forAsk:false, fly:true});
 
-  if(a && judged(code) && a.ok){          // already right - just say so
+  if(a && a.ok){                          // already right - just say so
     closeAsk();
     showTip(t, 'ok', '✓ ' + t.name);
     return;
   }
-  if(a && judged(code) && a.told){
+  if(a && a.told){
     closeAsk();
     showTip(t, 'tell', t.name);
     return;
   }
   hideTip();
-  if(a && !judged(code)) showTip(t, 'tell', a.given);   // named but not yet checked
-  else if(a && !a.ok) showTip(t, 'no', '✗ Not ' + a.given);
+  if(a) showTip(t, 'no', '✗ Not ' + a.given);
   openAsk(t);
 }
 
 function answer(text){
   if(!S.sel) return;
   const t = BY_CODE[S.sel];
-  const guess = S.list ? (resolve(text) || null) : resolve(text);
+  const guess = resolve(text) || null;
   if(!guess){
     $('#asknote').textContent = 'No match for that name.';
     renderAskFoot(); placeFloaters();
@@ -2833,28 +2714,29 @@ function answer(text){
   closeAsk();
   render();
 
-  if(S.check === 'auto'){
-    if(a.ok){
-      S.streak++;
-      showTip(t, 'ok', '✓ ' + t.name);
-      celebrate(t);
-      if(S.adv === 'auto') hold(advance, 1200); else waiting();
-    } else {
-      S.streak = 0;
-      showTip(t, 'no', '✗ Not ' + a.given);
-      openAsk(t);
-      find.value = '';
-      renderAskFoot();
-    }
+  if(a.ok){
+    S.streak++;
+    showTip(t, 'ok', '✓ ' + t.name);
+    celebrate(t);
+    if(!finish()) waiting();
   } else {
-    showTip(t, 'tell', a.given);
-    if(S.adv !== 'auto') waiting();
-    if(!S.toldMode){
-      S.toldMode = true;
-      showToast('Nothing is marked right or wrong until you tap ‘Check answers’. For instant marking and confetti, set Check to ‘As you go’ under Setup.', 6500);
-    }
-    if(S.adv === 'auto') hold(advance, 640);
+    S.streak = 0;
+    showTip(t, 'no', '✗ Not ' + a.given);
+    openAsk(t);
+    find.value = '';
+    renderAskFoot();
   }
+}
+/* Settling the last one is the end of the game, and the end of the game is the
+   result. It used to arrive by itself only if the map was set to move you on,
+   and that setting has gone - which would have left a finished run sitting
+   there unremarked until you noticed Next had turned into Result. A wrong last
+   answer is not the end: the place is still open to another go, so the sheet
+   waits to be asked for. */
+function finish(){
+  if(unnamed().length) return false;
+  hold(()=>{ S.sel = null; closeAsk(); render(); openSheet(); }, 900);
+  return true;
 }
 /* highlight Next so it is obvious where to go, without moving the map */
 function waiting(){
@@ -2871,8 +2753,7 @@ function advance(){
   const rest = unnamed();
   if(!rest.length){
     S.sel = null; closeAsk(); render();
-    if(S.check === 'auto') openSheet();
-    else showToast('Everything is named — tap ‘Check answers’ when you are ready.', 4200);
+    openSheet();
     return;
   }
   const from = S.sel ? BY_CODE[S.sel] : null;
@@ -2894,66 +2775,42 @@ function reveal(code){
   S.ans[code] = {given:t.name, ok:false, told:true};
   closeAsk(); render();
   showTip(t, 'tell', t.name);
-  if(S.adv === 'auto') hold(advance, 1500); else waiting();
+  if(!finish()) waiting();
 }
 function bumpTally(){
   const el = $('#tally');
   el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
   setTimeout(()=>el.classList.remove('bump'), 500);
 }
-function checkAll(){
-  S.checked = true; S.sel = null; closeAsk(); hideTip(); render();
-  const t = targets();
-  const rights = t.filter(e=>S.ans[e.code] && S.ans[e.code].ok);
-  if(rights.length){
-    const r = wrap.getBoundingClientRect();
-    burst(r.width/2, visibleH(r)*0.55, 50 + Math.round(90 * rights.length / t.length));
-    rights.slice(0, 12).forEach((e,i)=> setTimeout(()=>ripple(e), i*90));
-    setTimeout(openSheet, 950);
-  } else openSheet();
-}
-
 /* ============ chrome ============ */
-function renderBar(){
+function renderMenu(){
   document.querySelectorAll('#menu .game').forEach(b=>
     b.toggleAttribute('aria-current', b.dataset.mode === S.mode));
-  document.querySelectorAll('#listseg button').forEach(b=>b.setAttribute('aria-pressed', String((b.dataset.list==='1')===S.list)));
-  document.querySelectorAll('#checkseg button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.check===S.check)));
-  document.querySelectorAll('#advseg button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.adv===S.adv)));
-  document.querySelectorAll('#motionseg button').forEach(b=>b.setAttribute('aria-pressed', String((b.dataset.motion==='1')===S.motion)));
 }
 function renderTally(){
   const t = targets();
   const named = t.filter(e=>S.ans[e.code]).length;
-  const right = t.filter(e=>S.ans[e.code] && S.ans[e.code].ok && judged(e.code)).length;
+  const right = t.filter(e=>S.ans[e.code] && S.ans[e.code].ok).length;
   const tight = window.innerWidth <= 760;
-  $('#tally').innerHTML = (S.check==='auto' || S.checked)
-    ? (tight ? `<b>${right}</b>✓ · ${named}/${t.length}` : `<b>${right}</b> right · <b>${named}</b> of ${t.length} done`)
-    : (tight ? `<b>${named}</b>/${t.length}` : `<b>${named}</b> of <b>${t.length}</b> named`);
-  const shown = (S.check === 'auto' || S.checked);
-  const bar = $('#prog');
-  bar.classList.toggle('won', shown);
-  bar.firstElementChild.style.width = (100 * (shown ? right : named) / Math.max(1, t.length)) + '%';
-  const all = named === t.length;
-  const btn = $('#check');
-  btn.style.display = S.check === 'auto' ? 'none' : '';
-  btn.disabled = !all;
-  btn.textContent = all ? 'Check answers' : `${t.length-named} to go`;
+  $('#tally').innerHTML = tight
+    ? `<b>${right}</b>✓ · ${named}/${t.length}`
+    : `<b>${right}</b> right · <b>${named}</b> of ${t.length} done`;
+  $('#prog').firstElementChild.style.width = (100 * right / Math.max(1, t.length)) + '%';
   /* A finished game had nowhere to go. The result comes up the moment you name
      the last one and never again - so closing it, or coming back to a game
      already finished, left the run with no way to be seen or put a name to.
      Next has nothing to advance to at that point, so it offers the result. */
-  const done = all && shown;
+  const done = named === t.length;
   const skip = $('#skip');
-  if(!unnamed().length) clearWaiting();      // before the label, since it sets one
+  if(done) clearWaiting();                   // before the label, since it sets one
   skip.classList.toggle('result', done);
-  skip.disabled = done ? false : !unnamed().length;
+  skip.disabled = false;
   skip.textContent = done ? 'Result' : 'Next';
 }
 /* clockTick here as well as on its own timer: it anchors the clock the moment
    anything changes rather than up to a second later, which is otherwise lost
-   from the run every time the result closes or you come back from setup. */
-function render(){ clockTick(); renderBar(); renderTally(); paintMap(); save(); }
+   from the run every time the result closes or you come back from the menu. */
+function render(){ clockTick(); renderMenu(); renderTally(); paintMap(); save(); }
 
 /* ============ results ============ */
 function openSheet(){
@@ -2967,9 +2824,10 @@ function openSheet(){
   $('#sheettime').innerHTML = `in <b>${clockText(ms)}</b>`;
   const list = $('#sheetlist');
   list.innerHTML = '';
-  if(!misses.length){
-    list.innerHTML = '<p style="padding:16px;color:var(--ink-2)" class="serif">A clean sheet — every one right.</p>';
-  } else {
+  /* nothing to list when nothing was missed: the score says it, and the line
+     above the name box says it again, so a third telling is just a grey band */
+  list.hidden = !misses.length;
+  if(misses.length){
     misses.forEach(e=>{
       const a = S.ans[e.code];
       const r = document.createElement('div'); r.className = 'r';
@@ -3015,6 +2873,44 @@ function openClaim(key, score, total, ms){
     ? 'A clean sheet — put your name to it'
     : 'Put this run on the leaderboard';
 }
+/* ============ passing it on ============
+   A score is worth telling somebody, and now that a game has a name in the
+   address there is somewhere for them to land. The phone's own share sheet does
+   the work where there is one; where there is not, the line goes to the
+   clipboard, which is what a desktop browser can offer.
+
+   The address is built from the game rather than read off the page, so it is
+   the tidy form - namethe.world/#capitals - and not whatever the player got
+   here by. A preview deployment shares its own address, though, since a link to
+   the live site would show something other than what was played. */
+const SHARE_HOME = 'https://namethe.world/';
+function shareLine(){
+  const t = targets();
+  const right = t.filter(e=>S.ans[e.code] && S.ans[e.code].ok).length;
+  const ms = elapsed(gameKey());
+  const what = boardLabel(gameKey(S.mode, S.scope === 'random' ? 'all' : S.scope));
+  return `${what}: ${right} of ${t.length} in ${clockText(ms)}`;
+}
+function shareUrl(){
+  const here = location.origin + location.pathname;
+  const base = BOARD_HOME.includes(location.hostname) ? SHARE_HOME
+             : (location.protocol === 'file:' ? SHARE_HOME : here);
+  return base.replace(/\/+$/, '/') + (gameHash() || '');
+}
+$('#share').onclick = async ()=>{
+  const text = shareLine(), url = shareUrl(), note = $('#claimnote');
+  const say = m => { if(!$('#claim').hidden) note.textContent = m; else showToast(m, 2600); };
+  try{
+    if(navigator.share){ await navigator.share({title:'Name the World', text, url}); return; }
+    await navigator.clipboard.writeText(`${text}\n${url}`);
+    say('Copied — paste it wherever you like.');
+  }catch(e){
+    /* a share the player backed out of is not a failure and should say nothing */
+    if(e && e.name === 'AbortError') return;
+    say('Could not share it. ' + text + ' ' + url);
+  }
+};
+
 $('#claim').addEventListener('submit', async ev=>{
   ev.preventDefault();
   if(!claiming) return;
@@ -3057,10 +2953,15 @@ function boardLabel(key){
   const [mode, scope, cont] = key.split('/');
   return (LABEL[mode] || mode) + (scope === 'continent' ? ' · ' + cont : '');
 }
+let boardCameFromSheet = false;
 function openBoard(key){
   /* whichever game is in hand, unless it is a round of ten - those are never
      the same ten twice, so there is nothing to compare */
   boardAt = key || (S.scope === 'random' ? gameKey(S.mode, 'all') : gameKey());
+  /* one card at a time: the result behind the leaderboard showed as an edge of
+     panel down either side, which reads as a mistake rather than as depth */
+  boardCameFromSheet = $('#sheet').classList.contains('on');
+  if(boardCameFromSheet) $('#sheet').classList.remove('on');
   $('#board').classList.add('on');
   renderBoard();
 }
@@ -3092,13 +2993,18 @@ async function renderBoard(){
     : (BOARD_URL ? (offline ? 'Offline — showing this device.' : 'Showing this device.')
                  : 'This device only — no leaderboard server is set up yet.');
 }
-$('#boardclose').onclick = ()=> $('#board').classList.remove('on');
+$('#boardclose').onclick = ()=>{
+  $('#board').classList.remove('on');
+  /* back to the result if that is where you came from, rather than dropping you
+     on the map with the run you just finished nowhere to be seen */
+  if(boardCameFromSheet){ boardCameFromSheet = false; $('#sheet').classList.add('on'); }
+};
 $('#board').addEventListener('click', ev=>{ if(ev.target.id === 'board') $('#board').classList.remove('on'); });
 $('#boardbtn').onclick = ()=> openBoard();
 $('#seeboard').onclick = ()=> openBoard(S.scope === 'random' ? gameKey(S.mode, 'all') : gameKey());
 $('#revealall').onclick = ()=>{
   targets().forEach(e=>{ if(!S.ans[e.code] || !S.ans[e.code].ok) S.ans[e.code] = {given:e.name, ok:false, told:true}; });
-  S.checked = true; $('#sheet').classList.remove('on'); render();
+  $('#sheet').classList.remove('on'); render();
 };
 $('#another').onclick = ()=>{
   rollRound();
@@ -3109,7 +3015,7 @@ $('#another').onclick = ()=>{
 };
 $('#retry').onclick = ()=>{
   targets().forEach(e=>{ const a = S.ans[e.code]; if(a && !a.ok) delete S.ans[e.code]; });
-  S.checked = false; S.sel = null;
+  S.sel = null;
   /* back in play, so the clock runs on and finishing again is worth marking */
   delete S.hailed[gameKey()];
   $('#sheet').classList.remove('on');
@@ -3118,33 +3024,35 @@ $('#retry').onclick = ()=>{
 
 /* ============ controls ============ */
 function switchView(){
-  S.sel = null; S.checked = false; S.cursor = 0;
+  S.sel = null; S.cursor = 0;
   closeAsk(); hideTip();
   $('#sheet').classList.remove('on');
   render(); fitCurrent();
 }
-function reset(){
-  forget(); cancelHold();
-  S.ans = {}; S.sel = null; S.checked = false; S.cursor = 0;
-  S.times = {}; S.hailed = {}; clockAt = 0;
-  closeAsk(); hideTip();
+/* how much of a game has been answered, in whatever scope it was answered in */
+function playedIn(mode){ return basis(mode).filter(e=>S.ans[e.code]).length; }
+/* Forget one game, and only that game.
+
+   Answers used to go all at once, from a button at the foot of the homepage.
+   That was wrong twice over: it was nowhere anybody would look for it, and
+   starting the boroughs over cost you the two hundred countries as well. No
+   two games share a code - the boroughs are LB-, the states US-, the flags
+   FL- - so a game's answers are exactly its own, and can go on their own. */
+function wipe(mode){
+  clockTick();                       // bank what is owed before the clocks go
+  cancelHold();
+  for(const e of basis(mode)) delete S.ans[e.code];
+  for(const k of Object.keys(S.times))  if(k.split('/')[0] === mode) delete S.times[k];
+  for(const k of Object.keys(S.hailed)) if(k.split('/')[0] === mode) delete S.hailed[k];
+  if(mode === S.mode){ S.sel = null; S.cursor = 0; closeAsk(); hideTip(); }
   $('#sheet').classList.remove('on');
-  render(); fitCurrent();
-}
-document.querySelectorAll('#listseg button').forEach(b=>b.onclick = ()=>{ S.list = b.dataset.list === '1'; render(); renderSuggestions(); });
-document.querySelectorAll('#advseg button').forEach(b=>b.onclick = ()=>{ S.adv = b.dataset.adv; clearWaiting(); render(); });
-document.querySelectorAll('#motionseg button').forEach(b=>b.onclick = ()=>{
-  S.motion = b.dataset.motion === '1'; calm = !S.motion; render();
-});
-document.querySelectorAll('#checkseg button').forEach(b=>b.onclick = ()=>{
-  S.check = b.dataset.check;
-  if(S.check === 'auto') S.checked = false;
   render();
-});
+  if(mode === S.mode) fitCurrent();
+}
 /* ============ menu ============
-   Games are chosen from the homepage now, not from Setup, which is left to
-   settings. The map keeps running underneath, so coming back to the menu and
-   picking the same game again lands you exactly where you were. */
+   Games are chosen from the homepage, and the map keeps running underneath, so
+   coming back to the menu and picking the same game again lands you exactly
+   where you were. */
 const LABEL = {continents:'Continents', world:'Countries', capitals:'Capitals',
                flags:'Flags', counties:'English counties', boroughs:'London boroughs',
                states:'States'};
@@ -3217,8 +3125,9 @@ function panelFor(mode){
   return b ? b.closest('.menupanel').dataset.menu : 'main';
 }
 function openHome(){
+  clockTick();                  // bank the time played before the clock stops
   S.playing = false; document.body.classList.remove('playing');
-  setSetup(false); closeAsk(); hideTip();
+  closeAsk(); hideTip();
   $('#sheet').classList.remove('on');
   showMenu(panelFor(S.mode));
   syncHash();
@@ -3229,11 +3138,20 @@ function showScope(mode){
   pending = mode;
   const opt = SCOPED[mode] || {};
   const total = basis(mode).length;
+  const done = playedIn(mode);
   let h = `<button class="back" data-open="${panelFor(mode)}"><span class="chev" aria-hidden="true">‹</span> All games</button>`
         + `<h2 class="caps">${esc(LABEL[mode] || mode)}</h2>`
-        + `<button class="go" data-scope="all">Every one<small>All ${total} of them.</small></button>`;
+        /* the same button either way - it is the whole game - but it is picking
+           up where you left off rather than starting, and should say so */
+        + (done ? `<button class="go" data-scope="all">Carry on<small>${done} of ${total} named so far.</small></button>`
+                : `<button class="go" data-scope="all">Every one<small>All ${total} of them.</small></button>`);
   if(opt.conts)  h += `<button class="more" data-open="conts">One continent<span class="chev" aria-hidden="true">›</span><small>A part of the world at a time.</small></button>`;
   if(opt.random) h += `<button class="go" data-scope="random">Random ten<small>Ten at a time, then ten more.</small></button>`;
+  /* Restarting a game belongs with that game, not in a drawer of settings: this
+     is where you came looking for it, and it can only touch what it is under. */
+  if(done) h += `<button class="wipe" data-wipe="${mode}">Start again`
+              + `<small>Forget ${done === 1 ? 'the one answer' : `all ${done} answers`} in `
+              + `${esc(LABEL[mode] || mode)} and begin from an empty map.</small></button>`;
   const p = document.querySelector('.menupanel[data-menu="scope"]');
   p.innerHTML = h; wireMenu(); showMenu('scope');
 }
@@ -3274,8 +3192,26 @@ function startGame(mode, scope, cont){
 
 function wireMenu(){
   document.querySelectorAll('#menu .game').forEach(b=>
-    b.onclick = ()=> SCOPED[b.dataset.mode] ? showScope(b.dataset.mode)
-                                            : startGame(b.dataset.mode, 'all'));
+    /* Continents has nothing to narrow, so it is normally gone straight into.
+       Once there are answers in it there is something to decide, and it gets
+       the same panel as everything else. */
+    b.onclick = ()=> (SCOPED[b.dataset.mode] || playedIn(b.dataset.mode))
+                       ? showScope(b.dataset.mode)
+                       : startGame(b.dataset.mode, 'all'));
+  /* one tap arms it and says what it will forget, a second inside a few
+     seconds goes through with it - it is sitting among the ordinary buttons */
+  document.querySelectorAll('#menu .wipe').forEach(b=>{
+    const said = b.querySelector('small').textContent;
+    let armed = 0;
+    const rest = ()=>{ armed = 0; b.classList.remove('armed');
+                       b.querySelector('small').textContent = said; };
+    b.onclick = ()=>{
+      if(armed){ clearTimeout(armed); wipe(b.dataset.wipe); showScope(b.dataset.wipe); return; }
+      b.classList.add('armed');
+      b.querySelector('small').textContent = 'Tap again to forget them. This cannot be undone.';
+      armed = setTimeout(rest, 5000);
+    };
+  });
   document.querySelectorAll('#menu .go').forEach(b=>
     b.onclick = ()=> startGame(pending, b.dataset.scope, b.dataset.cont));
   document.querySelectorAll('#menu [data-open]').forEach(b=>
@@ -3284,31 +3220,9 @@ function wireMenu(){
 wireMenu();
 $('#menubtn').onclick = openHome;
 
-function setSetup(open){
-  clockTick();                      // the clock stops while you are in here
-  document.body.classList.toggle('setup', open);
-  $('#gear').setAttribute('aria-expanded', String(open));
-  clockTick(); sizeCanvas(); placeFloaters();
-}
-$('#gear').onclick = ()=> setSetup(!document.body.classList.contains('setup'));
-$('#done').onclick = ()=> setSetup(false);
-/* changing the game takes you to a different map, so get out of the way; the
-   rest of the settings leave the panel up, to be read and adjusted together */
 document.addEventListener('keydown', ev=>{
   if(ev.key === 'Escape' && $('#board').classList.contains('on')) $('#board').classList.remove('on');
-  if(ev.key === 'Escape' && document.body.classList.contains('setup')) setSetup(false);
 });
-/* each row can explain itself */
-document.querySelectorAll('#bar .info').forEach(b=>{
-  b.onclick = ()=>{
-    const note = document.getElementById(b.getAttribute('aria-controls'));
-    const show = note.hasAttribute('hidden');
-    note.toggleAttribute('hidden', !show);
-    b.setAttribute('aria-expanded', String(show));
-  };
-});
-$('#restart2').onclick = ()=>{ reset(); setSetup(false); };
-$('#check').onclick = checkAll;
 $('#skip').onclick = ()=> $('#skip').classList.contains('result') ? openSheet() : advance();
 
 /* ============ go ============ */
