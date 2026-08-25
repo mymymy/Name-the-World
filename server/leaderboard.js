@@ -10,6 +10,8 @@
        GET    /runs?g=world/all   the board for one game, best first
        POST   /runs               add a run, as {g, n, s, t, ms}
        DELETE /runs/123           remove one, with the admin key
+       POST   /picks              report what a run reached, as {g, o, p}
+       GET    /picks?g=world/all  which places are hard, with the admin key
 
    Written on the assumption that the link gets shared further than intended.
    That means three things beyond storing rows:
@@ -37,6 +39,10 @@ const MAX_MS      = 24 * 3600 * 1000;
 const RATE_N      = 12;              // runs one address may post
 const RATE_WINDOW = 3600 * 1000;     // ... per hour
 const CACHE_S     = 30;              // how long the edge may hold a board
+/* A player may report more than once in a game - on finishing, on leaving it,
+   on closing the tab - and may well play several games in a sitting, so this
+   is far looser than the board's. It is here to stop a script, not a player. */
+const BEAT_N      = 60;              // reports one address may send per hour
 
 const cors = {
   'access-control-allow-origin': '*',
@@ -115,6 +121,44 @@ async function hashIp(ip, salt) {
 }
 
 const row = r => ({g: r.game, n: r.name, s: r.score, t: r.total, ms: r.ms, at: r.at, id: r.id});
+
+/* What a report is allowed to say.
+
+   It arrives as {g, o, p}: the game, whether this is the run's opening report,
+   and the places taken, each as [code, outcome, position]. Everything is
+   checked and bounded before it goes near the database - the endpoint is as
+   public as the page, and the whole point of counters is that nobody can put
+   a row in them that costs anything.
+
+   A place may appear once. Codes are bounded in length and count, positions
+   are bounded by the size of the game, and an outcome is one of three letters.
+   Anything malformed loses that entry rather than the whole report: a report
+   is not worth refusing over one bad row, and a partial count is still true
+   about the rows it kept. */
+const OUTCOME = {h: 'hit', m: 'miss', t: 'told'};
+function cleanBeat(b) {
+  if (!b || typeof b !== 'object') return null;
+  const game = String(b.g || '');
+  const total = GAMES[game];
+  if (!total) return null;
+  const list = Array.isArray(b.p) ? b.p : [];
+  if (!list.length || list.length > total) return null;
+  const seen = new Set();
+  const picks = [];
+  for (const item of list) {
+    if (!Array.isArray(item) || item.length !== 3) continue;
+    const code = String(item[0] || '');
+    const what = OUTCOME[item[1]];
+    const posn = Number(item[2]);
+    if (!code || code.length > 48 || seen.has(code)) continue;
+    if (!what) continue;
+    if (!Number.isInteger(posn) || posn < 1 || posn > total) continue;
+    seen.add(code);
+    picks.push({code, what, posn});
+  }
+  if (!picks.length) return null;
+  return {game, opening: !!b.o, picks};
+}
 
 export default {
   async fetch(request, env, ctx) {
@@ -211,6 +255,81 @@ export default {
         ctx && ctx.waitUntil(cache.delete(key));
       }
       return json({ok: true, deleted: !!gone});
+    }
+
+    /* ---- what people found hard ----
+
+       A report is fire-and-forget: the page sends it with sendBeacon on the way
+       out and never learns what happened to it, so this answers quickly and
+       says little. Nothing it stores is tied to anyone - the counters go up,
+       the sequence that moved them is discarded with the request. */
+    if (request.method === 'POST' && path === '/picks') {
+      let body;
+      try { body = await request.json(); } catch (e) { return json({error: 'bad json'}, 400); }
+      const beat = cleanBeat(body);
+      if (!beat) return json({error: 'bad report'}, 400);
+
+      const now = Date.now();
+      const ip = await hashIp(request.headers.get('cf-connecting-ip'), env.IP_SALT);
+      const since = now - RATE_WINDOW;
+      const recent = await env.DB.prepare(
+        'SELECT COUNT(*) AS n FROM beats WHERE ip = ?1 AND at > ?2').bind(ip, since).first();
+      if (recent && recent.n >= BEAT_N) return json({ok: true, counted: 0});
+
+      const bump = env.DB.prepare(
+        'INSERT INTO picks (game, code, got, hit, miss, told, opens, posn, at)' +
+        ' VALUES (?1, ?2, 1, ?3, ?4, ?5, ?6, ?7, ?8)' +
+        ' ON CONFLICT(game, code) DO UPDATE SET' +
+        '   got = got + 1, hit = hit + ?3, miss = miss + ?4, told = told + ?5,' +
+        '   opens = opens + ?6, posn = posn + ?7, at = ?8');
+      const work = beat.picks.map(p => bump.bind(
+        beat.game, p.code,
+        p.what === 'hit' ? 1 : 0, p.what === 'miss' ? 1 : 0, p.what === 'told' ? 1 : 0,
+        p.posn === 1 ? 1 : 0, p.posn, now));
+
+      /* Only the first report of a run counts as a run. The ones that follow
+         carry what was named since, so the places they name are new but the
+         run they belong to is not. */
+      if (beat.opening) work.push(env.DB.prepare(
+        'INSERT INTO games (game, runs, at) VALUES (?1, 1, ?2)' +
+        ' ON CONFLICT(game) DO UPDATE SET runs = runs + 1, at = ?2').bind(beat.game, now));
+
+      work.push(env.DB.prepare('INSERT INTO beats (ip, at) VALUES (?1, ?2)').bind(ip, now));
+      work.push(env.DB.prepare('DELETE FROM beats WHERE at < ?1').bind(since));
+      await env.DB.batch(work);
+      return json({ok: true, counted: beat.picks.length});
+    }
+
+    /* ---- and the reading of it ----
+
+       Behind the admin key. The counters say nothing about any one person, but
+       they are the game's answer sheet: which places are missed, and in what
+       order everybody walks the map. Published, they would be a guide to
+       playing it, and the sort of thing that is more fun to find out. */
+    if (request.method === 'GET' && path === '/picks') {
+      const given = (request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
+      if (!env.ADMIN_KEY || given !== env.ADMIN_KEY) return json({error: 'no'}, 401);
+      const game = url.searchParams.get('g') || '';
+      if (!GAMES[game]) return json({error: 'no such game', games: Object.keys(GAMES)}, 400);
+
+      const tally = await env.DB.prepare(
+        'SELECT runs, at FROM games WHERE game = ?1').bind(game).first();
+      const {results} = await env.DB.prepare(
+        'SELECT code, got, hit, miss, told, opens, posn FROM picks' +
+        ' WHERE game = ?1 ORDER BY got DESC').bind(game).all();
+
+      return json({
+        game, total: GAMES[game],
+        runs: tally ? tally.runs : 0,
+        at: tally ? tally.at : 0,
+        picks: (results || []).map(p => ({
+          code: p.code, got: p.got, hit: p.hit, miss: p.miss, told: p.told,
+          opens: p.opens,
+          /* the average place in the order, to one decimal - the sum on its own
+             means nothing without the count it was summed over */
+          mean: p.got ? Math.round(10 * p.posn / p.got) / 10 : 0
+        }))
+      }, 200, {'cache-control': 'no-store'});
     }
 
     return json({error: 'not found'}, 404);

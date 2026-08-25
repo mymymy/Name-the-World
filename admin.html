@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Name the World — what people find hard</title>
+<style>
+/* The game's own paper and ink, because this is the same thing seen from the
+   other side - but plainer, since nobody is playing here. */
+:root{
+  --paper:#F2EDE0; --panel:#FBF7EC; --rule:#CFC6B2;
+  --ink:#23282B; --ink-2:#5C6266; --ink-3:#8A8F8E;
+  --right:#7FA86A; --miss:#C25749; --told:#B3AA94; --live:#1F4E6B;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;padding:24px 16px 60px;background:var(--paper);color:var(--ink);
+  font:15px/1.5 "Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+}
+main{max-width:900px;margin:0 auto}
+h1{font-size:22px;font-weight:400;margin:0 0 4px}
+.caps{font:600 10.5px/1 "Helvetica Neue",Arial,sans-serif;letter-spacing:.14em;text-transform:uppercase}
+p.note{color:var(--ink-2);font-size:13.5px;max-width:64ch}
+#bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:18px 0}
+select,input,button{
+  font:inherit;font-size:14px;background:var(--panel);color:inherit;
+  border:1px solid var(--ink);border-radius:4px;padding:7px 10px;
+}
+button{cursor:pointer}
+button.key{background:var(--ink);color:var(--paper)}
+#key{flex:1 1 240px;min-width:0}
+#say{margin:14px 0;color:var(--ink-2);font-size:14px}
+#top{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:18px 0}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:8px;padding:12px 14px}
+.card b{display:block;font-size:26px;font-weight:400;margin-top:2px}
+.card span{color:var(--ink-3)}
+table{width:100%;border-collapse:collapse;margin-top:10px;font-size:14px}
+th{
+  text-align:right;color:var(--ink-3);font:600 10px/1 "Helvetica Neue",Arial,sans-serif;
+  letter-spacing:.12em;text-transform:uppercase;padding:8px 6px;border-bottom:1px solid var(--rule);
+  cursor:pointer;white-space:nowrap;
+}
+th:first-child,td:first-child{text-align:left}
+th[aria-sort]{color:var(--ink)}
+td{padding:6px;text-align:right;border-bottom:1px solid rgba(207,198,178,.45);white-space:nowrap}
+td:first-child{white-space:normal}
+tbody tr:hover{background:var(--panel)}
+/* the share of runs that got it right, drawn behind the number */
+.rate{position:relative;min-width:78px}
+.rate i{
+  position:absolute;right:6px;top:50%;transform:translateY(-50%);height:16px;
+  background:var(--right);opacity:.28;border-radius:2px;
+}
+.rate span{position:relative}
+.warn{color:var(--miss)}
+#wrap{overflow-x:auto}
+</style>
+</head>
+<body>
+<main>
+  <h1>What people find hard</h1>
+  <p class="note">Counters, not events. Every number here is a total across all
+    runs of a game &mdash; there is no record of who played, of any one session,
+    or of the order any single person went in. Only whole games are counted; a
+    continent or a random ten is a different length each time, so a place in the
+    order would not mean the same thing twice.</p>
+
+  <div id="bar">
+    <select id="game" aria-label="Game">
+      <option value="world/all">Countries</option>
+      <option value="capitals/all">Capitals</option>
+      <option value="flags/all">Flags</option>
+      <option value="continents/all">Continents</option>
+      <option value="counties/all">English counties</option>
+      <option value="states/all">States</option>
+      <option value="boroughs/all">London boroughs</option>
+    </select>
+    <input id="key" type="password" placeholder="Admin key" autocomplete="off" spellcheck="false">
+    <button id="go" class="key">Show</button>
+    <button id="forget">Forget key</button>
+  </div>
+
+  <p id="say"></p>
+  <div id="top"></div>
+  <div id="wrap"><table id="tbl" hidden>
+    <thead><tr>
+      <th data-sort="code" title="The place, by the code the game knows it as">Place</th>
+      <th data-sort="got" title="Runs that reached it at all">Reached</th>
+      <th data-sort="rate" title="Of the runs that reached it, how many named it right">Got it</th>
+      <th data-sort="miss" title="Named, but named wrong">Wrong</th>
+      <th data-sort="told" title="Asked to be shown the answer">Shown</th>
+      <th data-sort="opens" title="Runs that started on this place">Opened on</th>
+      <th data-sort="mean" title="Average position in the order it was taken">Mean order</th>
+    </tr></thead>
+    <tbody></tbody>
+  </table></div>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const KEY = 'name-the-world/admin/v1';
+/* Same rule as the game: under the domain that serves it the worker answers at
+   /api on this very origin, so the browser has nothing to ask permission for. */
+const HOME = ['namethe.world', 'www.namethe.world'];
+const API = HOME.includes(location.hostname)
+  ? '/api'
+  : 'https://name-the-world-board.mwatsonyoung.workers.dev';
+
+try{ $('#key').value = localStorage.getItem(KEY) || ''; }catch(e){}
+
+let data = null, sort = 'got', down = true;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pct = (a, b) => b ? Math.round(100 * a / b) : 0;
+/* Codes carry the game they belong to on the front - CTY-, LB-, US-, FL- - and
+   in a table that is one game throughout, that prefix is the same on every row
+   and says nothing. The rest is the place, near enough to read. */
+const plain = c => String(c).replace(/^(CTY|LB|FL|CAP|CONT|US)-/, '');
+
+async function load(){
+  const game = $('#game').value;
+  const key = $('#key').value.trim();
+  if(!key){ $('#say').textContent = 'The admin key is needed to read this.'; return; }
+  try{ localStorage.setItem(KEY, key); }catch(e){}
+  $('#say').textContent = 'Asking…';
+  try{
+    const res = await fetch(API.replace(/\/$/,'') + '/picks?g=' + encodeURIComponent(game),
+                            {headers:{authorization:'Bearer ' + key}});
+    if(res.status === 401){ $('#say').innerHTML = '<span class="warn">That key was not accepted.</span>'; return; }
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    data = await res.json();
+    draw();
+  }catch(e){
+    $('#say').innerHTML = '<span class="warn">Could not reach the worker: ' + esc(e.message) + '</span>';
+  }
+}
+
+function draw(){
+  if(!data) return;
+  const picks = data.picks || [];
+  const runs = data.runs || 0;
+  /* A place nobody has reached has no row at all, so the ones that are missing
+     are as interesting as the ones that are here - and worth saying out loud
+     rather than leaving to be noticed. */
+  const untouched = data.total - picks.length;
+  $('#say').textContent = runs
+    ? `${runs} run${runs === 1 ? '' : 's'} counted, covering ${picks.length} of ${data.total} places.`
+    : 'Nothing counted for this game yet.';
+
+  const hit = picks.reduce((n, p) => n + p.hit, 0);
+  const got = picks.reduce((n, p) => n + p.got, 0);
+  const opener = picks.slice().sort((a, b) => b.opens - a.opens)[0];
+  const hardest = picks.filter(p => p.got >= Math.max(3, runs * 0.1))
+                       .sort((a, b) => (a.hit / a.got) - (b.hit / b.got))[0];
+  $('#top').innerHTML = [
+    ['Runs', runs],
+    ['Named right', got ? pct(hit, got) + '%' : '—'],
+    ['Never reached', untouched],
+    ['Most opened on', opener && opener.opens ? esc(plain(opener.code)) : '—'],
+    ['Hardest', hardest ? esc(plain(hardest.code)) + ' · ' + pct(hardest.hit, hardest.got) + '%' : '—']
+  ].map(([k, v]) => `<div class="card"><span class="caps">${k}</span><b>${v}</b></div>`).join('');
+
+  const rows = picks.slice().sort((a, b) => {
+    const v = x => sort === 'code' ? x.code
+                 : sort === 'rate' ? (x.got ? x.hit / x.got : -1)
+                 : x[sort];
+    const [p, q] = [v(a), v(b)];
+    const c = typeof p === 'string' ? p.localeCompare(q) : p - q;
+    return down ? -c : c;
+  });
+  $('#tbl').hidden = !rows.length;
+  $('#tbl tbody').innerHTML = rows.map(p => {
+    const share = p.got ? pct(p.hit, p.got) : 0;
+    return `<tr><td>${esc(plain(p.code))}</td><td>${p.got}</td>`
+         + `<td class="rate"><i style="width:${share * 0.62}px"></i><span>${share}%</span></td>`
+         + `<td>${p.miss}</td><td>${p.told}</td><td>${p.opens}</td>`
+         + `<td>${p.mean || '—'}</td></tr>`;
+  }).join('');
+  document.querySelectorAll('th[data-sort]').forEach(th=>{
+    if(th.dataset.sort === sort) th.setAttribute('aria-sort', down ? 'descending' : 'ascending');
+    else th.removeAttribute('aria-sort');
+  });
+}
+
+document.querySelectorAll('th[data-sort]').forEach(th=>{
+  th.onclick = ()=>{
+    if(sort === th.dataset.sort) down = !down;
+    /* Biggest first everywhere, except the two columns whose interesting end is
+       the small one: the page is called what people find hard, so a first tap
+       on the share that got it right should show the worst, and codes read up
+       the alphabet. */
+    else { sort = th.dataset.sort; down = sort !== 'code' && sort !== 'rate'; }
+    draw();
+  };
+});
+$('#go').onclick = load;
+$('#game').onchange = ()=>{ if($('#key').value.trim()) load(); };
+$('#key').addEventListener('keydown', ev=>{ if(ev.key === 'Enter') load(); });
+$('#forget').onclick = ()=>{
+  try{ localStorage.removeItem(KEY); }catch(e){}
+  $('#key').value = ''; $('#say').textContent = 'Key forgotten on this device.';
+};
+if($('#key').value.trim()) load();
+</script>
+</body>
+</html>
