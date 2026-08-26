@@ -84,6 +84,50 @@ One ceiling worth knowing: Cloudflare's free plan covers 100,000 worker requests
 a day. Past that it stops answering until the next day rather than charging you.
 If this game ever gets near it, the paid plan is $5 a month.
 
+## What people find hard
+
+The game knows something no analytics service could tell you: which places get
+named first, which get named wrong, and which nobody ever reaches. The same
+worker keeps count, and **`admin.html`** reads it back.
+
+Counters, not events. The obvious shape is a row per answer, which for the world
+game is two hundred rows a run and grows for ever — and a table of who named
+what in which order is a record of a person's session, which is not a thing this
+game should hold. So the page sends the run's arithmetic, the worker adds it to
+a pile, and the report is discarded with the request. What is left is one row
+per place per game: about seven hundred and thirty rows in total, however many
+people play. There is no session, no address, and nothing to say two reports
+came from the same person.
+
+Three things it deliberately does not count:
+
+- **Anything but a whole game.** A continent or a random ten is a different
+  length each time, so a place in the order would not mean the same thing twice.
+- **Anywhere but the game's own address.** Previews, forks and copies opened off
+  disk all point at the same worker, and none of them are people playing.
+- **Answers shown all at once** at the end, which are not places anybody
+  reached.
+
+To read it, open `/admin.html` and give it the `ADMIN_KEY`. The page is public;
+the numbers behind it are not — they are the game's answer sheet, and more fun
+to find out than to be told. `curl` works too:
+
+```sh
+curl https://YOUR-WORKER/picks?g=world/all -H "Authorization: Bearer YOUR-ADMIN-KEY"
+```
+
+Each place comes back with `got` (runs that reached it), `hit`, `miss`, `told`,
+`opens` (runs that started there) and `mean` (its average place in the order).
+A place with no row is one nobody has reached at all, which is its own kind of
+hard: `got / runs` and `hit / got` are two different questions.
+
+If the board is already up, the new tables are added by running the schema
+again — every statement in it is `IF NOT EXISTS`, so it leaves the runs alone:
+
+```sh
+cd server && npx wrangler d1 execute name-the-world-board --remote --file=schema.sql
+```
+
 ## Hosting
 
 Any static host will serve it. For GitHub Pages: **Settings → Pages → Deploy from a branch → `main` / root**.

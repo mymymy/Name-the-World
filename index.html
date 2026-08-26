@@ -560,7 +560,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 24 aug · v84</span>
+      <span id="build" class="caps">build 25 aug · v85</span>
     </div>
   </div>
 </div>
@@ -666,7 +666,7 @@ let saveTimer = 0;
 function snapshot(){
   return JSON.stringify({v:1, ans:S.ans, mode:S.mode, playing:S.playing,
                          scope:S.scope, continent:S.continent, pick:S.pick, round:S.round,
-                         times:S.times, hailed:S.hailed});
+                         times:S.times, hailed:S.hailed, sent:S.sent, opened:S.opened});
 }
 function save(){
   if(!store) return;
@@ -687,6 +687,12 @@ function restore(){
       if(typeof ms === 'number' && ms >= 0 && ms < 864e5) S.times[key] = ms;
   if(o.hailed && typeof o.hailed === 'object')
     for(const [key, v] of Object.entries(o.hailed)) if(v) S.hailed[key] = true;
+  /* what has already gone to the counters, so a game picked up tomorrow does
+     not report today's places a second time */
+  if(o.sent && typeof o.sent === 'object')
+    for(const [code, v] of Object.entries(o.sent)) if(v && BY_CODE[code]) S.sent[code] = true;
+  if(o.opened && typeof o.opened === 'object')
+    for(const [key, v] of Object.entries(o.opened)) if(v) S.opened[key] = true;
   S.playing = !!o.playing;
   if(['all','continent','random'].includes(o.scope)) S.scope = o.scope;
   if(CONTINENTS.includes(o.continent)) S.continent = o.continent;
@@ -967,6 +973,9 @@ const MODES = ['world','continents','capitals','counties','states','boroughs','f
    spelling from costing you a country. So none of them are choices any more. */
 const S = { mode:'world', scope:'all', continent:'Europe', pick:[], round:0, playing:false,
             ans:{}, sel:null, cursor:0, streak:0,
+            /* which places have been reported to the counters, so a report sent
+               partway through a game is not counted again when it ends */
+            sent:{}, opened:{},
             /* how long each game has been played for, in milliseconds, kept per
                game so switching between them does not run one clock for another */
             times:{}, hailed:{} };
@@ -1018,6 +1027,10 @@ function spentNames(){
   for(const [code,a] of Object.entries(S.ans)) if(a.ok) out.add(a.given);
   return out;
 }
+/* How many places in this game have been reached, which is also where the next
+   one comes in the order. Counted over the whole game rather than the scope in
+   play, so a place keeps one position however the game was narrowed. */
+function taken(){ return basis().filter(e=>S.ans[e.code] && S.ans[e.code].n).length; }
 
 /* ============ matching ============
    Ranked, and deliberately literal: exact, then starts-with, then a word
@@ -2708,7 +2721,12 @@ function answer(text){
     renderAskFoot(); placeFloaters();
     return;
   }
-  const a = {given:guess.name, ok:guess.code === t.code, told:false};
+  const old = S.ans[t.code];
+  /* Where in the run this place was reached. Kept from the first time it was
+     answered: coming back to a place already tried is the same visit, and the
+     order everybody walks the map in should not be moved by second thoughts. */
+  const a = {given:guess.name, ok:guess.code === t.code, told:false,
+             n: old && old.n ? old.n : taken() + 1};
   S.ans[t.code] = a;
   find.value = '';
   closeAsk();
@@ -2772,7 +2790,8 @@ function advance(){
 function reveal(code){
   S.streak = 0;
   const t = BY_CODE[code];
-  S.ans[code] = {given:t.name, ok:false, told:true};
+  const was = S.ans[code];
+  S.ans[code] = {given:t.name, ok:false, told:true, n: was && was.n ? was.n : taken() + 1};
   closeAsk(); render();
   showTip(t, 'tell', t.name);
   if(!finish()) waiting();
@@ -2807,6 +2826,59 @@ function renderTally(){
   skip.disabled = false;
   skip.textContent = done ? 'Result' : 'Next';
 }
+/* ============ what people find hard ============
+
+   The game knows something nobody else does: which places get named first,
+   which get named wrong, and which nobody reaches at all. That is worth
+   knowing, and worth being careful with - so what leaves this page is not the
+   record of a session but arithmetic that can be added to a pile. Each place
+   goes as three things: which place, how it went, and where in the order it
+   came. No identifier travels with it, there is nothing to say that two
+   reports came from the same person, and the server keeps counters rather than
+   the reports themselves.
+
+   Only whole games. A continent or a random ten is a different length every
+   time, so a place in the order would not mean the same thing twice, and the
+   board already draws the same line.
+
+   And only from the game's own address. A preview build, a copy opened off
+   disk and a fork all point at the same worker, and none of them are people
+   playing - counting them would be counting ourselves. */
+let statsOn = BOARD_HOME.includes(location.hostname);
+function reportPicks(){
+  if(!statsOn || !BOARD_URL || S.scope !== 'all') return;
+  const key = gameKey();
+  const out = [];
+  for(const e of basis()){
+    const a = S.ans[e.code];
+    if(!a || !a.n || S.sent[e.code]) continue;
+    out.push([e.code, a.told ? 't' : (a.ok ? 'h' : 'm'), a.n]);
+  }
+  if(!out.length) return;
+  const body = JSON.stringify({g:key, o:!S.opened[key], p:out});
+  const to = BOARD_URL.replace(/\/$/,'') + '/picks';
+  /* sendBeacon is made for exactly this: it survives the page going away and
+     cannot hold anything up, because there is nothing to wait for. It refuses
+     rather than queues when it is over its limit, which is what the fallback
+     is for - and if both refuse, nothing is marked as sent and it goes with
+     the next report instead. */
+  let gone = false;
+  try{
+    gone = !!(navigator.sendBeacon &&
+              navigator.sendBeacon(to, new Blob([body], {type:'application/json'})));
+  }catch(e){}
+  if(!gone){
+    try{
+      fetch(to, {method:'POST', body, keepalive:true,
+                 headers:{'content-type':'application/json'}}).catch(()=>{});
+      gone = true;
+    }catch(e){}
+  }
+  if(!gone) return;
+  S.opened[key] = true;
+  for(const p of out) S.sent[p[0]] = true;
+}
+
 /* clockTick here as well as on its own timer: it anchors the clock the moment
    anything changes rather than up to a second later, which is otherwise lost
    from the run every time the result closes or you come back from the menu. */
@@ -2814,6 +2886,7 @@ function render(){ clockTick(); renderMenu(); renderTally(); paintMap(); save();
 
 /* ============ results ============ */
 function openSheet(){
+  reportPicks();                 // the run is over, whatever happens to the sheet
   const t = targets();
   const right = t.filter(e=>S.ans[e.code] && S.ans[e.code].ok).length;
   const misses = t.filter(e=>!S.ans[e.code] || !S.ans[e.code].ok);
@@ -3003,7 +3076,10 @@ $('#board').addEventListener('click', ev=>{ if(ev.target.id === 'board') $('#boa
 $('#boardbtn').onclick = ()=> openBoard();
 $('#seeboard').onclick = ()=> openBoard(S.scope === 'random' ? gameKey(S.mode, 'all') : gameKey());
 $('#revealall').onclick = ()=>{
-  targets().forEach(e=>{ if(!S.ans[e.code] || !S.ans[e.code].ok) S.ans[e.code] = {given:e.name, ok:false, told:true}; });
+  /* Shown all at once, at the end. They are not places anybody reached, so they
+     are given no place in the order and are left out of the counters. */
+  targets().forEach(e=>{ if(!S.ans[e.code] || !S.ans[e.code].ok)
+    S.ans[e.code] = {given:e.name, ok:false, told:true, all:true}; });
   $('#sheet').classList.remove('on'); render();
 };
 $('#another').onclick = ()=>{
@@ -3042,8 +3118,11 @@ function wipe(mode){
   clockTick();                       // bank what is owed before the clocks go
   cancelHold();
   for(const e of basis(mode)) delete S.ans[e.code];
+  for(const e of basis(mode)) delete S.sent[e.code];
   for(const k of Object.keys(S.times))  if(k.split('/')[0] === mode) delete S.times[k];
   for(const k of Object.keys(S.hailed)) if(k.split('/')[0] === mode) delete S.hailed[k];
+  /* the run that reported is gone, so the next one is a new run to count */
+  for(const k of Object.keys(S.opened)) if(k.split('/')[0] === mode) delete S.opened[k];
   if(mode === S.mode){ S.sel = null; S.cursor = 0; closeAsk(); hideTip(); }
   $('#sheet').classList.remove('on');
   render();
@@ -3126,6 +3205,7 @@ function panelFor(mode){
 }
 function openHome(){
   clockTick();                  // bank the time played before the clock stops
+  reportPicks();                // and send what this run reached, before leaving it
   S.playing = false; document.body.classList.remove('playing');
   closeAsk(); hideTip();
   $('#sheet').classList.remove('on');
@@ -3251,6 +3331,7 @@ if(linked) startGame(linked.mode, linked.scope, linked.cont);
 else syncHash();
 window.addEventListener('pagehide', ()=>{
   clearTimeout(saveTimer);
+  reportPicks();                // sendBeacon outlives the page; a fetch would not
   try{ store && store.setItem(KEY, snapshot()); }catch(e){}
 });
 
