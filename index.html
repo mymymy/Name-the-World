@@ -66,12 +66,23 @@ button{font:inherit;color:inherit;cursor:pointer}
    as sitting on the sheet above the map rather than floating loose - a second
    line here would only compete with the one that matters. */
 header{
-  display:flex;align-items:baseline;gap:9px;
+  display:flex;align-items:center;gap:9px;
   padding:10px var(--pad) 9px;flex:0 0 auto;
 }
-h1{margin:0;font-size:16px;font-weight:500;letter-spacing:.03em}
-#rose{width:19px;height:19px;flex:0 0 auto;align-self:center;fill:var(--coast)}
+h1{margin:0;font-size:16px;font-weight:500;letter-spacing:.03em;min-width:0}
+/* The title is the way back to the games. A compass rose beside the name of a
+   map game is the one mark on this page nobody reads as decoration, so it is
+   the thing to hang it on - and it saves the header a button, which is how the
+   settings get a corner of their own back. */
+#menubtn{
+  display:flex;align-items:center;gap:9px;background:none;border:0;padding:4px 6px;
+  margin-left:-6px;border-radius:5px;font:inherit;color:inherit;letter-spacing:.03em;
+}
+#menubtn:active{background:var(--tap)}
+#rose{width:19px;height:19px;flex:0 0 auto;fill:var(--coast)}
 #rose .thin{opacity:.45}
+#gear{background:none;border:1px solid var(--ink);border-radius:4px;padding:5px 9px;margin-left:4px}
+#gear[aria-expanded="true"]{background:var(--ink);color:var(--paper)}
 #tally{margin-left:auto;color:var(--ink-2);white-space:nowrap}
 #tally b{color:var(--ink);font-weight:600}
 
@@ -131,11 +142,11 @@ body.playing #home{display:none}
   font-weight:600;font-family:inherit;
 }
 #menu h2:first-of-type{margin-top:4px}
-#menubtn{background:none;border:1px solid var(--ink);border-radius:4px;padding:5px 9px;margin-left:4px}
 
-/* Everything the game used to ask you to decide is decided: suggestions are on,
-   marking is instant, you choose where to go next, and the device says whether
-   to animate. Nothing is left down here but which build you are looking at. */
+/* Marking is instant, you choose where to go next, and the device says whether
+   to animate - none of those are asked about. What is left to decide is asked
+   in the game, where it can be seen taking effect, so nothing is left down here
+   but which build you are looking at. */
 #homefoot{margin-top:24px;padding-top:14px;border-top:1px solid var(--rule);text-align:right}
 
 /* Starting a game over is that game's business, so it lives on that game's
@@ -146,6 +157,36 @@ body.playing #home{display:none}
 #menu .wipe.armed small{color:rgba(255,255,255,.85)}
 
 #top{position:relative;z-index:3;flex:0 0 auto}
+/* Settings slide out from under the header and may take the whole screen, so
+   this lives inside main - its height is exactly what is left below the header,
+   and closed it hides behind the header rather than being clipped. */
+#bar{
+  position:absolute;left:0;right:0;top:0;z-index:12;
+  max-height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  background:var(--panel);border-bottom:1px solid var(--rule);
+  box-shadow:0 12px 24px rgba(20,26,28,.16);
+  transform:translateY(-100%);visibility:hidden;
+  transition:transform .3s cubic-bezier(.4,0,.2,1), visibility 0s linear .3s;
+}
+body.setup #bar{transform:none;visibility:visible;transition-delay:0s,0s}
+@media (prefers-reduced-motion: reduce){ #bar{transition:none} }
+#bar .row{padding:13px var(--pad);border-bottom:1px solid var(--rule)}
+#bar .row:last-of-type{border-bottom:0}
+.rowlabel{display:block;color:var(--ink-2);margin-bottom:8px}
+/* here a note is not an aside but the row's own explanation, so it reads before
+   the switch rather than after it, and without the rule that marks it as extra */
+#bar .note{margin:0 0 9px;border-left:0;padding-left:0;font-size:13px}
+#barfoot{display:flex;padding:12px var(--pad) 16px}
+#done{background:var(--ink);color:var(--paper);border:1px solid var(--ink);
+  border-radius:4px;padding:8px 16px}
+.seg{display:flex;flex-wrap:wrap;border:1px solid var(--ink);border-radius:4px;
+  overflow:hidden;width:fit-content;max-width:100%}
+.seg button{background:none;border:0;padding:7px 10px;border-right:1px solid var(--ink)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+#restart2{background:none;border:1px solid var(--ink-3);color:var(--ink-2);
+  border-radius:4px;padding:7px 11px}
+#restart2.armed{background:var(--miss);border-color:var(--miss);color:#fff}
 .note{
   margin:9px 0 0;max-width:62ch;color:var(--ink-2);font-size:13.5px;line-height:1.5;
   border-left:2px solid var(--rule);padding-left:10px;
@@ -446,6 +487,9 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
   #sug .row.used{background:none}
   #sug .row .mark{display:none}
   #sug .note{padding:7px 4px;white-space:nowrap}
+  /* the short notes are a few words and read better on one line; this one is a
+     sentence, and on a narrow phone nowrap walked it off the side of the screen */
+  #sug .note.off{white-space:normal}
   #ask{width:min(330px, calc(100vw - 20px))}
   header{padding:7px var(--pad) 6px}
   h1{font-size:14px}
@@ -457,16 +501,38 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
 <div id="app">
   <div id="top">
   <header>
-    <svg id="rose" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M12 1.5 13.7 10.3 22.5 12 13.7 13.7 12 22.5 10.3 13.7 1.5 12 10.3 10.3Z"/><path class="thin" d="M18.4 5.6 13.9 10.1 12 12 10.1 13.9 5.6 18.4 10.1 13.9 12 12 13.9 10.1Z"/><circle cx="12" cy="12" r="1.5"/></g></svg>
-    <h1 class="serif">Name the World</h1>
+    <h1><button id="menubtn" class="serif"><svg id="rose" viewBox="0 0 24 24" aria-hidden="true"><g><path d="M12 1.5 13.7 10.3 22.5 12 13.7 13.7 12 22.5 10.3 13.7 1.5 12 10.3 10.3Z"/><path class="thin" d="M18.4 5.6 13.9 10.1 12 12 10.1 13.9 5.6 18.4 10.1 13.9 12 12 13.9 10.1Z"/><circle cx="12" cy="12" r="1.5"/></g></svg>Name the World</button></h1>
     <div id="tally" class="caps"></div>
-    <button id="menubtn" class="caps">Menu</button>
+    <button id="gear" class="caps" aria-expanded="false" aria-controls="bar">Setup</button>
   </header>
 
     <div id="prog"><i></i></div>
   </div>
 
   <main>
+  <div id="bar">
+    <div class="row">
+      <span class="rowlabel caps">Suggestions</span>
+      <p class="note" id="i-list">On offers a list of matching names as you type, to pick from. Off
+        asks for the whole name, typed out — which is a harder game, and the one it was meant to
+        be: naming a place from memory rather than recognising it in a list. Spelling is still
+        forgiven.</p>
+      <div class="seg" id="listseg" role="group" aria-label="Suggestions">
+        <button data-list="1" class="caps">On</button>
+        <button data-list="0" class="caps">Off</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <span class="rowlabel caps">Start again</span>
+      <p class="note" id="i-restart">Forget every answer in this game and begin from an empty map.
+        Other games keep theirs. This cannot be undone.</p>
+      <button id="restart2" class="caps"></button>
+    </div>
+
+    <div id="barfoot"><button id="done" class="caps">Done</button></div>
+  </div>
+
     <div id="mapwrap">
       <svg id="map" viewBox="0 0 2000 1000" preserveAspectRatio="xMidYMid meet" aria-label="World map">
         <g id="scene">
@@ -560,7 +626,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 25 aug · v85</span>
+      <span id="build" class="caps">build 26 aug · v86</span>
     </div>
   </div>
 </div>
@@ -666,7 +732,8 @@ let saveTimer = 0;
 function snapshot(){
   return JSON.stringify({v:1, ans:S.ans, mode:S.mode, playing:S.playing,
                          scope:S.scope, continent:S.continent, pick:S.pick, round:S.round,
-                         times:S.times, hailed:S.hailed, sent:S.sent, opened:S.opened});
+                         list:S.list, times:S.times, hailed:S.hailed,
+                         sent:S.sent, opened:S.opened});
 }
 function save(){
   if(!store) return;
@@ -682,6 +749,7 @@ function restore(){
     if(BY_CODE[code] && a && typeof a.given === 'string') ans[code] = a;
   S.ans = ans;
   if(MODES.includes(o.mode)) S.mode = o.mode;
+  if(typeof o.list === 'boolean') S.list = o.list;
   if(o.times && typeof o.times === 'object')
     for(const [key, ms] of Object.entries(o.times))
       if(typeof ms === 'number' && ms >= 0 && ms < 864e5) S.times[key] = ms;
@@ -715,6 +783,7 @@ let clockAt = 0;
 function clockOn(){
   return S.playing && !document.hidden
       && !$('#sheet').classList.contains('on')
+      && !document.body.classList.contains('setup')
       && !!unnamed().length;
 }
 /* Called on a tick and before anything reads the time, so the answer is never
@@ -965,14 +1034,19 @@ const PAINTABLE = DATA.concat(CAP_ENTRY, CTY_ENTRY, US_ENTRY, LB_ENTRY);
 
 const BOARDS = ['counties','states','boroughs'];   // their own map, not the globe
 const MODES = ['world','continents','capitals','counties','states','boroughs','flags'];
-/* The game used to be adjustable: suggestions on or off, marking now or at the
-   end, the next place chosen for you or by you. Every one of those was a way of
-   making it worse. Marking as you go is what makes it a game rather than a form
-   to fill in; choosing where to go next is how anyone actually plays, following
-   one place to the next by association; and the list of names is what keeps a
-   spelling from costing you a country. So none of them are choices any more. */
+/* Marking now or at the end, and the next place chosen for you or by you, were
+   both adjustable once, and both were ways of making the game worse: marking as
+   you go is what makes it a game rather than a form to fill in, and choosing
+   where to go next is how anyone actually plays, following one place to the
+   next by association. Neither is a choice any more.
+
+   Suggestions are, and belong on a different footing. They do not make the game
+   worse - they make it a different game. With the list you are recognising a
+   name; without it you are recalling one, which is what somebody who wants to
+   know how much of the world they can name is actually asking. Both are worth
+   playing, so both are offered, and the list is on to begin with. */
 const S = { mode:'world', scope:'all', continent:'Europe', pick:[], round:0, playing:false,
-            ans:{}, sel:null, cursor:0, streak:0,
+            ans:{}, sel:null, cursor:0, streak:0, list:true,
             /* which places have been reported to the counters, so a report sent
                partway through a game is not counted again when it ends */
             sent:{}, opened:{},
@@ -1072,6 +1146,34 @@ function resolve(text){
   if(r[0].s <= 3) return r[0].e;                       // exact, prefix or word start
   if(r.length === 1 || r[0].s < r[1].s) return r[0].e; // otherwise only if unambiguous
   return null;
+}
+/* And what it resolves to with the suggestions off, which is a different and
+   much shorter list of things.
+
+   Hiding the list is not on its own a harder game: 'kyr' scores 1 here, and the
+   reading above takes anything up to 3, so the aid would still be there with
+   the evidence of it removed. Off has to mean the name, or a name the place is
+   also known by - Holland, Burma, the UK.
+
+   The one thing still forgiven is spelling. A near miss scores 7 or more and is
+   only reached at five characters and one slip, so it cannot complete a name
+   that was not recalled; it only spares somebody who did recall Kyrgyzstan and
+   put the y in the wrong place. That is the difference between a memory game
+   and a typing test. */
+function resolveStrict(text){
+  const q = norm(text);
+  const r = rank(q);
+  if(!r.length) return null;
+  if(r[0].s <= 0.5) return r[0].e;                     // a name, or another of its names
+  if(r[0].s >= 7 && (r.length === 1 || r[1].s > r[0].s)) return r[0].e;
+  return null;
+}
+/* whether what was typed is a piece of a name rather than no name at all - the
+   two need different words, since one is a wrong answer and the other is not
+   yet an answer */
+function partial(text){
+  const r = rank(norm(text));
+  return !!r.length && r[0].s > 0.5 && r[0].s < 7;
 }
 
 /* ============ map ============ */
@@ -2447,6 +2549,10 @@ function renderAskFoot(){
 }
 function renderSuggestions(){
   sug.innerHTML = '';
+  if(!S.list){
+    sug.innerHTML = '<p class="note off">Suggestions are off — type the name in full.</p>';
+    return;
+  }
   const q = norm(find.value);
   if(!q){
     sug.innerHTML = '<p class="note">Start typing a name.</p>';
@@ -2474,7 +2580,7 @@ find.addEventListener('keydown', ev=>{
   const rows = [...sug.querySelectorAll('.row:not(.used)')];
   if(ev.key === 'Enter'){
     ev.preventDefault();
-    if(rows.length) (rows[S.cursor] || rows[0]).click();
+    if(S.list && rows.length) (rows[S.cursor] || rows[0]).click();
     else answer(find.value);
     return;
   }
@@ -2715,9 +2821,10 @@ function select(code){
 function answer(text){
   if(!S.sel) return;
   const t = BY_CODE[S.sel];
-  const guess = resolve(text) || null;
+  const guess = (S.list ? resolve(text) : resolveStrict(text)) || null;
   if(!guess){
-    $('#asknote').textContent = 'No match for that name.';
+    $('#asknote').textContent = !S.list && partial(text)
+      ? 'Type the name in full.' : 'No match for that name.';
     renderAskFoot(); placeFloaters();
     return;
   }
@@ -2805,6 +2912,12 @@ function bumpTally(){
 function renderMenu(){
   document.querySelectorAll('#menu .game').forEach(b=>
     b.toggleAttribute('aria-current', b.dataset.mode === S.mode));
+  document.querySelectorAll('#listseg button').forEach(b=>
+    b.setAttribute('aria-pressed', String((b.dataset.list === '1') === S.list)));
+  /* Start again in here clears the game being played, and says which that is -
+     it is reached from inside a game, where the one on the homepage is reached
+     by choosing a game from a list. Same act, two ways in. */
+  if(!restartArmed) $('#restart2').textContent = 'Start ' + (LABEL[S.mode] || S.mode) + ' again';
 }
 function renderTally(){
   const t = targets();
@@ -3206,6 +3319,7 @@ function panelFor(mode){
 function openHome(){
   clockTick();                  // bank the time played before the clock stops
   reportPicks();                // and send what this run reached, before leaving it
+  setSetup(false);
   S.playing = false; document.body.classList.remove('playing');
   closeAsk(); hideTip();
   $('#sheet').classList.remove('on');
@@ -3300,9 +3414,35 @@ function wireMenu(){
 wireMenu();
 $('#menubtn').onclick = openHome;
 
+function setSetup(open){
+  clockTick();                      // the clock stops while you are in here
+  document.body.classList.toggle('setup', open);
+  $('#gear').setAttribute('aria-expanded', String(open));
+  if(!open) disarmRestart();
+  clockTick(); sizeCanvas(); placeFloaters();
+}
+$('#gear').onclick = ()=> setSetup(!document.body.classList.contains('setup'));
+$('#done').onclick = ()=> setSetup(false);
 document.addEventListener('keydown', ev=>{
   if(ev.key === 'Escape' && $('#board').classList.contains('on')) $('#board').classList.remove('on');
+  else if(ev.key === 'Escape' && document.body.classList.contains('setup')) setSetup(false);
 });
+document.querySelectorAll('#listseg button').forEach(b=>b.onclick = ()=>{
+  S.list = b.dataset.list === '1';
+  render(); renderSuggestions();
+});
+/* the same two taps as the one on the homepage: it is as destructive here */
+let restartArmed = 0;
+function disarmRestart(){
+  clearTimeout(restartArmed); restartArmed = 0;
+  $('#restart2').classList.remove('armed'); renderMenu();
+}
+$('#restart2').onclick = ()=>{
+  if(restartArmed){ const m = S.mode; disarmRestart(); wipe(m); setSetup(false); return; }
+  $('#restart2').classList.add('armed');
+  $('#restart2').textContent = 'Tap again to forget them';
+  restartArmed = setTimeout(disarmRestart, 5000);
+};
 $('#skip').onclick = ()=> $('#skip').classList.contains('result') ? openSheet() : advance();
 
 /* ============ go ============ */

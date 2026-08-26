@@ -3,8 +3,8 @@
 A map naming game. Click a country on the world map and name it.
 
 - **Games:** the whole world, one continent at a time, or name the seven continents
-- **Country list** on (filter as you type) or off (type the name from memory)
-- **Checking** at the end (default) or as you go
+- **Suggestions** on (a list to pick from as you type) or off (the whole name, from
+  memory) — off is the harder game, and only spelling is forgiven
 - 200 countries in play; small states have dot targets. Scroll or pinch to zoom, drag to pan.
 
 Everything — map geometry, styles, logic — is in `index.html`. No build step, no dependencies.
