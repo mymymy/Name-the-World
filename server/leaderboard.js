@@ -29,9 +29,9 @@
 
 /* How many there are to name in each game - and each game is two, because
    naming a place from memory and picking it out of a list are different feats
-   and rank against themselves. The mode rides on the end of the key, so the
-   runs, the counters and everything else keyed by game divided along the same
-   line without a column being added to any of them. */
+   and rank against themselves. The harder of the two rides on the end of the
+   key, so the runs, the counters and everything else keyed by game divided
+   along the same line without a column being added to any of them. */
 const PLAYED = {
   'continents': 7,   'world': 200,    'capitals': 198,
   'flags': 199,      'counties': 48,  'boroughs': 33,
@@ -39,8 +39,8 @@ const PLAYED = {
 };
 const GAMES = {};
 for (const [mode, n] of Object.entries(PLAYED)) {
-  GAMES[mode + '/all'] = n;               // with the list up
-  GAMES[mode + '/all/memory'] = n;        // and without it
+  GAMES[mode + '/all'] = n;             // with the list up
+  GAMES[mode + '/all/hard'] = n;        // and without it
 }
 const KEEP        = 100;             // rows kept per game
 const SHOW        = 100;             // rows sent to the page

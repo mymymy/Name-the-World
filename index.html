@@ -522,9 +522,9 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     <div class="row">
       <span class="rowlabel caps">Suggestions</span>
       <p class="note" id="i-list">On offers a list of matching names as you type, to pick from. Off
-        asks for the whole name, typed out — which is a harder game, and the one it was meant to
-        be: naming a place from memory rather than recognising it in a list. Spelling is still
-        forgiven.</p>
+        asks for the whole name, typed out — naming a place from memory rather than recognising
+        it in a list. That is the hard game, and it ranks on a leaderboard of its own. Spelling is
+        still forgiven.</p>
       <div class="seg" id="listseg" role="group" aria-label="Suggestions">
         <button data-list="1" class="caps">On</button>
         <button data-list="0" class="caps">Off</button>
@@ -634,7 +634,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 26 aug · v87</span>
+      <span id="build" class="caps">build 26 aug · v88</span>
     </div>
   </div>
 </div>
@@ -673,8 +673,8 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
       <span class="caps" id="boardtitle">Leaderboard</span>
       <p id="boardgame" class="serif"></p>
       <div class="seg" id="boardmode" role="group" aria-label="Which board">
-        <button data-memory="0" class="caps">With suggestions</button>
-        <button data-memory="1" class="caps">From memory</button>
+        <button data-hard="0" class="caps">Normal</button>
+        <button data-hard="1" class="caps">Hard</button>
       </div>
       <div id="boardtabs" role="tablist" aria-label="Which game"></div>
     </div>
@@ -828,18 +828,18 @@ function elapsed(key){ clockTick(); return S.times[key || gameKey()] || 0; }
    Naming a place from memory and picking it out of a list are different feats,
    and a board that mixed them would rank the easier one first: the list is
    quicker to type as well as easier to recall, so time does not correct for it
-   either. They get a board each.
+   either. They get a board each - the ordinary one and the hard one.
 
    No flag is kept for the run as a whole. Instead each answer records whether
    anything helped it - the list being up, or a hint taken on that one place -
-   and the memory board counts only the answers nothing helped. That way the
+   and the hard board counts only the answers nothing helped. That way the
    switch can be thrown mid-game, which is worth allowing, without the strict
    board being open to throwing it on for the six you cannot remember and off
    again afterwards: those six simply do not count on it.
 
    The mode rides in the game key, so the board, the clock's own key and the
    counters all divide on the same line and none of them needed a new column. */
-const boardKey = (key) => (key || gameKey()) + (S.list ? '' : '/memory');
+const boardKey = (key) => (key || gameKey()) + (S.list ? '' : '/hard');
 /* what the run is worth on the board it is going to */
 function boardScore(){
   return targets().filter(e=>{
@@ -2604,7 +2604,7 @@ function renderAskFoot(){
   const showTell = !!(t && a && !a.ok && !a.told);
   /* Offered on the same terms as showing the answer: once you have tried and
      got it wrong. It is the gentler of the two - the list for this one place
-     rather than the name - and it costs the place on the memory board rather
+     rather than the name - and it costs the place on the hard board rather
      than the game. With it there, nobody stuck on one country has any reason
      to reach for the switch and turn the whole run assisted. */
   $('#hint').hidden = !(showTell && !S.list && !hinted.has(t.code));
@@ -2910,7 +2910,7 @@ function answer(text){
   const a = {given:guess.name, ok:guess.code === t.code, told:false,
              n: old && old.n ? old.n : taken() + 1,
              /* the list being up is help, and so is a hint asked for on this
-                one place; either way the memory board will not count it */
+                one place; either way the hard board will not count it */
              aid: S.list || hinted.has(t.code) || !!(old && old.aid)};
   S.ans[t.code] = a;
   find.value = '';
@@ -3087,11 +3087,11 @@ function openSheet(){
   /* the clock is read before the sheet goes up, since putting it up stops it */
   const key = gameKey(), ms = elapsed(key);
   /* Two numbers when they differ: what was named, and what was named with
-     nothing helping. The second is what the memory board takes, and saying so
+     nothing helping. The second is what the hard board takes, and saying so
      here is the only place it can be understood rather than just noticed. */
   const own = unaided();
   $('#score').innerHTML = `${right} of ${t.length} <small>named correctly</small>`
-    + (!S.list && own < right ? ` <small>· <b>${own}</b> from memory</small>` : '')
+    + (!S.list && own < right ? ` <small>· <b>${own}</b> without help</small>` : '')
     + (S.scope === 'random' ? ` <small>· round ${S.round}</small>` : '');
   $('#sheettime').innerHTML = `in <b>${clockText(ms)}</b>`;
   const list = $('#sheetlist');
@@ -3141,10 +3141,9 @@ function openClaim(key, score, total, ms){
   $('#claimgo').disabled = false;
   $('#claimrow').style.display = '';
   $('#claimname').value = askedName();
-  const memory = /\/memory$/.test(key);
-  $('#claim label').textContent = (total === score
+  $('#claim label').textContent = total === score
     ? 'A clean sheet — put your name to it'
-    : 'Put this run on the leaderboard') + (memory ? ', from memory' : '');
+    : 'Put this run on the ' + (isHard(key) ? 'hard ' : '') + 'leaderboard';
 }
 /* ============ passing it on ============
    A score is worth telling somebody, and now that a game has a name in the
@@ -3210,7 +3209,7 @@ $('#claim').addEventListener('submit', async ev=>{
 $('#close').onclick = ()=>{ $('#sheet').classList.remove('on'); clockTick(); };
 
 /* ============ the board ============ */
-/* Each game twice: the list up, and from memory. Fourteen tabs is more than
+/* Each game twice: the list up, and without it. Fourteen tabs is more than
    the row wants to carry at once, so the two sets are shown one at a time and
    the board opens on whichever the run being looked at belongs to. */
 const BOARD_GAMES = [
@@ -3221,15 +3220,15 @@ const BOARD_GAMES = [
   {k:'counties/all',   label:'Counties'},
   {k:'boroughs/all',   label:'Boroughs'},
   {k:'states/all',     label:'States'}
-].flatMap(g=>[g, {k:g.k + '/memory', label:g.label, memory:true}]);
-const isMemory = k => /\/memory$/.test(String(k));
+].flatMap(g=>[g, {k:g.k + '/hard', label:g.label, hard:true}]);
+const isHard = k => /\/hard$/.test(String(k));
 let boardAt = 'world/all', boardSeq = 0;
 function boardLabel(key){
   const known = BOARD_GAMES.find(g=>g.k === key);
-  if(known) return known.label + (known.memory ? ' · from memory' : '');
+  if(known) return known.label + (known.hard ? ' · hard' : '');
   const [mode, scope, cont] = String(key).split('/');
   return (LABEL[mode] || mode) + (scope === 'continent' ? ' · ' + cont : '')
-       + (isMemory(key) ? ' · from memory' : '');
+       + (isHard(key) ? ' · hard' : '');
 }
 let boardCameFromSheet = false;
 function openBoard(key){
@@ -3246,8 +3245,8 @@ function openBoard(key){
 async function renderBoard(){
   const key = boardAt, seq = ++boardSeq;
   const tabs = $('#boardtabs'), list = $('#boardlist');
-  const mem = isMemory(key);
-  const games = BOARD_GAMES.filter(g=>!!g.memory === mem);
+  const hard = isHard(key);
+  const games = BOARD_GAMES.filter(g=>!!g.hard === hard);
   if(!games.some(g=>g.k === key)) games.unshift({k:key, label:boardLabel(key)});
   /* the tab keeps the game's own name; which board it is is said once, above */
   tabs.innerHTML = games.map(g=>
@@ -3256,12 +3255,12 @@ async function renderBoard(){
     b.onclick = ()=>{ boardAt = b.dataset.key; renderBoard(); });
   /* switching sides keeps the game you were looking at */
   document.querySelectorAll('#boardmode button').forEach(b=>{
-    const want = b.dataset.memory === '1';
-    b.setAttribute('aria-pressed', String(want === mem));
+    const want = b.dataset.hard === '1';
+    b.setAttribute('aria-pressed', String(want === hard));
     b.onclick = ()=>{
-      if(want === mem) return;
-      const base = String(key).replace(/\/memory$/, '');
-      boardAt = want ? base + '/memory' : base;
+      if(want === hard) return;
+      const base = String(key).replace(/\/hard$/, '');
+      boardAt = want ? base + '/hard' : base;
       renderBoard();
     };
   });
