@@ -68,13 +68,24 @@ tbody tr:hover{background:var(--panel)}
 
   <div id="bar">
     <select id="game" aria-label="Game">
-      <option value="world/all">Countries</option>
-      <option value="capitals/all">Capitals</option>
-      <option value="flags/all">Flags</option>
-      <option value="continents/all">Continents</option>
-      <option value="counties/all">English counties</option>
-      <option value="states/all">States</option>
-      <option value="boroughs/all">London boroughs</option>
+      <optgroup label="With suggestions">
+        <option value="world/all">Countries</option>
+        <option value="capitals/all">Capitals</option>
+        <option value="flags/all">Flags</option>
+        <option value="continents/all">Continents</option>
+        <option value="counties/all">English counties</option>
+        <option value="states/all">States</option>
+        <option value="boroughs/all">London boroughs</option>
+      </optgroup>
+      <optgroup label="From memory">
+        <option value="world/all/memory">Countries</option>
+        <option value="capitals/all/memory">Capitals</option>
+        <option value="flags/all/memory">Flags</option>
+        <option value="continents/all/memory">Continents</option>
+        <option value="counties/all/memory">English counties</option>
+        <option value="states/all/memory">States</option>
+        <option value="boroughs/all/memory">London boroughs</option>
+      </optgroup>
     </select>
     <input id="key" type="password" placeholder="Admin key" autocomplete="off" spellcheck="false">
     <button id="go" class="key">Show</button>
