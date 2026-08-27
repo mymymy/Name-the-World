@@ -712,13 +712,26 @@ const quiet = window.matchMedia && window.matchMedia('(prefers-reduced-motion: r
 let calm = !!(quiet && quiet.matches);
 if(quiet && quiet.addEventListener) quiet.addEventListener('change', e=>{ calm = e.matches; });
 
+/* How many single-character slips turn one string into the other: a letter put
+   in, taken out, typed as the wrong one, or - and this is the one that matters
+   - two next to each other the wrong way round.
+
+   Counted as one edit rather than two, which plain edit distance would make it.
+   A transposition is the commonest typo there is, and at two edits it fell
+   outside what a name of ordinary length is allowed to be wrong by: austrai for
+   Austria matched nothing at all, and with the suggestions off there was no
+   list to fall back on - you recalled the country and were told there was no
+   such name. */
 function lev(a,b){
   if(Math.abs(a.length-b.length) > 2) return 9;
   const m=a.length, n=b.length, d=[];
   for(let i=0;i<=m;i++) d[i]=[i];
   for(let j=0;j<=n;j++) d[0][j]=j;
-  for(let i=1;i<=m;i++) for(let j=1;j<=n;j++)
+  for(let i=1;i<=m;i++) for(let j=1;j<=n;j++){
     d[i][j] = Math.min(d[i-1][j]+1, d[i][j-1]+1, d[i-1][j-1] + (a[i-1]===b[j-1]?0:1));
+    if(i>1 && j>1 && a[i-1]===b[j-2] && a[i-2]===b[j-1])
+      d[i][j] = Math.min(d[i][j], d[i-2][j-2] + 1);
+  }
   return d[m][n];
 }
 
