@@ -328,6 +328,8 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
 #find::placeholder{color:var(--ink-3)}
 #shut{background:none;border:0;padding:2px 4px;color:var(--ink-3);font-size:18px;line-height:1}
 #sug{max-height:196px;overflow-y:auto;-webkit-overflow-scrolling:touch;border-radius:0 0 7px 7px}
+/* with nothing to suggest and nothing left to explain, it takes no room */
+#sug:empty{display:none}
 #sug .row{
   display:flex;align-items:baseline;width:100%;background:none;border:0;text-align:left;
   padding:9px 12px;line-height:1.2;border-bottom:1px solid rgba(0,0,0,.06);
@@ -337,7 +339,9 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
 #sug .row.used{color:var(--ink-3)}
 #sug .row .mark{margin-left:auto;padding-left:10px;color:var(--ink-3)}
 #sug .note{padding:10px 12px;color:var(--ink-3);font-size:13px}
-#askfoot{padding:7px 10px;border-top:1px solid var(--rule);display:none;gap:10px;align-items:baseline}
+#askfoot{padding:7px 10px;border-top:1px solid var(--rule);display:none;gap:10px;
+  align-items:baseline;flex-wrap:wrap}
+#asknote:empty{display:none}
 #askfoot.on{display:flex}
 #tellme,#hint{background:none;border:0;padding:0;color:var(--shown);font-size:13px;border-bottom:1px solid currentColor}
 /* the kinder of the two ways out, so it leads - and it is not grey, because it
@@ -586,7 +590,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
           <button id="shut" aria-label="Close">×</button>
         </div>
         <div id="sug" role="listbox" aria-label="Suggestions"></div>
-        <div id="askfoot"><button id="hint" hidden>Need the list?</button><button id="tellme">Show the answer</button><span id="asknote"></span></div>
+        <div id="askfoot"><span id="asknote"></span><button id="hint" hidden>Need the list?</button><button id="tellme">Reveal the answer</button></div>
       </div>
 
       <div id="tools">
@@ -634,7 +638,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 26 aug · v89</span>
+      <span id="build" class="caps">build 27 aug · v90</span>
     </div>
   </div>
 </div>
@@ -2602,17 +2606,33 @@ function renderAskFoot(){
   const t = S.sel && BY_CODE[S.sel];
   const a = t && S.ans[t.code];
   const showTell = !!(t && a && !a.ok && !a.told);
-  /* Offered on the same terms as showing the answer: once you have tried and
-     got it wrong. It is the gentler of the two - the list for this one place
-     rather than the name - and it costs the place on the hard board rather
-     than the game. With it there, nobody stuck on one country has any reason
-     to reach for the switch and turn the whole run assisted. */
-  $('#hint').hidden = !(showTell && !S.list && !hinted.has(t.code));
+  /* Not on the same terms as revealing the answer, which can be asked for the
+     moment you are stuck: that is giving up, and giving up is always allowed.
+     This is the thing you turned off, so offering it after one slip is nagging
+     - it waits until you have actually tried. It is the gentler of the two
+     when it comes, costing the place on the hard board rather than the game,
+     and with it there nobody stuck on one country has a reason to reach for
+     the switch and turn the whole run assisted. */
+  $('#hint').hidden = !(t && !S.list && !hinted.has(t.code) && triesAt(t.code) >= HINT_AFTER);
   $('#askfoot').className = showTell || !$('#hint').hidden || $('#asknote').textContent ? 'on' : '';
 }
 /* Places the list has been asked for. Not saved: it exists to decide what is
    on screen now, and the lasting record of it is the aid flag on the answer. */
 const hinted = new Set();
+/* How many times each place has been tried and not got. A try is any answer
+   that did not land - a wrong country, or a string the game would not read -
+   because the two are the same predicament from the player's side.
+   Counting only wrong countries would miss the case the hint is most for:
+   somebody who knows the shape is Uzbek-ish and cannot produce the word never
+   names a country at all, so a wrong-country count would sit at nought while
+   they got nowhere. */
+const tries = new Map();
+const triesAt = code => tries.get(code) || 0;
+/* enough to have tried, not so many as to be nagged after one slip */
+const HINT_AFTER = 3;
+/* The list being off is worth saying while it is new and not after that. Said
+   every time, on every place, it is a line of furniture rather than a fact. */
+let offSeen = 0;
 $('#hint').onclick = ()=>{
   if(!S.sel) return;
   hinted.add(S.sel);
@@ -2623,7 +2643,9 @@ $('#hint').onclick = ()=>{
 function renderSuggestions(){
   sug.innerHTML = '';
   if(!S.list && !(S.sel && hinted.has(S.sel))){
-    sug.innerHTML = '<p class="note off">Suggestions are off — type the name in full.</p>';
+    /* and once it has been read a few times it is in the way: the box below is
+       empty, so nothing is displaced by saying nothing */
+    if(offSeen < 3) sug.innerHTML = '<p class="note off">No suggestions — name it from memory.</p>';
     return;
   }
   const q = norm(find.value);
@@ -2898,11 +2920,16 @@ function answer(text){
   const lenient = S.list || hinted.has(t.code);
   const guess = (lenient ? resolve(text) : resolveStrict(text)) || null;
   if(!guess){
+    tries.set(t.code, triesAt(t.code) + 1);
     $('#asknote').textContent = !lenient && partial(text)
       ? 'Type the name in full.' : 'No match for that name.';
+    /* what was typed stays put: it is nearly right, and asking for it again
+       from nothing is the wrong thing to do to somebody who nearly had it */
     renderAskFoot(); placeFloaters();
     return;
   }
+  if(guess.code !== t.code) tries.set(t.code, triesAt(t.code) + 1);
+  else if(!S.list) offSeen++;
   const old = S.ans[t.code];
   /* What was named instead, when it was not this place.
      Kept as a list rather than as the last one standing: the interesting case
