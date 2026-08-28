@@ -377,7 +377,17 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
 #sheet.on{display:flex}
 #sheetbox{background:var(--panel);border:1px solid var(--ink);border-radius:8px;overflow:hidden;
   max-width:420px;width:100%;max-height:82vh;display:flex;flex-direction:column}
-#sheethead{padding:16px var(--pad) 12px;border-bottom:1px solid var(--ink)}
+#sheethead{padding:16px var(--pad) 12px;border-bottom:1px solid var(--ink);position:relative}
+/* Close was a button in the row of things you might want to do next, which is
+   the wrong company: everything else there is a choice, and this is only the
+   way out. A cross in the corner, tapping the sheet's own shadow, or Escape. */
+#sheetx{position:absolute;top:10px;right:8px;background:none;border:0;
+  font-size:22px;line-height:1;padding:2px 8px;color:var(--ink-3)}
+#claimwhere,#claimrank{margin:0 0 6px;font-size:13px;color:var(--ink-2)}
+#claimrank{color:var(--ink);font-weight:600}
+#claimwhere:empty,#claimrank:empty{display:none}
+/* The misses were a list with nothing saying what it was a list of. */
+#misshead{margin:12px var(--pad) 0;color:var(--ink-3)}
 #score{font-size:30px;line-height:1;margin:6px 0 0}
 #score small{font-size:15px;color:var(--ink-2)}
 #sheetlist{overflow-y:auto;padding:6px 0}
@@ -635,7 +645,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 27 aug · v92</span>
+      <span id="build" class="caps">build 28 aug · v93</span>
     </div>
   </div>
 </div>
@@ -644,11 +654,14 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
   <div id="sheetbox">
     <div id="sheethead">
       <span class="caps" id="scoretitle">Result</span>
+      <button id="sheetx" aria-label="Close">×</button>
       <p id="score" class="serif"></p>
       <p id="sheettime" class="caps"></p>
     </div>
     <form id="claim" hidden autocomplete="off">
-      <label class="caps" for="claimname">Put it on the leaderboard</label>
+      <p id="claimwhere"></p>
+      <p id="claimrank"></p>
+      <label class="caps" for="claimname">Add your name to the leaderboard</label>
       <div id="claimrow">
         <input id="claimname" maxlength="24" placeholder="Your name" autocomplete="nickname"
                enterkeyhint="done" spellcheck="false">
@@ -656,14 +669,16 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
       </div>
       <p class="note" id="claimnote"></p>
     </form>
-    <div id="sheetlist"></div>
+    <div id="sheetmiss" hidden>
+      <p class="caps" id="misshead"></p>
+      <div id="sheetlist"></div>
+    </div>
     <div id="sheetfoot">
       <button id="another" class="key caps">Another ten</button>
       <button id="retry" class="caps">Try the misses again</button>
-      <button id="revealall" class="caps">Show all answers</button>
+      <button id="revealall" class="caps">Fill in the answers</button>
       <button id="share" class="caps">Share</button>
       <button id="seeboard" class="caps">Leaderboard</button>
-      <button id="close" class="caps">Close</button>
     </div>
   </div>
 </div>
@@ -2951,7 +2966,10 @@ function answer(text){
              n: old && old.n ? old.n : taken() + 1,
              /* the list being up is help, and so is a hint asked for on this
                 one place; either way the hard board will not count it */
-             aid: S.list || hinted.has(t.code) || !!(old && old.aid)};
+             aid: S.list || hinted.has(t.code) || !!(old && old.aid),
+             /* which kind, so the result can say hint when it was a hint - the
+                list being up is the other kind and reads differently */
+             hint: hinted.has(t.code) || !!(old && old.hint)};
   if(said.length) a.wrong = said;
   S.ans[t.code] = a;
   find.value = '';
@@ -3043,8 +3061,10 @@ function renderTally(){
   const named = t.filter(e=>S.ans[e.code]).length;
   const right = t.filter(e=>S.ans[e.code] && S.ans[e.code].ok).length;
   const tight = window.innerWidth <= 760;
+  /* the second number is how much of the game has been answered, not what it
+     scored - without the word it reads as a fraction and so as a score */
   $('#tally').innerHTML = tight
-    ? `<b>${right}</b>✓ · ${named}/${t.length}`
+    ? `<b>${right}</b>✓ · ${named}/${t.length} done`
     : `<b>${right}</b> right · <b>${named}</b> of ${t.length} done`;
   $('#prog').firstElementChild.style.width = (100 * right / Math.max(1, t.length)) + '%';
   /* A finished game had nowhere to go. The result comes up the moment you name
@@ -3129,19 +3149,26 @@ function openSheet(){
   const misses = t.filter(e=>!S.ans[e.code] || !S.ans[e.code].ok);
   /* the clock is read before the sheet goes up, since putting it up stops it */
   const key = gameKey(), ms = elapsed(key);
-  /* Two numbers when they differ: what was named, and what was named with
-     nothing helping. The second is what the hard board takes, and saying so
-     here is the only place it can be understood rather than just noticed. */
-  const own = unaided();
-  $('#score').innerHTML = `${right} of ${t.length} <small>named correctly</small>`
-    + (!S.list && own < right ? ` <small>· <b>${own}</b> without help</small>` : '')
+  /* What was named, and then the exception rather than a second total: four
+     without help means subtracting to find out what happened, where one hint
+     used says it. Only the kind of help that was actually taken is named. */
+  const helped = t.filter(e=>{ const a = S.ans[e.code]; return a && a.ok && a.aid; });
+  const hints = helped.filter(e=>S.ans[e.code].hint).length;
+  const aside = !S.list && helped.length
+    ? (hints === helped.length
+        ? ` <small>· ${hints} hint${hints === 1 ? '' : 's'} used</small>`
+        : ` <small>· ${helped.length} with help</small>`)
+    : '';
+  $('#score').innerHTML = `${right} of ${t.length} <small>named correctly</small>` + aside
     + (S.scope === 'random' ? ` <small>· round ${S.round}</small>` : '');
   $('#sheettime').innerHTML = `in <b>${clockText(ms)}</b>`;
   const list = $('#sheetlist');
   list.innerHTML = '';
   /* nothing to list when nothing was missed: the score says it, and the line
      above the name box says it again, so a third telling is just a grey band */
-  list.hidden = !misses.length;
+  $('#sheetmiss').hidden = !misses.length;
+  $('#misshead').textContent = misses.length === 1 ? 'The one you missed'
+                                                  : `The ${misses.length} you missed`;
   if(misses.length){
     misses.forEach(e=>{
       const a = S.ans[e.code];
@@ -3184,9 +3211,36 @@ function openClaim(key, score, total, ms){
   $('#claimgo').disabled = false;
   $('#claimrow').style.display = '';
   $('#claimname').value = askedName();
-  $('#claim label').textContent = total === score
-    ? 'A clean sheet — put your name to it'
-    : 'Put this run on the ' + (isHard(key) ? 'hard ' : '') + 'leaderboard';
+  $('#claim label').textContent = 'Add your name to the leaderboard';
+  /* The hard board does not count a place a hint was taken on, so the run is
+     worth less there than the result above says. Saying which board and what
+     it scores, here, is the difference between a number that makes sense and
+     a number that changed while nobody was looking. */
+  const named = targets().filter(e=>S.ans[e.code] && S.ans[e.code].ok).length;
+  $('#claimwhere').textContent = !isHard(key) ? ''
+    : score < named ? `Scores ${score} of ${total} here — a hinted place does not count on the hard board.`
+                    : `The hard board, where nothing helped you.`;
+  standing(key, score, ms);
+}
+/* Where this run would come, when that is worth knowing.
+
+   A score on its own says nothing until there is something to hold it against,
+   and a board with two runs on it makes everybody first, which is worse than
+   saying nothing. So the line waits for the board to be reachable and to have
+   a few runs on it, and is simply absent until then. */
+async function standing(key, score, ms){
+  const where = $('#claimrank');
+  where.textContent = '';
+  const mine = claiming;
+  try{
+    const {rows, shared} = await Board.list(key);
+    if(claiming !== mine || !shared || rows.length < 3) return;
+    const better = rows.filter(r=>r.s > score || (r.s === score && r.ms < ms)).length;
+    const n = better + 1;
+    const th = n % 100 >= 11 && n % 100 <= 13 ? 'th'
+             : ({1:'st', 2:'nd', 3:'rd'})[n % 10] || 'th';
+    where.textContent = `This run would come ${n}${th}.`;
+  }catch(e){ /* no board, no standing, nothing said */ }
 }
 /* ============ passing it on ============
    A score is worth telling somebody, and now that a game has a name in the
@@ -3249,7 +3303,13 @@ $('#claim').addEventListener('submit', async ev=>{
   if(res.status === 400){ $('#claimrow').style.display = ''; $('#claimgo').disabled = false; $('#claimname').select(); }
   else { $('#claimrow').style.display = 'none'; claiming = null; }
 });
-$('#close').onclick = ()=>{ $('#sheet').classList.remove('on'); clockTick(); };
+/* Three ways out and none of them a button among the choices: the cross in the
+   corner, the sheet's own shadow, and Escape. Close sat in the row with Share
+   and Leaderboard, which are things to do; it is only the way back to the map,
+   and tapping the map is how anybody would ask for that. */
+function shutSheet(){ $('#sheet').classList.remove('on'); clockTick(); }
+$('#sheetx').onclick = shutSheet;
+$('#sheet').addEventListener('click', ev=>{ if(ev.target.id === 'sheet') shutSheet(); });
 
 /* ============ the board ============ */
 /* Each game twice: the list up, and without it. Fourteen tabs is more than
@@ -3571,8 +3631,10 @@ function setSetup(open){
 $('#gear').onclick = ()=> setSetup(!document.body.classList.contains('setup'));
 $('#done').onclick = ()=> setSetup(false);
 document.addEventListener('keydown', ev=>{
-  if(ev.key === 'Escape' && $('#board').classList.contains('on')) $('#board').classList.remove('on');
-  else if(ev.key === 'Escape' && document.body.classList.contains('setup')) setSetup(false);
+  if(ev.key !== 'Escape') return;
+  if($('#board').classList.contains('on')) $('#board').classList.remove('on');
+  else if($('#sheet').classList.contains('on')) shutSheet();
+  else if(document.body.classList.contains('setup')) setSetup(false);
 });
 document.querySelectorAll('#listseg button').forEach(b=>b.onclick = ()=>{
   S.list = b.dataset.list === '1';
