@@ -7,7 +7,11 @@ A map naming game. Click a country on the world map and name it.
   memory) — off is the harder game, and only spelling is forgiven
 - 200 countries in play; small states have dot targets. Scroll or pinch to zoom, drag to pan.
 
-Everything — map geometry, styles, logic — is in `index.html`. No build step, no dependencies.
+Everything — map geometry, styles, logic — is in `index.html`. No build step, no
+dependencies. Beside it sit the two things too big to inline: `flags/` and
+`fonts/`, the latter holding Young Serif by Bastien Sozeau (OFL, licence
+included), which the page is set in. Both are served from here rather than
+fetched from anyone, and the service worker precaches them with the page.
 
 ## lab/
 

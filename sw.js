@@ -1,18 +1,23 @@
 /* Name the World - offline support.
 
-   The app is a single self-contained page: no external scripts, styles, fonts
-   or images, and it never fetches anything at runtime. So caching the page
-   itself is enough to make the whole game work with no connection.
+   The app is a single self-contained page: no external scripts or styles, and
+   nothing fetched from anybody else at runtime. What it does carry of its own -
+   the flags, and the font it is set in - is served from here and precached with
+   the page, so the whole game works with no connection.
 
    Bump VERSION to retire the old cache and publish a new one. */
-const VERSION = 'ntw-v77';
+const VERSION = 'ntw-v78';
 const SHELL = [
   './',
   './index.html',
   './manifest.webmanifest',
   './icon-192.png',
   './icon-512.png',
-  './apple-touch-icon.png'
+  './apple-touch-icon.png',
+  /* the page names itself in Young Serif, so the font is part of the shell -
+     44 KB, and without it an offline player gets the fallback serif instead */
+  './fonts/young-serif-latin.woff2',
+  './fonts/young-serif-latin-ext.woff2'
 ];
 /* the flags game is unplayable without its pictures, so they are precached with
    everything else - 199 files, about 465 KB all told */
