@@ -3,8 +3,8 @@
 A map naming game. Click a country on the world map and name it.
 
 - **Games:** the whole world, one continent at a time, or name the seven continents
-- **Country list** on (filter as you type) or off (type the name from memory)
-- **Checking** at the end (default) or as you go
+- **Suggestions** on (a list to pick from as you type) or off (the whole name, from
+  memory) — off is the harder game, and only spelling is forgiven
 - 200 countries in play; small states have dot targets. Scroll or pinch to zoom, drag to pan.
 
 Everything — map geometry, styles, logic — is in `index.html`. No build step, no dependencies.
@@ -120,6 +120,16 @@ Each place comes back with `got` (runs that reached it), `hit`, `miss`, `told`,
 `opens` (runs that started there) and `mean` (its average place in the order).
 A place with no row is one nobody has reached at all, which is its own kind of
 hard: `got / runs` and `hit / got` are two different questions.
+
+Alongside them, `mix` — what places get called instead, counted per pair. A
+wrong answer that was then corrected still counts, and that is most of them:
+somebody says Slovakia, sees it marked wrong and puts Slovenia. Reading it off
+the answer's final state would show a clean right answer and lose every one.
+
+Each game is two: with the list up and from memory. The mode rides on the end
+of the game key (`world/all` and `world/all/hard`), so the runs, the counters
+and the confusions all divide along the same line and none of them needed a
+column adding.
 
 If the board is already up, the new tables are added by running the schema
 again — every statement in it is `IF NOT EXISTS`, so it leaves the runs alone:
