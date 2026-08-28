@@ -499,9 +499,6 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
   #sug .row.used{background:none}
   #sug .row .mark{display:none}
   #sug .note{padding:7px 4px;white-space:nowrap}
-  /* the short notes are a few words and read better on one line; this one is a
-     sentence, and on a narrow phone nowrap walked it off the side of the screen */
-  #sug .note.off{white-space:normal}
   #ask{width:min(330px, calc(100vw - 20px))}
   header{padding:7px var(--pad) 6px}
   h1{font-size:14px}
@@ -638,7 +635,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 27 aug · v90</span>
+      <span id="build" class="caps">build 27 aug · v91</span>
     </div>
   </div>
 </div>
@@ -2630,9 +2627,6 @@ const tries = new Map();
 const triesAt = code => tries.get(code) || 0;
 /* enough to have tried, not so many as to be nagged after one slip */
 const HINT_AFTER = 3;
-/* The list being off is worth saying while it is new and not after that. Said
-   every time, on every place, it is a line of furniture rather than a fact. */
-let offSeen = 0;
 $('#hint').onclick = ()=>{
   if(!S.sel) return;
   hinted.add(S.sel);
@@ -2642,12 +2636,11 @@ $('#hint').onclick = ()=>{
 };
 function renderSuggestions(){
   sug.innerHTML = '';
-  if(!S.list && !(S.sel && hinted.has(S.sel))){
-    /* and once it has been read a few times it is in the way: the box below is
-       empty, so nothing is displaced by saying nothing */
-    if(offSeen < 3) sug.innerHTML = '<p class="note off">No suggestions — name it from memory.</p>';
-    return;
-  }
+  /* Nothing at all with the list off: an empty box under the place you are
+     being asked to name is the whole of what there is to say, and saying it in
+     words as well - on every place, for two hundred places - is labouring a
+     point the player made themselves when they turned the list off. */
+  if(!S.list && !(S.sel && hinted.has(S.sel))) return;
   const q = norm(find.value);
   if(!q){
     sug.innerHTML = '<p class="note">Start typing a name.</p>';
@@ -2929,7 +2922,6 @@ function answer(text){
     return;
   }
   if(guess.code !== t.code) tries.set(t.code, triesAt(t.code) + 1);
-  else if(!S.list) offSeen++;
   const old = S.ans[t.code];
   /* What was named instead, when it was not this place.
      Kept as a list rather than as the last one standing: the interesting case
