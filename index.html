@@ -391,7 +391,11 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
 #score{font-size:30px;line-height:1;margin:6px 0 0}
 #score small{font-size:15px;color:var(--ink-2)}
 #sheetlist{overflow-y:auto;padding:6px 0}
-#sheetlist .r{display:flex;align-items:baseline;padding:6px var(--pad)}
+#sheetlist .r{display:flex;align-items:baseline;padding:6px var(--pad);width:100%;
+  background:none;border:0;text-align:left;font:inherit;color:inherit}
+#sheetlist .r.go{cursor:pointer}
+#sheetlist .r.go:active{background:var(--tap)}
+#sheetlist .r.go:hover .lead{border-bottom-color:var(--ink-3)}
 #sheetlist .r .lead{flex:1;border-bottom:1px dotted var(--rule);margin:0 6px;transform:translateY(-4px)}
 #sheetlist .r .was{color:var(--no);font-size:13px;white-space:nowrap}
 #sheetfoot{padding:11px var(--pad);border-top:1px solid var(--rule);display:flex;gap:8px;flex-wrap:wrap}
@@ -645,7 +649,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 28 aug · v93</span>
+      <span id="build" class="caps">build 28 aug · v94</span>
     </div>
   </div>
 </div>
@@ -676,7 +680,6 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     <div id="sheetfoot">
       <button id="another" class="key caps">Another ten</button>
       <button id="retry" class="caps">Try the misses again</button>
-      <button id="revealall" class="caps">Fill in the answers</button>
       <button id="share" class="caps">Share</button>
       <button id="seeboard" class="caps">Leaderboard</button>
     </div>
@@ -980,6 +983,12 @@ DATA.forEach(e=>{
   e.key = norm(e.name);
   e.alt = [...new Set((e.aliases||[]).map(norm))].filter(a => a && a !== e.key);
   e.exact = new Set((e.also||[]).map(norm));
+  /* The frame is how the map is aimed, and a place without one is never flown
+     to: the globe stays where it was and the box points at nothing. Tuvalu came
+     through the data with no frame - the only one - so selecting it left it off
+     the side of the screen. A place with a position always has a frame now, even
+     if it is a frame with no width; Nauru's is one of those and works. */
+  if(!e.fr && e.cll) e.fr = [e.cll[0], 0, e.cll[1], e.cll[1]];
 });
 const BY_CODE = Object.fromEntries(DATA.map(e=>[e.code,e]));
 const PLAYABLE = DATA.filter(e=>e.play);
@@ -1018,7 +1027,11 @@ CONT_ENTRY.forEach(c=>{ BY_CODE[c.code] = c; });
    capital shows enough of its country to place it. */
 const CAP_ENTRY = CAPS.map(e=>({
   code:e.code, name:e.name, of:e.of, iso:e.iso, continent:e.continent,
-  cll:e.cll, point:true, play:true, isCap:true, fr:e.fr,
+  cll:e.cll, point:true, play:true, isCap:true,
+  /* Funafuti's country came through the data without a frame, so the city had
+     none either and nothing ever flew to it. The country has one now; failing
+     that, the city stands for itself. */
+  fr: e.fr || (BY_CODE[e.iso] || {}).fr || [e.cll[0], 0, e.cll[1], e.cll[1]],
   aliases:e.aliases||[], key:norm(e.name),
   alt:[...new Set((e.aliases||[]).map(norm))].filter(a => a && a !== norm(e.name)),
   exact:new Set()
@@ -2568,14 +2581,18 @@ function startTracking(t){
      wherever it was last put and not follow the map. */
   if(!floatRaf) floatRaf = requestAnimationFrame(trackFloaters);
 }
-function showTip(t, kind, text){
+/* Two seconds is right for a tip that follows something you just did - it says
+   the word and gets out of the way. It is wrong for a name you asked to be
+   shown, where the name is the whole errand and a map with an outline on it and
+   nothing written is no answer at all. So that one holds until you move on. */
+function showTip(t, kind, text, hold){
   startTracking(t);
   tip.className = ''; void tip.offsetWidth;
   tip.textContent = text;
   tip.className = 'on ' + kind;
   placeFloaters();
   clearTimeout(tipTimer);
-  tipTimer = setTimeout(hideTip, 2000);
+  if(!hold) tipTimer = setTimeout(hideTip, 2000);
 }
 function hideTip(){
   tip.className = '';
@@ -3172,7 +3189,16 @@ function openSheet(){
   if(misses.length){
     misses.forEach(e=>{
       const a = S.ans[e.code];
-      const r = document.createElement('div'); r.className = 'r';
+      /* Tap one to be taken to it. This is what the old Fill in the answers was
+         reaching for and could not do: it marked every place you had not got as
+         shown and went back to the map, where the names only draw past a certain
+         zoom - none at all on a desktop fitted to the screen - and two hundred
+         of them at once would be unreadable anyway. One at a time, flown to and
+         named, is the thing that was wanted. */
+      const where = !!(e.c || e.cll);
+      const r = document.createElement(where ? 'button' : 'div');
+      r.className = 'r' + (where ? ' go' : '');
+      if(where){ r.type = 'button'; r.onclick = ()=> showMe(e.code); }
       const of = e.of ? ` <small>${esc(e.of)}</small>` : '';
       r.innerHTML = `<span>${esc(e.name)}${of}</span><span class="lead"></span>` +
         `<span class="was">${a && !a.told ? 'you said ' + esc(a.given) : (a && a.told ? 'shown' : 'not named')}</span>`;
@@ -3308,6 +3334,16 @@ $('#claim').addEventListener('submit', async ev=>{
    and Leaderboard, which are things to do; it is only the way back to the map,
    and tapping the map is how anybody would ask for that. */
 function shutSheet(){ $('#sheet').classList.remove('on'); clockTick(); }
+/* Here is where that one is. Nothing is written down: the run is over and may
+   already be on a board, so being shown where Kyrgyzstan was must not turn a
+   wrong answer into a given-away one behind your back. */
+function showMe(code){
+  const t = BY_CODE[code]; if(!t) return;
+  shutSheet(); closeAsk();
+  S.sel = code; paintMap();
+  frameOn(t, {forAsk:false, fly:true});
+  showTip(t, 'tell', t.name, true);
+}
 $('#sheetx').onclick = shutSheet;
 $('#sheet').addEventListener('click', ev=>{ if(ev.target.id === 'sheet') shutSheet(); });
 
@@ -3395,13 +3431,6 @@ $('#boardclose').onclick = ()=>{
 $('#board').addEventListener('click', ev=>{ if(ev.target.id === 'board') $('#board').classList.remove('on'); });
 $('#boardbtn').onclick = ()=> openBoard();
 $('#seeboard').onclick = ()=> openBoard(boardKey(S.scope === 'random' ? gameKey(S.mode, 'all') : gameKey()));
-$('#revealall').onclick = ()=>{
-  /* Shown all at once, at the end. They are not places anybody reached, so they
-     are given no place in the order and are left out of the counters. */
-  targets().forEach(e=>{ if(!S.ans[e.code] || !S.ans[e.code].ok)
-    S.ans[e.code] = {given:e.name, ok:false, told:true, all:true}; });
-  $('#sheet').classList.remove('on'); render();
-};
 $('#another').onclick = ()=>{
   rollRound();
   const key = gameKey(); S.times[key] = 0; delete S.hailed[key];
