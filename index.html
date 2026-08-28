@@ -634,7 +634,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 26 aug · v88</span>
+      <span id="build" class="caps">build 26 aug · v89</span>
     </div>
   </div>
 </div>
@@ -2904,6 +2904,15 @@ function answer(text){
     return;
   }
   const old = S.ans[t.code];
+  /* What was named instead, when it was not this place.
+     Kept as a list rather than as the last one standing: the interesting case
+     is somebody who says Slovakia, sees it marked wrong and corrects to
+     Slovenia. That is a confusion worth knowing about, and reading it off the
+     answer's final state would lose every one of them - the right answer
+     overwrites the wrong one and takes the evidence with it. */
+  const said = (old && old.wrong) ? old.wrong.slice() : [];
+  if(guess.code !== t.code && !said.includes(guess.code) && said.length < 4)
+    said.push(guess.code);
   /* Where in the run this place was reached. Kept from the first time it was
      answered: coming back to a place already tried is the same visit, and the
      order everybody walks the map in should not be moved by second thoughts. */
@@ -2912,6 +2921,7 @@ function answer(text){
              /* the list being up is help, and so is a hint asked for on this
                 one place; either way the hard board will not count it */
              aid: S.list || hinted.has(t.code) || !!(old && old.aid)};
+  if(said.length) a.wrong = said;
   S.ans[t.code] = a;
   find.value = '';
   closeAsk();
@@ -3046,7 +3056,9 @@ function reportPicks(){
   for(const e of basis()){
     const a = S.ans[e.code];
     if(!a || !a.n || S.sent[e.code]) continue;
-    out.push([e.code, a.told ? 't' : (a.ok ? 'h' : 'm'), a.n]);
+    const one = [e.code, a.told ? 't' : (a.ok ? 'h' : 'm'), a.n];
+    if(a.wrong && a.wrong.length) one.push(a.wrong);
+    out.push(one);
   }
   if(!out.length) return;
   const body = JSON.stringify({g:key, o:!S.opened[key], p:out});

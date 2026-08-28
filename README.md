@@ -121,6 +121,16 @@ Each place comes back with `got` (runs that reached it), `hit`, `miss`, `told`,
 A place with no row is one nobody has reached at all, which is its own kind of
 hard: `got / runs` and `hit / got` are two different questions.
 
+Alongside them, `mix` — what places get called instead, counted per pair. A
+wrong answer that was then corrected still counts, and that is most of them:
+somebody says Slovakia, sees it marked wrong and puts Slovenia. Reading it off
+the answer's final state would show a clean right answer and lose every one.
+
+Each game is two: with the list up and from memory. The mode rides on the end
+of the game key (`world/all` and `world/all/hard`), so the runs, the counters
+and the confusions all divide along the same line and none of them needed a
+column adding.
+
 If the board is already up, the new tables are added by running the schema
 again — every statement in it is `IF NOT EXISTS`, so it leaves the runs alone:
 

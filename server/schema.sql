@@ -64,6 +64,28 @@ CREATE TABLE IF NOT EXISTS games (
   at   INTEGER NOT NULL DEFAULT 0
 );
 
+-- What gets named instead.
+--
+-- One row per pair: this place, that answer, how many times. Slovenia called
+-- Slovakia is one row, and it is the sort of thing the game is in a position to
+-- know and nothing else is.
+--
+-- Bounded by the game rather than by traffic, as the counters are: a game of
+-- two hundred has at most two hundred times a hundred and ninety-nine pairs in
+-- it, and in practice almost all of the weight sits on a few dozen - people
+-- confuse neighbours, not opposites. Nothing here is tied to anyone either; a
+-- pair says two countries look alike to people, not which person said so.
+CREATE TABLE IF NOT EXISTS confusions (
+  game TEXT    NOT NULL,            -- 'world/all', 'world/all/hard', ...
+  code TEXT    NOT NULL,            -- the place being asked about
+  said TEXT    NOT NULL,            -- what was named instead
+  n    INTEGER NOT NULL DEFAULT 0,
+  at   INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (game, code, said)
+);
+-- the readout wants the commonest few, per game
+CREATE INDEX IF NOT EXISTS confusions_top ON confusions(game, n DESC);
+
 -- Reports carry no name and beat no rate limit of their own, so they get one:
 -- a row per accepted report, counted per address over the last hour and then
 -- forgotten. The address is salted and hashed exactly as it is for the board.

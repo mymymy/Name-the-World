@@ -11,7 +11,8 @@
        POST   /runs               add a run, as {g, n, s, t, ms}
        DELETE /runs/123           remove one, with the admin key
        POST   /picks              report what a run reached, as {g, o, p}
-       GET    /picks?g=world/all  which places are hard, with the admin key
+       GET    /picks?g=world/all  which places are hard, and what they get
+                                  called instead, with the admin key
 
    Written on the assumption that the link gets shared further than intended.
    That means three things beyond storing rows:
@@ -142,6 +143,8 @@ const row = r => ({g: r.game, n: r.name, s: r.score, t: r.total, ms: r.ms, at: r
 
    A place may appear once. Codes are bounded in length and count, positions
    are bounded by the size of the game, and an outcome is one of three letters.
+   An entry may carry a fourth thing: the places named instead of this one,
+   capped at four, which is what the confusions are counted from.
    Anything malformed loses that entry rather than the whole report: a report
    is not worth refusing over one bad row, and a partial count is still true
    about the rows it kept. */
@@ -156,15 +159,22 @@ function cleanBeat(b) {
   const seen = new Set();
   const picks = [];
   for (const item of list) {
-    if (!Array.isArray(item) || item.length !== 3) continue;
+    if (!Array.isArray(item) || item.length < 3 || item.length > 4) continue;
     const code = String(item[0] || '');
     const what = OUTCOME[item[1]];
     const posn = Number(item[2]);
     if (!code || code.length > 48 || seen.has(code)) continue;
     if (!what) continue;
     if (!Number.isInteger(posn) || posn < 1 || posn > total) continue;
+    /* what was named instead, if anything was: at most four, each a code of
+       ordinary length, and never this place itself */
+    const wrong = [];
+    if (Array.isArray(item[3])) for (const w of item[3].slice(0, 4)) {
+      const said = String(w || '');
+      if (said && said !== code && said.length <= 48 && !wrong.includes(said)) wrong.push(said);
+    }
     seen.add(code);
-    picks.push({code, what, posn});
+    picks.push({code, what, posn, wrong});
   }
   if (!picks.length) return null;
   return {game, opening: !!b.o, picks};
@@ -304,6 +314,13 @@ export default {
         'INSERT INTO games (game, runs, at) VALUES (?1, 1, ?2)' +
         ' ON CONFLICT(game) DO UPDATE SET runs = runs + 1, at = ?2').bind(beat.game, now));
 
+      /* one row per pair of places, however many runs put them together */
+      const mix = env.DB.prepare(
+        'INSERT INTO confusions (game, code, said, n, at) VALUES (?1, ?2, ?3, 1, ?4)' +
+        ' ON CONFLICT(game, code, said) DO UPDATE SET n = n + 1, at = ?4');
+      for (const p of beat.picks) for (const said of p.wrong)
+        work.push(mix.bind(beat.game, p.code, said, now));
+
       work.push(env.DB.prepare('INSERT INTO beats (ip, at) VALUES (?1, ?2)').bind(ip, now));
       work.push(env.DB.prepare('DELETE FROM beats WHERE at < ?1').bind(since));
       await env.DB.batch(work);
@@ -327,6 +344,11 @@ export default {
       const {results} = await env.DB.prepare(
         'SELECT code, got, hit, miss, told, opens, posn FROM picks' +
         ' WHERE game = ?1 ORDER BY got DESC').bind(game).all();
+      /* the commonest few pairs, which is the readable end of a table that has
+         a long thin tail by its nature */
+      const mixed = await env.DB.prepare(
+        'SELECT code, said, n FROM confusions WHERE game = ?1' +
+        ' ORDER BY n DESC, code ASC LIMIT 60').bind(game).all();
 
       return json({
         game, total: GAMES[game],
@@ -338,7 +360,8 @@ export default {
           /* the average place in the order, to one decimal - the sum on its own
              means nothing without the count it was summed over */
           mean: p.got ? Math.round(10 * p.posn / p.got) / 10 : 0
-        }))
+        })),
+        mix: (mixed.results || []).map(m => ({code: m.code, said: m.said, n: m.n}))
       }, 200, {'cache-control': 'no-store'});
     }
 
