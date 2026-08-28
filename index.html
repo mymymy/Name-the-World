@@ -635,7 +635,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 27 aug · v91</span>
+      <span id="build" class="caps">build 27 aug · v92</span>
     </div>
   </div>
 </div>
@@ -2322,7 +2322,19 @@ svg.addEventListener('wheel', ev=>{
 }, {passive:false});
 svg.addEventListener('click', ev=>{
   if(moved) return;
-  const el = ev.target.closest('[data-code]');
+  /* The map takes pointer capture on the way down, so that a drag which wanders
+     off the edge of it carries on being a drag. The cost is paid here: with a
+     capture held, the click that follows is dispatched to the element holding
+     it - the map itself - and not to the shape under the pointer. So ev.target
+     reads 'the map' for every click, including the ones on a country, and this
+     handler took that to mean the sea and cleared the selection.
+     Asking what is actually at the point gives back what the target would have
+     been. Land that is out of play has no pointer events, so it is passed
+     through to whatever is beneath, and a click on the sea still finds nothing
+     with a code on it and still means put this one down. */
+  const under = ev.target.closest('[data-code]') ? ev.target
+              : document.elementFromPoint(ev.clientX, ev.clientY);
+  const el = under && under.closest ? under.closest('[data-code]') : null;
   if(!el){ closeAsk(); hideTip(); S.sel = null; paintMap(); return; }
   const shape = BY_CODE[el.dataset.code]; if(!shape) return;
   const t = entryForShape(shape); if(!t) return;
