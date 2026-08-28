@@ -649,7 +649,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 28 aug · v94</span>
+      <span id="build" class="caps">build 28 aug · v95</span>
     </div>
   </div>
 </div>
@@ -850,8 +850,10 @@ function elapsed(key){ clockTick(); return S.times[key || gameKey()] || 0; }
    either. They get a board each - the ordinary one and the hard one.
 
    No flag is kept for the run as a whole. Instead each answer records whether
-   anything helped it - the list being up, or a hint taken on that one place -
-   and the hard board counts only the answers nothing helped. That way the
+   the suggestions were showing for it - because they are on for the game, or
+   because they were asked for on that one place, which is the same list and the
+   same reading either way - and the hard board counts only the answers that had
+   neither. That way the
    switch can be thrown mid-game, which is worth allowing, without the strict
    board being open to throwing it on for the six you cannot remember and off
    again afterwards: those six simply do not count on it.
@@ -2979,14 +2981,14 @@ function answer(text){
   /* Where in the run this place was reached. Kept from the first time it was
      answered: coming back to a place already tried is the same visit, and the
      order everybody walks the map in should not be moved by second thoughts. */
+  /* Suggestions were showing for this place - because they are on for the whole
+     game, or because they were asked for on this one. There is no difference
+     between the two: the button hands over the very same list and the very same
+     lenient reading, for one place instead of all of them. So one flag, and the
+     hard board will not count it either way. */
   const a = {given:guess.name, ok:guess.code === t.code, told:false,
              n: old && old.n ? old.n : taken() + 1,
-             /* the list being up is help, and so is a hint asked for on this
-                one place; either way the hard board will not count it */
-             aid: S.list || hinted.has(t.code) || !!(old && old.aid),
-             /* which kind, so the result can say hint when it was a hint - the
-                list being up is the other kind and reads differently */
-             hint: hinted.has(t.code) || !!(old && old.hint)};
+             aid: S.list || hinted.has(t.code) || !!(old && old.aid)};
   if(said.length) a.wrong = said;
   S.ans[t.code] = a;
   find.value = '';
@@ -3167,15 +3169,12 @@ function openSheet(){
   /* the clock is read before the sheet goes up, since putting it up stops it */
   const key = gameKey(), ms = elapsed(key);
   /* What was named, and then the exception rather than a second total: four
-     without help means subtracting to find out what happened, where one hint
-     used says it. Only the kind of help that was actually taken is named. */
-  const helped = t.filter(e=>{ const a = S.ans[e.code]; return a && a.ok && a.aid; });
-  const hints = helped.filter(e=>S.ans[e.code].hint).length;
-  const aside = !S.list && helped.length
-    ? (hints === helped.length
-        ? ` <small>· ${hints} hint${hints === 1 ? '' : 's'} used</small>`
-        : ` <small>· ${helped.length} with help</small>`)
-    : '';
+     without help means subtracting to find out what happened, where two with
+     suggestions says it. Named as the switch in Setup names it, since that is
+     the same thing the button in the ask box lends you for one place. */
+  const helped = t.filter(e=>{ const a = S.ans[e.code]; return a && a.ok && a.aid; }).length;
+  const aside = !S.list && helped
+    ? ` <small>· ${helped} with suggestions</small>` : '';
   $('#score').innerHTML = `${right} of ${t.length} <small>named correctly</small>` + aside
     + (S.scope === 'random' ? ` <small>· round ${S.round}</small>` : '');
   $('#sheettime').innerHTML = `in <b>${clockText(ms)}</b>`;
@@ -3238,13 +3237,13 @@ function openClaim(key, score, total, ms){
   $('#claimrow').style.display = '';
   $('#claimname').value = askedName();
   $('#claim label').textContent = 'Add your name to the leaderboard';
-  /* The hard board does not count a place a hint was taken on, so the run is
-     worth less there than the result above says. Saying which board and what
-     it scores, here, is the difference between a number that makes sense and
-     a number that changed while nobody was looking. */
+  /* The hard board does not count a place the suggestions were showing for, so
+     the run is worth less there than the result above says. Saying which board
+     and what it scores, here, is the difference between a number that makes
+     sense and a number that changed while nobody was looking. */
   const named = targets().filter(e=>S.ans[e.code] && S.ans[e.code].ok).length;
   $('#claimwhere').textContent = !isHard(key) ? ''
-    : score < named ? `Scores ${score} of ${total} here — a hinted place does not count on the hard board.`
+    : score < named ? `Scores ${score} of ${total} here — a place you had suggestions for does not count on the hard board.`
                     : `The hard board, where nothing helped you.`;
   standing(key, score, ms);
 }
