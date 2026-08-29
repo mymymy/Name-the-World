@@ -112,7 +112,14 @@ h1{margin:0;font-size:16px;font-weight:500;letter-spacing:.03em;min-width:0}
 #gear{background:none;border:1px solid var(--ink);border-radius:4px;padding:5px 9px;margin-left:4px}
 #gear[aria-expanded="true"]{background:var(--ink);color:var(--paper)}
 #tally{margin-left:auto;color:var(--ink-2);white-space:nowrap}
-#tally b{color:var(--ink);font-weight:600}
+/* The two counts are told apart by where they sit as much as by their colour -
+   what you got is always first, what you added to it comes after the plus - so
+   the pair still reads for anyone who cannot tell the two colours apart. Both
+   sit at about the contrast of the muted ink around them, so the colour reads
+   as meaning rather than as emphasis. */
+#tally b{font-weight:600}
+#tally .got{color:var(--ok)}
+#tally .lost{color:var(--no)}
 
 /* the progress track went too, for the same reason: an unfilled bar spanning
    the whole width is a rule under the header whatever it is called. Only the
@@ -764,7 +771,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v121</span>
+      <span id="build" class="caps">build 29 aug · v122</span>
     </div>
   </div>
 </div>
@@ -3324,12 +3331,20 @@ function renderTally(){
   const t = targets();
   const named = t.filter(e=>S.ans[e.code]).length;
   const right = t.filter(e=>S.ans[e.code] && S.ans[e.code].ok).length;
-  const tight = window.innerWidth <= 760;
-  /* the second number is how much of the game has been answered, not what it
-     scored - without the word it reads as a fraction and so as a score */
-  $('#tally').innerHTML = tight
-    ? `<b>${right}</b>✓ · ${named}/${t.length} done`
-    : `<b>${right}</b> right · <b>${named}</b> of ${t.length} done`;
+  /* Two numbers with nothing between them: 33, and 39 of 200. Both true, and
+     the relationship between them left for the reader to work out - which is
+     that the second is how much of the game has been answered rather than what
+     it scored. The word 'done' was meant to say so and did not, because a
+     fraction reads as a score whatever is written after it.
+     So show the sum instead of hiding it. What you got, what you got wrong, and
+     the two of them together over the length of the game - and the fraction is
+     honestly a fraction now, of the game rather than of your score.
+     Nothing wrong yet is nothing to add, and 33 + 0 (33) is a worse way of
+     writing 33, so the arithmetic only appears once there is any. */
+  const wrong = named - right;
+  $('#tally').innerHTML = wrong
+    ? `<b class="got">${right}</b> + <b class="lost">${wrong}</b> (${named}) / ${t.length}`
+    : `<b class="got">${right}</b> / ${t.length}`;
   $('#prog').firstElementChild.style.width = (100 * right / Math.max(1, t.length)) + '%';
   /* A finished game had nowhere to go. The result comes up the moment you name
      the last one and never again - so closing it, or coming back to a game
