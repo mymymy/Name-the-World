@@ -548,20 +548,24 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
   :root{--pad:12px}
   /* suggestions as a single scrollable row of chips - a vertical list eats
      the little map that is left once the keyboard is up */
-  /* Centred, and with room to spare above and below. The strip scrolls sideways,
-     which means overflow-y:hidden, which means it is also the thing that clips
-     the chips - and a flex row stretches its children to the line's height by
-     default, so a chip was taking a height worked out from the text rather than
-     its own. Six pixels of clearance was enough in one browser and not in
-     another: iOS shaved the bottom off the rounded border. Now the chips keep
-     their own height and there is more room around them than any disagreement
-     about a line box is going to cost. */
+  /* align-items, so a chip keeps its own height rather than being stretched to
+     the line's */
   #sug{display:flex;gap:6px;align-items:center;max-height:none;
-       overflow-x:auto;overflow-y:hidden;padding:8px}
+       overflow-x:auto;overflow-y:hidden;padding:6px 8px}
   #sug .row{
     width:auto;flex:0 0 auto;border:1px solid var(--rule);border-radius:999px;
-    padding:7px 12px;background:#fff;border-bottom:1px solid var(--rule);
+    padding:7px 12px;background:#fff;
   }
+  /* Down the list, the last row wants no line under it - there is nothing below
+     to be separated from. Across as chips, that same rule takes the bottom off
+     the last pill's outline, which reads as a chip cropped along its lower edge:
+     the one on its own is always the last one, so a search matching a single
+     name looked broken and a search matching four looked fine. The rule outside
+     this block wins on specificity whatever the order, so it is put back here
+     rather than narrowed there - it is right where it is, for the shape it was
+     written for. */
+  #sug .row:last-child{border-bottom:1px solid var(--rule)}
+  #sug .row.cursor:last-child{border-bottom-color:var(--ink)}
   #sug .row.cursor{background:#E2E7DD;border-color:var(--ink)}
   #sug .row.used{background:none}
   #sug .row .mark{display:none}
@@ -702,7 +706,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v104</span>
+      <span id="build" class="caps">build 29 aug · v105</span>
     </div>
   </div>
 </div>
