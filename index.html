@@ -340,15 +340,21 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
   box-shadow:0 10px 26px rgba(20,26,28,.3);
   transform:translate(-50%,-100%);
 }
-#ask.on{display:block}
-/* Let go of it and it fades rather than vanishing. Only when it is let go of -
-   panned away from, dismissed, put down. When it closes because its job is done
-   and the next thing is already arriving, it goes at once and out of the way.
-   An animation rather than a transition: the class arrives on an element that
-   was display:none a moment ago, and a transition needs a settled starting
-   value to move away from, which it does not have. */
+/* It fades in, and out again when it is let go of - panned away from,
+   dismissed, put down. Not when it closes because its job is done and the next
+   thing is already arriving: there it goes at once and out of the way.
+
+   In is quicker than out. Appearing is the answer to something you just did and
+   wants to feel immediate; leaving is only tidying up after you.
+
+   Animations rather than transitions: the class arrives on an element that was
+   display:none a moment ago, and a transition needs a settled starting value to
+   move away from, which it does not have. */
+@keyframes askcome{ from{opacity:0} to{opacity:1} }
 @keyframes askgo{ from{opacity:1} to{opacity:0} }
+#ask.on{display:block;animation:askcome .14s ease-out}
 #ask.going{display:block;pointer-events:none;animation:askgo .18s ease-out forwards}
+@media (prefers-reduced-motion: reduce){ #ask.on{animation:none} }
 #ask.below{transform:translate(-50%,0)}
 /* the tail sits where the place is, which placeFloaters works out; the middle
    of the box is only the fallback for before it has.
@@ -744,7 +750,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v118</span>
+      <span id="build" class="caps">build 29 aug · v119</span>
     </div>
   </div>
 </div>
