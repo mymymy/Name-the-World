@@ -2,11 +2,11 @@
 
    The app is a single self-contained page: no external scripts or styles, and
    nothing fetched from anybody else at runtime. What it does carry of its own -
-   the flags, and the two faces it is set in - is served from here and precached
+   the flags, and the face it is set in - is served from here and precached
    with the page, so the whole game works with no connection.
 
    Bump VERSION to retire the old cache and publish a new one. */
-const VERSION = 'ntw-v82';
+const VERSION = 'ntw-v83';
 const SHELL = [
   './',
   './index.html',
@@ -14,14 +14,11 @@ const SHELL = [
   './icon-192.png',
   './icon-512.png',
   './apple-touch-icon.png',
-  /* the page is set in these, so they are part of the shell - without them an
-     offline player gets whatever the device has instead */
-  './fonts/young-serif-latin.woff2',
-  './fonts/young-serif-latin-ext.woff2'
+  /* the page is set in this, so it is part of the shell - without it an offline
+     player gets whatever the device has instead */
+  './fonts/faculty-glyphic-latin.woff2',
+  './fonts/faculty-glyphic-latin-ext.woff2'
 ];
-for(const w of [400, 600, 700])
-  for(const cut of ['latin', 'latin-ext'])
-    SHELL.push(`./fonts/belanosima-${w}-${cut}.woff2`);
 /* the flags game is unplayable without its pictures, so they are precached with
    everything else - 199 files, about 465 KB all told */
 const FLAGS = ["AFG", "AGO", "ALB", "AND", "ARE", "ARG", "ARM", "ATG", "AUS", "AUT", "AZE", "BDI", "BEL", "BEN", "BFA", "BGD", "BGR", "BHR", "BHS", "BIH", "BLR", "BLZ", "BOL", "BRA", "BRB", "BRN", "BTN", "BWA", "CAF", "CAN", "CHE", "CHL", "CHN", "CIV", "CMR", "COD", "COG", "COL", "COM", "CPV", "CRI", "CUB", "CYP", "CZE", "DEU", "DJI", "DMA", "DNK", "DOM", "DZA", "ECU", "EGY", "ERI", "ESH", "ESP", "EST", "ETH", "FIN", "FJI", "FRA", "FSM", "GAB", "GBR", "GEO", "GHA", "GIN", "GMB", "GNB", "GNQ", "GRC", "GRD", "GRL", "GTM", "GUY", "HND", "HRV", "HTI", "HUN", "IDN", "IND", "IRL", "IRN", "IRQ", "ISL", "ISR", "ITA", "JAM", "JOR", "JPN", "KAZ", "KEN", "KGZ", "KHM", "KIR", "KNA", "KOR", "KWT", "LAO", "LBN", "LBR", "LBY", "LCA", "LIE", "LKA", "LSO", "LTU", "LUX", "LVA", "MAR", "MCO", "MDA", "MDG", "MDV", "MEX", "MHL", "MKD", "MLI", "MLT", "MMR", "MNE", "MNG", "MOZ", "MRT", "MUS", "MWI", "MYS", "NAM", "NER", "NGA", "NIC", "NLD", "NOR", "NPL", "NRU", "NZL", "OMN", "PAK", "PAN", "PER", "PHL", "PLW", "PNG", "POL", "PRK", "PRT", "PRY", "PSE", "QAT", "ROU", "RUS", "RWA", "SAU", "SDN", "SEN", "SGP", "SLB", "SLE", "SLV", "SMR", "SOM", "SRB", "SSD", "STP", "SUR", "SVK", "SVN", "SWE", "SWZ", "SYC", "SYR", "TCD", "TGO", "THA", "TJK", "TKM", "TLS", "TON", "TTO", "TUN", "TUR", "TUV", "TWN", "TZA", "UGA", "UKR", "URY", "USA", "UZB", "VAT", "VCT", "VEN", "VNM", "VUT", "WSM", "XKX", "YEM", "ZAF", "ZMB", "ZWE"];

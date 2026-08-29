@@ -50,84 +50,38 @@
 }
 *{box-sizing:border-box}
 html,body{height:100%}
-/* Belanosima, by Ana Sanfelippo and Juan Pablo del Peral - OFL, and carried
-   here like the serif is. Three weights, because a browser handed one weight and
-   asked for a bolder invents it, and an invented bold is a smear; 400, 600 and
-   700 are the three the page actually asks for. Latin and Latin-ext each: the
-   suggestion list and the box you type into are set in this, so Chisinau has to
-   be spellable in it as well as readable on the map. */
-@font-face{
-  font-family:'Belanosima'; font-style:normal; font-weight:400; font-display:swap;
-  src:url(./fonts/belanosima-400-latin.woff2) format('woff2');
-  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,
-                U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,
-                U+2212,U+2215,U+FEFF,U+FFFD;
-}
-@font-face{
-  font-family:'Belanosima'; font-style:normal; font-weight:400; font-display:swap;
-  src:url(./fonts/belanosima-400-latin-ext.woff2) format('woff2');
-  unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,
-                U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,
-                U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
-}
-@font-face{
-  font-family:'Belanosima'; font-style:normal; font-weight:600; font-display:swap;
-  src:url(./fonts/belanosima-600-latin.woff2) format('woff2');
-  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,
-                U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,
-                U+2212,U+2215,U+FEFF,U+FFFD;
-}
-@font-face{
-  font-family:'Belanosima'; font-style:normal; font-weight:600; font-display:swap;
-  src:url(./fonts/belanosima-600-latin-ext.woff2) format('woff2');
-  unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,
-                U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,
-                U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
-}
-@font-face{
-  font-family:'Belanosima'; font-style:normal; font-weight:700; font-display:swap;
-  src:url(./fonts/belanosima-700-latin.woff2) format('woff2');
-  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,
-                U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,
-                U+2212,U+2215,U+FEFF,U+FFFD;
-}
-@font-face{
-  font-family:'Belanosima'; font-style:normal; font-weight:700; font-display:swap;
-  src:url(./fonts/belanosima-700-latin-ext.woff2) format('woff2');
-  unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,
-                U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,
-                U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
-}
 body{
   margin:0;background:var(--paper);color:var(--ink);
-  font-family:Belanosima,"Helvetica Neue",Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  font-family:'Faculty Glyphic',"Helvetica Neue",Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
   font-size:15px;-webkit-text-size-adjust:100%;overflow:hidden;
 }
 button{font:inherit;color:inherit;cursor:pointer}
 .caps{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;font-weight:600}
-/* Young Serif, by Bastien Sozeau - OFL, and carried here rather than fetched
-   from anybody, so the game still works with no connection. Two files, and the
-   second is here for exactly one name: Chisinau is spelt with a comma below the
-   s and a breve over the a, and neither is in the Latin-1 cut. The browser only
-   fetches it if that name is drawn, which is what unicode-range is for. One
-   weight is all there is, so nothing here asks for bold - a browser asked for
-   a bold it has not got will smear the one it has. */
+/* Faculty Glyphic, by Dylan Young - OFL, and carried here rather than fetched
+   from anybody, so the game still works with no connection. One face for the
+   whole game: the names on the map, the headings and everything else. Two files,
+   and the second is here for exactly one name - Chisinau is spelt with a comma
+   below the s and a breve over the a, and neither is in the Latin-1 cut. The
+   browser only fetches it if that name is drawn, which is what unicode-range is
+   for. */
 @font-face{
-  font-family:'Young Serif'; font-style:normal; font-weight:400; font-display:swap;
-  src:url(./fonts/young-serif-latin.woff2) format('woff2');
+  font-family:'Faculty Glyphic'; font-style:normal; font-weight:400; font-display:swap;
+  src:url(./fonts/faculty-glyphic-latin.woff2) format('woff2');
   unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,
                 U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,
                 U+2212,U+2215,U+FEFF,U+FFFD;
 }
 @font-face{
-  font-family:'Young Serif'; font-style:normal; font-weight:400; font-display:swap;
-  src:url(./fonts/young-serif-latin-ext.woff2) format('woff2');
+  font-family:'Faculty Glyphic'; font-style:normal; font-weight:400; font-display:swap;
+  src:url(./fonts/faculty-glyphic-latin-ext.woff2) format('woff2');
   unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,
                 U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,
                 U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
 }
-.serif{font-family:"Young Serif","Iowan Old Style","Palatino Linotype",Palatino,"Hoefler Text","Times New Roman",serif;
-  font-weight:400}
+/* Display type - the title, the score, a game's name. One face throughout means
+   this no longer changes the family; what it still does is pin the weight to the
+   one that exists, so a heading's default bold is not faked out of it. */
+.serif{font-weight:400}
 
 #app{display:flex;flex-direction:column;height:100%}
 
@@ -189,7 +143,7 @@ body.playing #home{display:none}
 #menu button{
   display:block;width:100%;text-align:left;background:var(--panel);color:inherit;
   border:1px solid var(--ink);border-radius:8px;padding:14px 15px;margin-bottom:9px;
-  font-size:19px;font-family:"Young Serif","Iowan Old Style","Palatino Linotype",Palatino,serif;
+  font-size:19px;
   position:relative;
 }
 #menu button small{
@@ -201,7 +155,7 @@ body.playing #home{display:none}
 #menu .game[aria-current]{border-width:2px;background:var(--tap)}
 #menu .game[aria-current]::after{
   content:'in progress';position:absolute;right:15px;top:17px;
-  font:600 9.5px/1 Belanosima,"Helvetica Neue",sans-serif;letter-spacing:.13em;
+  font:600 9.5px/1 'Faculty Glyphic',"Helvetica Neue",sans-serif;letter-spacing:.13em;
   text-transform:uppercase;color:var(--ink-3);font-style:normal;
 }
 #menu .more .chev,#menu .back .chev{font-size:22px;line-height:1}
@@ -293,7 +247,7 @@ svg#map.dragging{cursor:grabbing}
   vector-effect:non-scaling-stroke;pointer-events:none}
 #labels{pointer-events:none}
 #labels text{
-  fill:#262420;font-family:"Young Serif","Iowan Old Style","Palatino Linotype",Palatino,"Hoefler Text",serif;
+  fill:#262420;
   text-anchor:middle;dominant-baseline:middle;letter-spacing:.06em;opacity:.8;
 }
 #labels.hide{display:none}
@@ -463,10 +417,10 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
 /* The misses were a list with nothing saying what it was a list of. */
 #misshead{margin:12px var(--pad) 0;color:var(--ink-3)}
 #score{font-size:30px;line-height:1;margin:6px 0 0}
-/* Young Serif is a wider face than the one before it, and this line no longer
-   fits across a narrow phone at any size worth reading - 12px still wraps at
-   360. So it is allowed to wrap, but only between the two phrases: breaking
-   'with suggestions' in half is the part that looked like a mistake. */
+/* This line does not fit across a narrow phone at any size worth reading - it
+   did not with the face before this one either, and 12px still wrapped at 360.
+   So it is allowed to wrap, but only between the two phrases: breaking 'with
+   suggestions' in half is the part that looked like a mistake. */
 #score small{font-size:15px;color:var(--ink-2);white-space:nowrap}
 /* The list is the one part of the card that gives, so the card fits the screen
    however long it gets. It was not giving: the card is a flex column and this
@@ -739,7 +693,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v101</span>
+      <span id="build" class="caps">build 29 aug · v102</span>
     </div>
   </div>
 </div>
