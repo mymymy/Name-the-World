@@ -548,7 +548,16 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
   :root{--pad:12px}
   /* suggestions as a single scrollable row of chips - a vertical list eats
      the little map that is left once the keyboard is up */
-  #sug{display:flex;gap:6px;max-height:none;overflow-x:auto;overflow-y:hidden;padding:6px 8px}
+  /* Centred, and with room to spare above and below. The strip scrolls sideways,
+     which means overflow-y:hidden, which means it is also the thing that clips
+     the chips - and a flex row stretches its children to the line's height by
+     default, so a chip was taking a height worked out from the text rather than
+     its own. Six pixels of clearance was enough in one browser and not in
+     another: iOS shaved the bottom off the rounded border. Now the chips keep
+     their own height and there is more room around them than any disagreement
+     about a line box is going to cost. */
+  #sug{display:flex;gap:6px;align-items:center;max-height:none;
+       overflow-x:auto;overflow-y:hidden;padding:8px}
   #sug .row{
     width:auto;flex:0 0 auto;border:1px solid var(--rule);border-radius:999px;
     padding:7px 12px;background:#fff;border-bottom:1px solid var(--rule);
@@ -693,7 +702,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v103</span>
+      <span id="build" class="caps">build 29 aug · v104</span>
     </div>
   </div>
 </div>
