@@ -205,13 +205,27 @@ body.playing #home{display:none}
 #menu .wipe.armed{background:var(--miss);border-color:var(--miss);color:#fff}
 #menu .wipe.armed small{color:rgba(255,255,255,.85)}
 
-#top{position:relative;z-index:3;flex:0 0 auto}
+/* Above the settings panel, and by its own number rather than by an accident of
+   where the panel lives. The panel is inside main, and main opens a stacking
+   context of its own, so everything in it is ordered as one block underneath
+   this - which meant a header at 3 could sit over a panel at 12 and be right.
+   Correct, and a hair trigger: it holds only while that third element keeps its
+   context, and a panel that is transformed and scrollable is exactly the sort
+   of thing an engine lifts onto a compositing layer of its own, where the
+   ancestor's ordering has historically not always been honoured. Saying it here
+   costs nothing and is true under either reading. Still below #menu, which is
+   the whole screen and is meant to cover this. */
+#top{position:relative;z-index:20;flex:0 0 auto}
 /* Settings slide out from under the header and may take the whole screen, so
    this lives inside main - its height is exactly what is left below the header,
    and closed it hides behind the header rather than being clipped. */
 #bar{
   position:absolute;left:0;right:0;top:0;z-index:12;
-  max-height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  /* no -webkit-overflow-scrolling here: momentum has been the default since
+     iOS 13, so it buys nothing, and what it does do is force this onto a
+     compositing layer - which is the way the panel gets out from under the
+     header in the first place */
+  max-height:100%;overflow-y:auto;overscroll-behavior:contain;
   background:var(--panel);border-bottom:1px solid var(--rule);
   box-shadow:0 12px 24px rgba(20,26,28,.16);
   transform:translateY(-100%);visibility:hidden;
@@ -785,7 +799,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v125</span>
+      <span id="build" class="caps">build 29 aug · v126</span>
     </div>
   </div>
 </div>
