@@ -420,7 +420,19 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
    360. So it is allowed to wrap, but only between the two phrases: breaking
    'with suggestions' in half is the part that looked like a mistake. */
 #score small{font-size:15px;color:var(--ink-2);white-space:nowrap}
-#sheetlist{overflow-y:auto;padding:6px 0}
+/* The list is the one part of the card that gives, so the card fits the screen
+   however long it gets. It was not giving: the card is a flex column and this
+   sits two levels down inside #sheetmiss, which took its full content height
+   and refused to shrink - a flex item will not go below its content unless it
+   is told it may - so overflow-y here had nothing to overflow and the rows past
+   the fold were simply cut off, with no way to reach them. Both levels shrink
+   now. It went unnoticed while a run missed seven; a run missing thirty-nine
+   found it at once. */
+#sheetmiss{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
+/* an author's display beats the browser's rule for [hidden], and a clean sheet
+   must not show an empty band where the misses would have been */
+#sheetmiss[hidden]{display:none}
+#sheetlist{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1 1 auto;min-height:0;padding:6px 0}
 #sheetlist .r{display:flex;align-items:baseline;padding:6px var(--pad);width:100%;
   background:none;border:0;text-align:left;font:inherit;color:inherit}
 #sheetlist .r.go{cursor:pointer}
@@ -679,7 +691,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 28 aug · v97</span>
+      <span id="build" class="caps">build 28 aug · v98</span>
     </div>
   </div>
 </div>
@@ -3195,7 +3207,12 @@ function openSheet(){
   reportPicks();                 // the run is over, whatever happens to the sheet
   const t = targets();
   const right = t.filter(e=>S.ans[e.code] && S.ans[e.code].ok).length;
-  const misses = t.filter(e=>!S.ans[e.code] || !S.ans[e.code].ok);
+  /* In the order they are written, not the order the game holds them in. The
+     game's own order is reverse alphabetical by a name the player never sees -
+     East Timor is filed under Timor-Leste, and Tuvalu is on the end - which
+     nobody notices among seven misses and nobody can search among forty. */
+  const misses = t.filter(e=>!S.ans[e.code] || !S.ans[e.code].ok)
+                  .sort((a, b)=> a.name.localeCompare(b.name, 'en'));
   /* the clock is read before the sheet goes up, since putting it up stops it */
   const key = gameKey(), ms = elapsed(key);
   /* What was named, and then the exception rather than a second total: four
