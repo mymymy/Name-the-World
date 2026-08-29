@@ -346,18 +346,27 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
    of the box is only the fallback for before it has.
 
    It leans, too. Standing straight up it can only say 'above me', and once the
-   place has gone past the end of the box that is a lie - it stood at the corner
-   pointing at empty sky while the country was off to the side. So it swings
-   with the direction, up to 45 degrees, and swings about its own base so that
-   base stays welded to the edge of the box however far over it goes. */
+   place has gone past the end of the box that is a lie - it stood there
+   pointing at empty sky while the country was off to the side.
+
+   It leans by changing shape rather than by turning. Turning it lifts one
+   corner of its base off the edge of the box and opens a sliver of daylight
+   underneath - five pixels of it at 45 degrees, which is exactly the join the
+   tail exists to make look solid. So the base stays flat on the edge, its full
+   width, both corners down, and the apex moves along it: the two border widths
+   either side share a fixed fourteen pixels between them, and shifting that
+   share walks the point across. Which is the same triangle the eye reads as
+   leaning, and at the end of its travel - point over one base corner - it is a
+   right angle lying on its side, with nothing to lift. */
 #ask:before{
   content:'';position:absolute;left:var(--tail,50%);margin-left:-7px;top:100%;
-  border:7px solid transparent;border-top-color:var(--ink);
-  transform-origin:50% 0;transform:rotate(var(--lean,0deg));
+  border-style:solid;border-color:transparent;border-width:7px;
+  border-left-width:calc(7px + var(--skew,0px));
+  border-right-width:calc(7px - var(--skew,0px));
+  border-top-color:var(--ink);
 }
 #ask.below:before{
   top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:var(--ink);
-  transform-origin:50% 100%;
 }
 /* The line between the box you type in and what is offered below it belongs to
    what is offered, not to the box. On #asktop it was drawn whether or not there
@@ -727,7 +736,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v115</span>
+      <span id="build" class="caps">build 29 aug · v116</span>
     </div>
   </div>
 </div>
@@ -2731,28 +2740,17 @@ function placeFloaters(){
     ask.style.left = mid + 'px';
     ask.style.top = Math.max(46, Math.min(r.height - h - 6,
                                           (bot ? bot.y : top.y) + 8)) + 'px';
-    /* Right into the corner if that is where the place is. It used to stop 14
-       clear of the end, which kept the triangle off the rounded corner but left
-       it pointing straight up at nothing whenever the place was further over
-       than that. Leaning is what makes the corner usable: at the end of its
-       travel it lies over the curve at an angle, aimed out of the corner. */
+    /* Where the point wants to be is simply where the place is. Where the base
+       may stand is more constrained: fourteen wide, and it has to sit on the
+       straight part of the edge, so its middle keeps 7 for its own half and 8
+       more for the rounded corner. Between those two the point gets its lean -
+       it can walk 7 either side of the base's middle, which is as far as the
+       base corner, and that is the 45 degrees. */
     const boxLeft = mid - w/2;
-    const tail = Math.max(3, Math.min(w - 3, top.x - boxLeft));
+    const want = top.x - boxLeft;
+    const tail = Math.max(15, Math.min(w - 15, want));
     ask.style.setProperty('--tail', tail + 'px');
-    /* How far off straight up the place is, measured from where the tail ended
-       up standing to the point the box was hung under - the bottom of the
-       place, not its top. A tall country measured to its top reads as almost
-       straight up however far sideways it has gone, which is how Tanzania at
-       the edge of the screen came out at 13 degrees when it wanted 45.
-
-       Nought while the tail is directly underneath, which is almost always,
-       since it only parts company with the place once it runs out of box. The
-       floor sets how quickly it leans after that: about thirty pixels past the
-       corner is a full 45. */
-    const lean = Math.atan2(top.x - (boxLeft + tail),
-                            Math.max(28, parseFloat(ask.style.top) - (bot ? bot.y : top.y)))
-                 * 180/Math.PI;
-    ask.style.setProperty('--lean', Math.max(-45, Math.min(45, lean)).toFixed(1) + 'deg');
+    ask.style.setProperty('--skew', Math.max(-7, Math.min(7, want - tail)).toFixed(1) + 'px');
   }
 }
 function trackFloaters(){
