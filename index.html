@@ -693,7 +693,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v102</span>
+      <span id="build" class="caps">build 29 aug · v103</span>
     </div>
   </div>
 </div>
@@ -1227,10 +1227,21 @@ function entryForShape(e){
 function unnamed(){ return targets().filter(e=>!S.ans[e.code]); }
 /* Names already used up, so the list cannot offer the same one twice. A wrong
    guess is not one of them: it was marked wrong the moment it was given, so the
-   name is free again and belongs to whoever it really is. */
+   name is free again and belongs to whoever it really is.
+
+   Used up in THIS game. Answers from every game are kept in one place, keyed by
+   code, and reading the lot meant a name spent in one game was spent in all of
+   them - so naming Antarctica in Continents greyed Antarctica out of Countries,
+   where it is a different place with the same name and nobody had touched it.
+   Flags is the same two hundred names as Countries, so a run at one greyed out
+   everything you had got in the other; Capitals shares six with it, the ones
+   where the city and the country are the same word. */
 function spentNames(){
   const out = new Set();
-  for(const [code,a] of Object.entries(S.ans)) if(a.ok) out.add(a.given);
+  for(const e of basis()){
+    const a = S.ans[e.code];
+    if(a && a.ok) out.add(a.given);
+  }
   return out;
 }
 /* How many places in this game have been reached, which is also where the next
