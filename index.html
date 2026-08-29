@@ -431,11 +431,25 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
 #tools button:disabled{opacity:.45;cursor:default}
 #zoom{position:absolute;right:10px;bottom:10px;z-index:5;display:flex;flex-direction:column;gap:5px}
 #zoom button{
-  width:36px;height:36px;line-height:1;font-size:16px;
+  width:36px;height:36px;line-height:1;font-size:16px;position:relative;
   background:var(--panel);border:1px solid var(--ink);border-radius:999px;
   box-shadow:0 2px 6px rgba(20,26,28,.16);
   transition:opacity .18s ease;
 }
+/* Drawn, not typed. As characters they sat a pixel and a half low in the
+   circle: plus and minus are drawn on the font's mathematical axis, and what
+   the browser centres is the line box, not the ink inside it - so where they
+   land depends on metrics that have nothing to do with this button. Two bars
+   are two bars, and they are centred because they are put there. Same weight
+   and length the glyphs had, measured off them: 9 long, 1.6 thick - rounded up
+   to 10, because the box inside the border is 34 and centring an odd width in
+   an even one leaves half a pixel to argue about. */
+#zin::before,#zin::after,#zout::before{
+  content:'';position:absolute;inset:0;margin:auto;   /* centred by being boxed in */
+  width:10px;height:1.6px;
+  background:currentColor;border-radius:1px;
+}
+#zin::after{transform:rotate(90deg)}
 /* dim when there is nowhere further to go, rather than a key that does nothing */
 #zoom button:disabled{opacity:.35;box-shadow:none;cursor:default}
 #toast{
@@ -709,8 +723,8 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
         <button id="skip" class="caps">Next</button>
       </div>
       <div id="zoom">
-        <button id="zin" aria-label="Zoom in">+</button>
-        <button id="zout" aria-label="Zoom out">−</button>
+        <button id="zin" aria-label="Zoom in"></button>
+        <button id="zout" aria-label="Zoom out"></button>
         <button id="zfit" aria-label="Fit map" style="font-size:11px">Fit</button>
       </div>
     </div>
@@ -750,7 +764,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v119</span>
+      <span id="build" class="caps">build 29 aug · v120</span>
     </div>
   </div>
 </div>
