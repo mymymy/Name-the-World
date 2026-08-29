@@ -366,7 +366,10 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
 #sug .row.cursor{background:#E2E7DD}
 #sug .row.used{color:var(--ink-3)}
 #sug .row .mark{margin-left:auto;padding-left:10px;color:var(--ink-3)}
-#sug .note{padding:10px 12px;color:var(--ink-3);font-size:13px}
+/* The rule down the left is for an aside beside something else - the note under
+   a setting, the line under the board. The one left in here is a status line in
+   a small box on its own, with nothing to be set aside from. */
+#sug .note{padding:10px 12px;color:var(--ink-3);font-size:13px;border-left:0;margin:0}
 #askfoot{padding:7px 10px;border-top:1px solid var(--rule);display:none;gap:10px;
   align-items:baseline;flex-wrap:wrap}
 #asknote:empty{display:none}
@@ -706,7 +709,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v105</span>
+      <span id="build" class="caps">build 29 aug · v106</span>
     </div>
   </div>
 </div>
@@ -2756,10 +2759,11 @@ function renderSuggestions(){
      point the player made themselves when they turned the list off. */
   if(!S.list && !(S.sel && hinted.has(S.sel))) return;
   const q = norm(find.value);
-  if(!q){
-    sug.innerHTML = '<p class="note">Start typing a name.</p>';
-    return;
-  }
+  /* Nothing yet, and nothing to say about it: the box above already says Name
+     it, and 'Start typing a name' underneath was the same instruction a second
+     time, in a panel sitting over the country you are trying to look at. Empty,
+     the strip takes no room at all. */
+  if(!q){ sug.innerHTML = ''; return; }
   const spent = spentNames();
   const hits = rank(q).slice(0, 5);
   if(!hits.length){ sug.innerHTML = '<p class="note">Nothing matches that.</p>'; return; }
