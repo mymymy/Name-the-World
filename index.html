@@ -139,12 +139,26 @@ h1{margin:0;font-size:16px;font-weight:500;letter-spacing:.03em;min-width:0}
    the whole width is a rule under the header whatever it is called. Only the
    part that has been earned is drawn - the tally beside the title says how far
    along you are anyway. */
-#prog{height:3px;background:none;flex:0 0 auto}
-/* One colour now. The bar used to run gold for names given and turn green once
-   they were marked; with marking instant there is only ever the marked count to
-   draw, so the two-tone was a distinction with nothing left on either side. */
-#prog i{display:block;height:100%;width:0;background:var(--ok);
-  transition:width .55s cubic-bezier(.4,0,.2,1)}
+#prog{height:3px;background:none;flex:0 0 auto;position:relative;overflow:hidden}
+/* Two marks, and a gap between them that is the point of the arrangement.
+
+   Butted together they make one bar, and one bar is what a reader with no red
+   and green sees: the two are within a whisker of the same lightness - which is
+   deliberate, it is what lets them sit side by side in the tally without either
+   shouting - so the join goes and the length reads as all green. Not a lost
+   distinction but a wrong number, and flattering.
+
+   The gap is a strip of paper, so the green ends against the same emptiness it
+   always did and the red is a separate mark rather than more bar. It comes out
+   of the red's start, not the green's end: the green is the count anybody is
+   watching and it stays exact, and 2px of slack in where the red begins is
+   about one country on a phone. That also keeps a single miss visible, which
+   taking the gap out of the red's own width would not. Overflow is hidden
+   because a finished game pushes the red's end 2px past the edge. */
+#prog i{position:absolute;top:0;height:100%;width:0;display:block;
+  transition:width .55s cubic-bezier(.4,0,.2,1), left .55s cubic-bezier(.4,0,.2,1)}
+#prog .got{left:0;background:var(--ok)}
+#prog .lost{background:var(--no)}
 
 /* ============ homepage ============ */
 #home{
@@ -699,7 +713,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     <button id="gear" class="caps" aria-expanded="false" aria-controls="bar">Setup</button>
   </header>
 
-    <div id="prog"><i></i></div>
+    <div id="prog"><i class="got"></i><i class="lost"></i></div>
   </div>
 
   <main>
@@ -819,7 +833,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v129</span>
+      <span id="build" class="caps">build 29 aug · v130</span>
     </div>
   </div>
 </div>
@@ -3403,7 +3417,13 @@ function renderTally(){
   $('#tally').innerHTML = wrong
     ? `<b class="got">${right}</b> + <b class="lost">${wrong}</b> ${of}`
     : `<b class="got">${right}</b> ${of}`;
-  $('#prog').firstElementChild.style.width = (100 * right / Math.max(1, t.length)) + '%';
+  /* the rule under the header says the same thing as the numbers above it:
+     what is right, what is not, and how much of the map is still untouched */
+  const pc = n => (100 * n / Math.max(1, t.length));
+  $('#prog .got').style.width = pc(right) + '%';
+  const lost = $('#prog .lost');
+  lost.style.left = 'calc(' + pc(right) + '% + 2px)';
+  lost.style.width = pc(wrong) + '%';
   /* A finished game had nowhere to go. The result comes up the moment you name
      the last one and never again - so closing it, or coming back to a game
      already finished, left the run with no way to be seen or put a name to.
