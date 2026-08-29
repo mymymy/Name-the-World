@@ -42,7 +42,16 @@
   --ink-2:#5C6266;
   --ink-3:#8A8F8E;
   --rule:#CFC6B2;
-  --ok:#2E6A50;
+  /* The map's green, darkened until it can be read as text. Text and a fill are
+     not the same job: --right at 2.3 to 1 on this paper is fine under a
+     coastline and illegible at 15px, so the number cannot simply borrow it.
+     What it can borrow is the hue and the colourfulness, and those are what
+     make a green look green - the old colour here sat at 163 degrees, a teal,
+     with barely half the chroma of the red beside it, so at small sizes it read
+     as black with a tint. This is the same hue and the same chroma as the land
+     it stands for, at the lightness the old one had: 5.4 to 1 on the paper,
+     6.3 to 1 under white, so nothing that used it has moved. */
+  --ok:#446A2E;
   --no:#A4382C;
   --shown:#7C7466;
   --live:#1F4E6B;
@@ -336,8 +345,8 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
 #tip:after{content:'';position:absolute;left:50%;top:100%;margin-left:-6px;
   border:6px solid transparent;border-top-color:var(--bg)}
 #tip.on{display:block}
-#tip.ok{--bg:#2E6A50}
-#tip.no{--bg:#A4382C}
+#tip.ok{--bg:var(--ok)}
+#tip.no{--bg:var(--no)}
 #tip.tell{--bg:#4B5A63}
 
 #ask{
@@ -771,7 +780,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v123</span>
+      <span id="build" class="caps">build 29 aug · v124</span>
     </div>
   </div>
 </div>
