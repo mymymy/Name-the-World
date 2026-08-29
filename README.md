@@ -7,6 +7,11 @@ A map naming game. Click a country on the world map and name it.
   memory) — off is the harder game, and only spelling is forgiven
 - 200 countries in play; small states have dot targets. Scroll or pinch to zoom, drag to pan.
 
+A country's names are written down once. The flags game asks about the same
+two hundred places in a different way, so a flag takes its country's name and
+every other name that country answers to rather than keeping a copy; only the
+code differs, which is what files the two games' answers apart.
+
 Everything — map geometry, styles, logic — is in `index.html`. No build step, no
 dependencies. Beside it sit the two things too big to inline: `flags/` and
 `fonts/`, the latter holding Faculty Glyphic by Dylan Young (OFL, licence
