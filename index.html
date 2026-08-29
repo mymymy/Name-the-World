@@ -736,7 +736,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v116</span>
+      <span id="build" class="caps">build 29 aug · v117</span>
     </div>
   </div>
 </div>
@@ -2729,12 +2729,18 @@ function placeFloaters(){
        of the width and the place is always somewhere beneath it; on a wide
        screen it is 258 across and a country can be a long way off the middle,
        and a tail that cannot reach is the very thing this was meant to stop.
-       So the box gives way, by the least it can, and only then. */
-    if(held){
-      const lo = mid - w/2 + 14, hi = mid + w/2 - 14;
-      if(top.x < lo) mid -= lo - top.x;
-      else if(top.x > hi) mid += top.x - hi;
-    }
+       So the box gives way, by the least it can, and only then - which is when
+       the place is past where the point can reach, eight in from either end.
+
+       Not conditional on the place being on screen. It was, and the test for
+       that allows forty pixels of grace beyond the edge, so a place dragged
+       further than that stopped counting and the box sprang back to the middle
+       just as it was about to go - which looked like the box changing its mind
+       at the last moment. It has nothing to change its mind about: the box
+       follows the place until the place is gone, and then it shuts. */
+    const lo = mid - w/2 + 8, hi = mid + w/2 - 8;
+    if(top.x < lo) mid -= lo - top.x;
+    else if(top.x > hi) mid += top.x - hi;
     /* on the screen whatever happens, across and down alike */
     mid = Math.max(w/2 + 8, Math.min(r.width - w/2 - 8, mid));
     ask.style.left = mid + 'px';
