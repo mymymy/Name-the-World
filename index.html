@@ -293,14 +293,24 @@ body.setup #bar{
 button:focus-visible{outline:2px solid var(--live);outline-offset:2px}
 
 main{flex:1 1 auto;min-height:0;display:flex;position:relative;z-index:1}
+/* The map takes the gestures, so the map is what refuses the browser's. This
+   used to say touch-action:none here, over the whole area - and the ask box
+   lives in here too, with a strip of names inside it that scrolls sideways.
+   Whether an ancestor's 'none' reaches down into a scroller of its own is the
+   sort of thing engines have disagreed about; where it does, the strip cannot
+   be moved by a finger. It is the map that needs the browser to keep its hands
+   off, and the map is the element to say so on. */
 #mapwrap{
-  position:relative;flex:1 1 auto;overflow:hidden;touch-action:none;
+  position:relative;flex:1 1 auto;overflow:hidden;
   background-color:var(--paper);
   /* No grid: every map now has a frame of its own - the globe's outline, or a
      board's plate - and a ruled ground behind that was a second edge competing
      with the first. Flat paper instead, so the frame is the only line. */
 }
-svg#map{display:block;width:100%;height:100%;cursor:grab}
+/* touch-action here rather than on the wrapper: this element fills the wrapper,
+   so it refuses the same gestures over the same ground, and it does not sit
+   over the ask box the way the wrapper does */
+svg#map{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
 svg#map.dragging{cursor:grabbing}
 
 #sphere{fill:var(--sea);stroke:none}
@@ -345,7 +355,10 @@ path.c.ctx.host{stroke-width:2.2;stroke-opacity:1;stroke:var(--ok)}
   vector-effect:non-scaling-stroke;pointer-events:none}
 /* the flags game has no map at all - the flag itself is the question */
 #flagwrap{
-  position:absolute;inset:0;z-index:4;display:none;
+  /* the other thing the wrapper used to refuse touch on behalf of - there is no
+     map here to drag, but there is nothing to be gained by letting a finger
+     drag the page about either */
+  position:absolute;inset:0;z-index:4;display:none;touch-action:none;
   flex-direction:column;align-items:center;justify-content:center;padding:20px;
 }
 
@@ -677,8 +690,11 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
      the little map that is left once the keyboard is up */
   /* align-items, so a chip keeps its own height rather than being stretched to
      the line's */
+  /* pan-x said out loud: sideways is the strip's own gesture, and up and down
+     belongs to whatever is underneath. Saying it here also means the strip is
+     not relying on an ancestor to have kept quiet about touch */
   #sug{display:flex;gap:6px;align-items:center;max-height:none;
-       overflow-x:auto;overflow-y:hidden;padding:6px 8px}
+       overflow-x:auto;overflow-y:hidden;touch-action:pan-x;padding:6px 8px}
   #sug .row{
     width:auto;flex:0 0 auto;border:1px solid var(--rule);border-radius:999px;
     padding:7px 12px;background:#fff;
@@ -833,7 +849,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v130</span>
+      <span id="build" class="caps">build 29 aug · v131</span>
     </div>
   </div>
 </div>
