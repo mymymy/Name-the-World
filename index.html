@@ -235,7 +235,10 @@ body.playing #home{display:none}
   background:var(--panel);border-bottom:1px solid var(--rule);
   box-shadow:0 12px 24px rgba(20,26,28,.16);
   transform:translateY(-100%);visibility:hidden;
-  transition:transform .3s cubic-bezier(.4,0,.2,1), visibility 0s linear .3s;
+  /* Fifty times its own speed, to be watched rather than used. The visibility
+     delay is what holds the panel on screen until the slide out has finished,
+     so it travels with the duration rather than being left at the old one. */
+  transition:transform 15s cubic-bezier(.4,0,.2,1), visibility 0s linear 15s;
 }
 body.setup #bar{transform:none;visibility:visible;transition-delay:0s,0s}
 @media (prefers-reduced-motion: reduce){ #bar{transition:none} }
@@ -805,7 +808,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v127</span>
+      <span id="build" class="caps">build 29 aug · v128</span>
     </div>
   </div>
 </div>
