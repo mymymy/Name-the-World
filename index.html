@@ -215,7 +215,13 @@ body.playing #home{display:none}
    ancestor's ordering has historically not always been honoured. Saying it here
    costs nothing and is true under either reading. Still below #menu, which is
    the whole screen and is meant to cover this. */
-#top{position:relative;z-index:20;flex:0 0 auto}
+/* Opaque, which it had never been. It reads as the paper because the paper is
+   what is behind it, and while nothing moves under the header that is the same
+   thing. The settings panel moves under the header: it starts above the top of
+   the map and slides down through this band, and a header with no background of
+   its own is a window onto it. Being in front is not enough - you have to be
+   something to be in front of it with. */
+#top{position:relative;z-index:20;flex:0 0 auto;background:var(--paper)}
 /* Settings slide out from under the header and may take the whole screen, so
    this lives inside main - its height is exactly what is left below the header,
    and closed it hides behind the header rather than being clipped. */
@@ -799,7 +805,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v126</span>
+      <span id="build" class="caps">build 29 aug · v127</span>
     </div>
   </div>
 </div>
