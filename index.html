@@ -342,8 +342,10 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
 }
 #ask.on{display:block}
 #ask.below{transform:translate(-50%,0)}
+/* the tail sits where the place is, which placeFloaters works out; the middle
+   of the box is only the fallback for before it has */
 #ask:before{
-  content:'';position:absolute;left:50%;margin-left:-7px;top:100%;
+  content:'';position:absolute;left:var(--tail,50%);margin-left:-7px;top:100%;
   border:7px solid transparent;border-top-color:var(--ink);
 }
 #ask.below:before{top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:var(--ink)}
@@ -715,7 +717,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v111</span>
+      <span id="build" class="caps">build 29 aug · v112</span>
     </div>
   </div>
 </div>
@@ -2653,8 +2655,38 @@ function placeFloaters(){
        which reserves the box's own height above the keyboard before deciding
        how much is left for the place itself. */
     ask.classList.add('below');
-    ask.style.left = (held ? edgeX(ask, x, r.width) : x) + 'px';
+    /* Across, it stays in the middle of the screen and the tail does the
+       pointing. It used to hang off the place, which on a phone bought almost
+       nothing - the box is 330 wide on a 393 screen, so it can shift about
+       twenty pixels before it hits the edge - and cost the one thing the
+       arrangement was for: nudged back on screen, the box stopped but the tail
+       did not, since the tail is drawn at the middle of the box. Naming Papua
+       New Guinea, it ended up pointing forty pixels of sea to the right of it.
+       Centred, the box is in the same place every time, in line with the
+       keyboard, and the tail is free to sit over the place wherever it is.
+
+       Off screen is different: once the map has been panned far enough to
+       carry the place away, a box held in the middle is pointing at nothing,
+       so it leaves with the place as it did before. */
+    const w = ask.offsetWidth || 0;
+    let mid = x;
+    if(held){
+      mid = r.width/2;
+      /* Unless the place is not under the box at all. On a phone the box is
+         most of the width and the place is always somewhere beneath it; on a
+         wide screen it is 258 across and a country can be a long way off the
+         middle, and a tail that cannot reach is the very thing this was meant
+         to stop. So the box gives way, by the least it can, and only then. */
+      const lo = mid - w/2 + 14, hi = mid + w/2 - 14;
+      if(top.x < lo) mid -= lo - top.x;
+      else if(top.x > hi) mid += top.x - hi;
+      mid = Math.max(w/2 + 8, Math.min(r.width - w/2 - 8, mid));
+    }
+    ask.style.left = mid + 'px';
     ask.style.top = ((bot ? bot.y : top.y) + 8) + 'px';
+    /* kept off the rounded corners, so the tail never hangs half over an edge */
+    const tail = Math.max(14, Math.min(w - 14, top.x - (mid - w/2)));
+    ask.style.setProperty('--tail', tail + 'px');
   }
 }
 function trackFloaters(){
