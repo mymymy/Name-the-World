@@ -771,7 +771,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v122</span>
+      <span id="build" class="caps">build 29 aug · v123</span>
     </div>
   </div>
 </div>
@@ -3336,15 +3336,19 @@ function renderTally(){
      that the second is how much of the game has been answered rather than what
      it scored. The word 'done' was meant to say so and did not, because a
      fraction reads as a score whatever is written after it.
-     So show the sum instead of hiding it. What you got, what you got wrong, and
-     the two of them together over the length of the game - and the fraction is
-     honestly a fraction now, of the game rather than of your score.
-     Nothing wrong yet is nothing to add, and 33 + 0 (33) is a worse way of
-     writing 33, so the arithmetic only appears once there is any. */
+     So say the arithmetic instead: what you got, what you got wrong, and the
+     length of the game. Nothing here is a fraction now, and nothing is a number
+     you have to work out - the two counts you might want are the two counts on
+     the strip. How many you have reached is their sum, which is a smaller thing
+     to want and cheaper to leave out than to punctuate: writing it as 33 + 6
+     (39) of 200 puts the one number the eye can already see in the brackets
+     that mean 'aside', and then leans the total on it.
+     Nothing wrong yet is nothing to add, so the sum only appears once there is
+     something to add to. */
   const wrong = named - right;
   $('#tally').innerHTML = wrong
-    ? `<b class="got">${right}</b> + <b class="lost">${wrong}</b> (${named}) / ${t.length}`
-    : `<b class="got">${right}</b> / ${t.length}`;
+    ? `<b class="got">${right}</b> + <b class="lost">${wrong}</b> of ${t.length}`
+    : `<b class="got">${right}</b> of ${t.length}`;
   $('#prog').firstElementChild.style.width = (100 * right / Math.max(1, t.length)) + '%';
   /* A finished game had nowhere to go. The result comes up the moment you name
      the last one and never again - so closing it, or coming back to a game
