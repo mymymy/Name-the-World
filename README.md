@@ -10,8 +10,8 @@ A map naming game. Click a country on the world map and name it.
 Everything — map geometry, styles, logic — is in `index.html`. No build step, no
 dependencies. Beside it sit the two things too big to inline: `flags/` and
 `fonts/`, the latter holding the two faces the page is set in — Young Serif by
-Bastien Sozeau for the names and headings, Harmattan by SIL for everything else
-(both OFL, licences included). All of it is served from here rather than fetched
+Bastien Sozeau for the names and headings, Belanosima by Ana Sanfelippo and Juan
+Pablo del Peral for everything else (both OFL, licences included). All of it is served from here rather than fetched
 from anyone, and the service worker precaches it with the page.
 
 ## lab/
