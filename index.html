@@ -349,7 +349,6 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
   content:'';position:absolute;left:var(--tail,50%);margin-left:-7px;top:100%;
   border:7px solid transparent;border-top-color:var(--ink);
 }
-#ask.adrift:before{display:none}
 #ask.below:before{top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:var(--ink)}
 /* The line between the box you type in and what is offered below it belongs to
    what is offered, not to the box. On #asktop it was drawn whether or not there
@@ -719,7 +718,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v113</span>
+      <span id="build" class="caps">build 29 aug · v114</span>
     </div>
   </div>
 </div>
@@ -2424,22 +2423,44 @@ svg.addEventListener('pointermove', ev=>{
     /* dragging east turns the map west, and it never runs out: the world just
        keeps coming round, so there is no edge to be stopped at */
     lam0 = wrapLon(drag.lam0 - (dx/k)/drag.scale);
-    clampView(); applyView(); turn(); return;
+    clampView(); applyView(); turn(); letGoIfGone(); return;
   }
   tx = drag.tx + dx;
-  clampView(); applyView(); placeFloaters();
+  clampView(); applyView(); placeFloaters(); letGoIfGone();
 });
+/* Drag or pinch the place right off the screen and the box goes with it.
+
+   It used to leave literally, following the place over the side, which was no
+   use to anybody. A box with nothing to point at should not be there at all -
+   and shutting it is a move the game already has, the one Escape makes: the
+   place stays selected and outlined, so panning back shows what is still in
+   play and a tap picks it up again, while the keyboard goes down and the map
+   gets its full height back. Which is what somebody panning wanted.
+
+   Off means the shape, not the anchor. The anchor is one point in the middle,
+   and it leaves the screen while a third of Papua New Guinea is still showing.
+
+   Asked here rather than wherever the box is positioned, because the box is
+   positioned on the way to a place as well as on the way away from one - the
+   flight to a country starts with the country off screen as often as not. This
+   only runs when a hand moved the map. */
+function letGoIfGone(){
+  if(!ask.classList.contains('on') || !anchorTarget) return;
+  if(!inView(anchorTarget, wrap.getBoundingClientRect())) closeAsk();
+}
 function endPointer(ev){
   pointers.delete(ev.pointerId);
   if(pointers.size < 2) pinchDist = 0;
   drag = null; svg.classList.remove('dragging');
   if(!pointers.size) springBack(0);            // let go of a pinch and it pulls back
+  letGoIfGone();
 }
 svg.addEventListener('pointerup', endPointer);
 svg.addEventListener('pointercancel', endPointer);
 svg.addEventListener('wheel', ev=>{
   ev.preventDefault();
   zoomAt(ev.clientX, ev.clientY, ev.deltaY < 0 ? 1.15 : 1/1.15);
+  letGoIfGone();
 }, {passive:false});
 svg.addEventListener('click', ev=>{
   if(moved) return;
@@ -2638,6 +2659,24 @@ function edgeX(el, x, w){
 function onScreen(p, r){
   return p && p.x > -40 && p.x < r.width + 40 && p.y > -60 && p.y < r.height + 60;
 }
+/* Whether any part of the place itself is on the screen - which is a different
+   question from onScreen above, and a later one. That asks about the anchor,
+   which is one point in the middle of the place; this asks about the shape.
+   Panning Papua New Guinea to the edge takes the anchor off while a third of
+   the country is still showing, so the anchor is the wrong thing to close a box
+   on. Nothing drawn to judge by - the flags game has no map at all - means
+   leave it alone. */
+function inView(t, r){
+  if(!t) return true;
+  const els = svg.querySelectorAll('[data-code="' + t.code + '"]');
+  if(!els.length) return true;
+  for(const e of els){
+    const b = e.getBoundingClientRect();
+    if(b.right > r.left && b.left < r.right && b.bottom > r.top && b.top < r.bottom)
+      return true;
+  }
+  return false;
+}
 function placeFloaters(){
   if(!anchorTarget) return;
   const a = anchorFor(anchorTarget); if(!a) return;
@@ -2665,14 +2704,7 @@ function placeFloaters(){
        did not, since the tail is drawn at the middle of the box. Naming Papua
        New Guinea, it ended up pointing forty pixels of sea to the right of it.
        Centred, the box is in the same place every time, in line with the
-       keyboard, and the tail is free to sit over the place wherever it is.
-
-       Panned away is not a special case any more. The box used to leave with
-       the place, on the grounds that one held in the middle would be pointing
-       at nothing - which left it half over the side of the screen and no use
-       to anybody. Now that the tail is a separate thing, it simply stops
-       pointing: the box stays where it is, still typeable, and the arrow goes
-       until the place is back. */
+       keyboard, and the tail is free to sit over the place wherever it is. */
     const w = ask.offsetWidth || 0, h = ask.offsetHeight || 0;
     let mid = r.width/2;
     /* Unless the place is not under the box at all. On a phone the box is most
@@ -2693,7 +2725,6 @@ function placeFloaters(){
     /* kept off the rounded corners, so the tail never hangs half over an edge */
     const tail = Math.max(14, Math.min(w - 14, top.x - (mid - w/2)));
     ask.style.setProperty('--tail', tail + 'px');
-    ask.classList.toggle('adrift', !held);
   }
 }
 function trackFloaters(){
