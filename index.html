@@ -341,6 +341,14 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
   transform:translate(-50%,-100%);
 }
 #ask.on{display:block}
+/* Let go of it and it fades rather than vanishing. Only when it is let go of -
+   panned away from, dismissed, put down. When it closes because its job is done
+   and the next thing is already arriving, it goes at once and out of the way.
+   An animation rather than a transition: the class arrives on an element that
+   was display:none a moment ago, and a transition needs a settled starting
+   value to move away from, which it does not have. */
+@keyframes askgo{ from{opacity:1} to{opacity:0} }
+#ask.going{display:block;pointer-events:none;animation:askgo .18s ease-out forwards}
 #ask.below{transform:translate(-50%,0)}
 /* the tail sits where the place is, which placeFloaters works out; the middle
    of the box is only the fallback for before it has.
@@ -736,7 +744,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v117</span>
+      <span id="build" class="caps">build 29 aug · v118</span>
     </div>
   </div>
 </div>
@@ -2464,7 +2472,7 @@ svg.addEventListener('pointermove', ev=>{
    only runs when a hand moved the map. */
 function letGoIfGone(){
   if(!ask.classList.contains('on') || !anchorTarget) return;
-  if(!inView(anchorTarget, wrap.getBoundingClientRect())) closeAsk();
+  if(!inView(anchorTarget, wrap.getBoundingClientRect())) closeAsk(true);
 }
 function endPointer(ev){
   pointers.delete(ev.pointerId);
@@ -2495,7 +2503,7 @@ svg.addEventListener('click', ev=>{
   const under = ev.target.closest('[data-code]') ? ev.target
               : document.elementFromPoint(ev.clientX, ev.clientY);
   const el = under && under.closest ? under.closest('[data-code]') : null;
-  if(!el){ closeAsk(); hideTip(); S.sel = null; paintMap(); return; }
+  if(!el){ closeAsk(true); hideTip(); S.sel = null; paintMap(); return; }
   const shape = BY_CODE[el.dataset.code]; if(!shape) return;
   const t = entryForShape(shape); if(!t) return;
   select(t.code);
@@ -2813,6 +2821,8 @@ window.addEventListener('resize', ()=>{
 
 /* ============ the ask box ============ */
 function openAsk(t){
+  clearTimeout(goingTimer);
+  ask.classList.remove('going');       // caught mid-fade, it comes straight back
   startTracking(t);
   S.cursor = 0;
   find.value = '';
@@ -2828,8 +2838,18 @@ function openAsk(t){
   frameOn(t, {forAsk:true, fly:true});
   requestAnimationFrame(placeFloaters);
 }
-function closeAsk(){
+let goingTimer = 0;
+function closeAsk(fade){
+  const was = ask.classList.contains('on');
   ask.classList.remove('on');
+  /* 'on' comes off first and stays off, so everything that asks whether the box
+     is open gets the true answer while the last of it is still on the screen */
+  clearTimeout(goingTimer);
+  ask.classList.remove('going');
+  if(fade && was && !calm){
+    ask.classList.add('going');
+    goingTimer = setTimeout(()=>ask.classList.remove('going'), 220);
+  }
   find.blur();
   /* the screen is the whole screen again, so the map has to cover it again */
   clampView(); applyView(); placeFloaters();
@@ -2916,9 +2936,9 @@ find.addEventListener('keydown', ev=>{
     const el = sug.querySelector('.cursor'); if(el) el.scrollIntoView({block:'nearest'});
     return;
   }
-  if(ev.key === 'Escape'){ closeAsk(); hideTip(); }
+  if(ev.key === 'Escape'){ closeAsk(true); hideTip(); }
 });
-$('#shut').onclick = ()=>{ closeAsk(); hideTip(); };
+$('#shut').onclick = ()=>{ closeAsk(true); hideTip(); };
 $('#tellme').onclick = ()=>{ if(S.sel) reveal(S.sel); };
 
 /* ============ confetti ============ */
