@@ -764,7 +764,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v120</span>
+      <span id="build" class="caps">build 29 aug · v121</span>
     </div>
   </div>
 </div>
@@ -2104,6 +2104,18 @@ function clampView(){
   tx = Math.min(OVER_X, Math.max(2000*(1-k) - OVER_X, tx));
   ty = Math.min(OVER_Y, Math.max(1000*(1-k) - OVER_Y, ty));
 }
+/* Hold the map to the screen and draw it there, which on the globe is one act
+   rather than two. Past its natural size only the part of the world near the
+   screen is projected and the rest is cleared, so the shapes on the map are an
+   answer to where the map is - and moving it without asking again leaves the
+   ground the move uncovered blank until something else happens to redraw it.
+   That is what emptied the top of the map when the address bar slid back in, or
+   the keyboard went away: the map settles down to fill the taller screen, sky
+   where a country should be, until the first pan puts it back. */
+function settleView(){
+  clampView(); applyView();
+  if(worldMap()) turn(); else placeFloaters();
+}
 /* The zoom keys go in the corner of the screen, which is the corner of the map
    too now that a board is held over the screen rather than free to be dragged
    off it. A board smaller than the screen - the states, the boroughs, which
@@ -2836,7 +2848,7 @@ window.addEventListener('resize', ()=>{
   unitCache = 0; if(!bits.length) sizeCanvas();
   /* the plate is cut to the screen, so a new screen means a new plate */
   if(isPlate()){ layoutPlate(); if(!ask.classList.contains('on')) fitCurrent(); }
-  clampView(); applyView(); placeFloaters(); renderTally();
+  settleView(); renderTally();
 });
 
 /* ============ the ask box ============ */
@@ -2872,7 +2884,7 @@ function closeAsk(fade){
   }
   find.blur();
   /* the screen is the whole screen again, so the map has to cover it again */
-  clampView(); applyView(); placeFloaters();
+  settleView();
 }
 function renderAskFoot(){
   const t = S.sel && BY_CODE[S.sel];
