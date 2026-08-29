@@ -347,7 +347,12 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
   border:7px solid transparent;border-top-color:var(--ink);
 }
 #ask.below:before{top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:var(--ink)}
-#asktop{display:flex;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--rule)}
+/* The line between the box you type in and what is offered below it belongs to
+   what is offered, not to the box. On #asktop it was drawn whether or not there
+   was anything under it - and since an empty strip takes no room, a box with
+   nothing typed in it had a rule ruling off thin air. #sug and #askfoot each
+   carry their own top edge, so the line appears exactly when something does. */
+#asktop{display:flex;align-items:center;gap:6px;padding:6px 10px}
 #find{
   flex:1;min-width:0;background:none;border:0;padding:4px 2px;
   font:inherit;font-size:16px;color:inherit;border-radius:0;
@@ -355,7 +360,8 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
 #find:focus{outline:0}
 #find::placeholder{color:var(--ink-3)}
 #shut{background:none;border:0;padding:2px 4px;color:var(--ink-3);font-size:18px;line-height:1}
-#sug{max-height:196px;overflow-y:auto;-webkit-overflow-scrolling:touch;border-radius:0 0 7px 7px}
+#sug{max-height:196px;overflow-y:auto;-webkit-overflow-scrolling:touch;border-radius:0 0 7px 7px;
+  border-top:1px solid var(--rule)}
 /* with nothing to suggest and nothing left to explain, it takes no room */
 #sug:empty{display:none}
 #sug .row{
@@ -709,7 +715,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v107</span>
+      <span id="build" class="caps">build 29 aug · v108</span>
     </div>
   </div>
 </div>
