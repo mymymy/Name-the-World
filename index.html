@@ -233,14 +233,25 @@ body.playing #home{display:none}
      header in the first place */
   max-height:100%;overflow-y:auto;overscroll-behavior:contain;
   background:var(--panel);border-bottom:1px solid var(--rule);
-  box-shadow:0 12px 24px rgba(20,26,28,.16);
+  /* The shadow is cast downwards, so it reaches past the panel's own bottom
+     edge - about 36px of it, the drop plus the blur. Parked above the header
+     the panel itself is hidden behind it, but that much of its shadow clears
+     the header and lands on the map, and it was arriving and leaving with
+     visibility: on the instant at one end of the move, off on the instant at
+     the other. Nothing was travelling, so it read as a flick of grey under the
+     header rather than as the panel's own shadow. It fades with the slide now,
+     which is why the shadow is written twice - what changes is the alpha. */
+  box-shadow:0 12px 24px rgba(20,26,28,0);
   transform:translateY(-100%);visibility:hidden;
-  /* Fifty times its own speed, to be watched rather than used. The visibility
-     delay is what holds the panel on screen until the slide out has finished,
-     so it travels with the duration rather than being left at the old one. */
-  transition:transform 15s cubic-bezier(.4,0,.2,1), visibility 0s linear 15s;
+  transition:transform .3s cubic-bezier(.4,0,.2,1),
+             box-shadow .3s cubic-bezier(.4,0,.2,1),
+             visibility 0s linear .3s;
 }
-body.setup #bar{transform:none;visibility:visible;transition-delay:0s,0s}
+body.setup #bar{
+  transform:none;visibility:visible;
+  box-shadow:0 12px 24px rgba(20,26,28,.16);
+  transition-delay:0s,0s,0s;
+}
 @media (prefers-reduced-motion: reduce){ #bar{transition:none} }
 #bar .row{padding:13px var(--pad);border-bottom:1px solid var(--rule)}
 #bar .row:last-of-type{border-bottom:0}
@@ -808,7 +819,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v128</span>
+      <span id="build" class="caps">build 29 aug · v129</span>
     </div>
   </div>
 </div>
