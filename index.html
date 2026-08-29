@@ -686,17 +686,28 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
 
 @media (max-width:760px){
   :root{--pad:12px}
-  /* suggestions as a single scrollable row of chips - a vertical list eats
-     the little map that is left once the keyboard is up */
-  /* align-items, so a chip keeps its own height rather than being stretched to
-     the line's */
-  /* pan-x said out loud: sideways is the strip's own gesture, and up and down
-     belongs to whatever is underneath. Saying it here also means the strip is
-     not relying on an ancestor to have kept quiet about touch */
-  #sug{display:flex;gap:6px;align-items:center;max-height:none;
-       overflow-x:auto;overflow-y:hidden;touch-action:pan-x;padding:6px 8px}
+  /* Suggestions as chips rather than as a list, because a list of five eats the
+     little map that is left once the keyboard is up.
+
+     They used to sit on one line and scroll sideways, and on a phone that line
+     could not be scrolled - so the fourth and fifth names were not merely
+     awkward to reach, they could not be reached at all. Two goes at making the
+     gesture work failed against an engine there is no way to try here, which is
+     the point at which the gesture is the wrong thing to be relying on: it was
+     hiding answers behind a swipe to save a row of height.
+
+     So they wrap. Five chips take two lines, about 30px more than one - against
+     a five-deep list, which is 190 - and every name is on screen with nothing to
+     find. Nothing scrolls, so there is nothing to fail.
+
+     align-items so a chip keeps its own height rather than being stretched to
+     its line's; align-content so the two lines sit together at the top rather
+     than being spread down a box sized for something else. */
+  #sug{display:flex;flex-wrap:wrap;gap:6px;align-items:center;align-content:flex-start;
+       max-height:none;padding:6px 8px}
   #sug .row{
-    width:auto;flex:0 0 auto;border:1px solid var(--rule);border-radius:999px;
+    width:auto;flex:0 1 auto;max-width:100%;
+    border:1px solid var(--rule);border-radius:999px;
     padding:7px 12px;background:#fff;
   }
   /* Down the list, the last row wants no line under it - there is nothing below
@@ -849,7 +860,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v131</span>
+      <span id="build" class="caps">build 29 aug · v132</span>
     </div>
   </div>
 </div>
