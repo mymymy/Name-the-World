@@ -343,13 +343,22 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
 #ask.on{display:block}
 #ask.below{transform:translate(-50%,0)}
 /* the tail sits where the place is, which placeFloaters works out; the middle
-   of the box is only the fallback for before it has. With the place panned off
-   the screen there is nowhere to point, so it does not. */
+   of the box is only the fallback for before it has.
+
+   It leans, too. Standing straight up it can only say 'above me', and once the
+   place has gone past the end of the box that is a lie - it stood at the corner
+   pointing at empty sky while the country was off to the side. So it swings
+   with the direction, up to 45 degrees, and swings about its own base so that
+   base stays welded to the edge of the box however far over it goes. */
 #ask:before{
   content:'';position:absolute;left:var(--tail,50%);margin-left:-7px;top:100%;
   border:7px solid transparent;border-top-color:var(--ink);
+  transform-origin:50% 0;transform:rotate(var(--lean,0deg));
 }
-#ask.below:before{top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:var(--ink)}
+#ask.below:before{
+  top:auto;bottom:100%;border-top-color:transparent;border-bottom-color:var(--ink);
+  transform-origin:50% 100%;
+}
 /* The line between the box you type in and what is offered below it belongs to
    what is offered, not to the box. On #asktop it was drawn whether or not there
    was anything under it - and since an empty strip takes no room, a box with
@@ -718,7 +727,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v114</span>
+      <span id="build" class="caps">build 29 aug · v115</span>
     </div>
   </div>
 </div>
@@ -2722,9 +2731,28 @@ function placeFloaters(){
     ask.style.left = mid + 'px';
     ask.style.top = Math.max(46, Math.min(r.height - h - 6,
                                           (bot ? bot.y : top.y) + 8)) + 'px';
-    /* kept off the rounded corners, so the tail never hangs half over an edge */
-    const tail = Math.max(14, Math.min(w - 14, top.x - (mid - w/2)));
+    /* Right into the corner if that is where the place is. It used to stop 14
+       clear of the end, which kept the triangle off the rounded corner but left
+       it pointing straight up at nothing whenever the place was further over
+       than that. Leaning is what makes the corner usable: at the end of its
+       travel it lies over the curve at an angle, aimed out of the corner. */
+    const boxLeft = mid - w/2;
+    const tail = Math.max(3, Math.min(w - 3, top.x - boxLeft));
     ask.style.setProperty('--tail', tail + 'px');
+    /* How far off straight up the place is, measured from where the tail ended
+       up standing to the point the box was hung under - the bottom of the
+       place, not its top. A tall country measured to its top reads as almost
+       straight up however far sideways it has gone, which is how Tanzania at
+       the edge of the screen came out at 13 degrees when it wanted 45.
+
+       Nought while the tail is directly underneath, which is almost always,
+       since it only parts company with the place once it runs out of box. The
+       floor sets how quickly it leans after that: about thirty pixels past the
+       corner is a full 45. */
+    const lean = Math.atan2(top.x - (boxLeft + tail),
+                            Math.max(28, parseFloat(ask.style.top) - (bot ? bot.y : top.y)))
+                 * 180/Math.PI;
+    ask.style.setProperty('--lean', Math.max(-45, Math.min(45, lean)).toFixed(1) + 'deg');
   }
 }
 function trackFloaters(){
