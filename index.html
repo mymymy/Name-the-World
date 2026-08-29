@@ -691,7 +691,7 @@ path.c.lit,circle.dot.lit{stroke:#2E6A50;stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 28 aug · v98</span>
+      <span id="build" class="caps">build 28 aug · v99</span>
     </div>
   </div>
 </div>
@@ -3045,6 +3045,11 @@ function answer(text){
   } else {
     S.streak = 0;
     showTip(t, 'no', '✗ Not ' + a.given);
+    /* Unless that was the last one. Mid-game a wrong answer leaves the box open
+       for another go, which is the right thing when there is more to come; on
+       the last place it holds the run open on a question nobody asked, and the
+       result has to be sent for. Wrong is an answer too. */
+    if(finish()) return;
     openAsk(t);
     find.value = '';
     renderAskFoot();
@@ -3053,9 +3058,7 @@ function answer(text){
 /* Settling the last one is the end of the game, and the end of the game is the
    result. It used to arrive by itself only if the map was set to move you on,
    and that setting has gone - which would have left a finished run sitting
-   there unremarked until you noticed Next had turned into Result. A wrong last
-   answer is not the end: the place is still open to another go, so the sheet
-   waits to be asked for. */
+   there unremarked until you noticed Next had turned into Result. */
 function finish(){
   if(unnamed().length) return false;
   hold(()=>{ S.sel = null; closeAsk(); render(); openSheet(); }, 900);
