@@ -866,7 +866,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 30 aug · v134</span>
+      <span id="build" class="caps">build 30 aug · v135</span>
     </div>
   </div>
 </div>
@@ -3041,7 +3041,22 @@ $('#hint').onclick = ()=>{
   if(a) a.aid = true;                  // asked for, whether or not it is used
   renderSuggestions(); renderAskFoot(); placeFloaters(); save();
 };
+/* A new list starts at its beginning.
+
+   A scroll offset belongs to the box rather than to what is in it, so swiping
+   along the names beginning with B and then replacing the B with a C left the
+   new names already scrolled past - the best of them off the left edge.
+
+   Wound back after the strip has been refilled, not before. Emptying it does
+   set the offset to nothing, and reading it there says so; but the browser
+   holds on to where the box was trying to be, and hands it back the moment
+   there is enough content to honour it again. Which is a kindness when a list
+   is being reflowed and the wrong answer when it is being replaced. */
 function renderSuggestions(){
+  fillSuggestions();
+  sug.scrollLeft = 0;
+}
+function fillSuggestions(){
   sug.innerHTML = '';
   /* Nothing at all with the list off: an empty box under the place you are
      being asked to name is the whole of what there is to say, and saying it in
