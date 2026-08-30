@@ -441,9 +441,18 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
    move away from, which it does not have. */
 @keyframes askcome{ from{opacity:0} to{opacity:1} }
 @keyframes askgo{ from{opacity:1} to{opacity:0} }
-#ask.on{display:block;animation:askcome .14s ease-out}
+/* The fade in is carried by a class of its own, taken off the moment it has
+   played, rather than by 'on' - which is true for as long as the box is open.
+   An animation declared on an element is not free once it has finished: the
+   engine keeps the thing on a compositing layer of its own, and a scroller
+   inside one of those is where touch scrolling has historically gone missing.
+   The strip of names is that scroller, and it stopped answering to a finger in
+   the same days this fade arrived. Playing for a seventh of a second is all
+   this was ever meant to do. */
+#ask.on{display:block}
+#ask.came{animation:askcome .14s ease-out}
 #ask.going{display:block;pointer-events:none;animation:askgo .18s ease-out forwards}
-@media (prefers-reduced-motion: reduce){ #ask.on{animation:none} }
+@media (prefers-reduced-motion: reduce){ #ask.came{animation:none} }
 /* the tail sits where the place is, which placeFloaters works out; the middle
    of the box is only the fallback for before it has.
 
@@ -857,7 +866,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v133</span>
+      <span id="build" class="caps">build 30 aug · v134</span>
     </div>
   </div>
 </div>
@@ -2948,6 +2957,11 @@ window.addEventListener('resize', ()=>{
 
 /* ============ the ask box ============ */
 function openAsk(t){
+  /* Only a box that was not already up fades in. Moving from one place to the
+     next the box travels rather than blinks, which is what carrying the fade on
+     'on' used to give for nothing: the class was already there, so the
+     animation did not play again. A class of its own has to be told. */
+  const wasUp = ask.classList.contains('on');
   clearTimeout(goingTimer);
   ask.classList.remove('going');       // caught mid-fade, it comes straight back
   startTracking(t);
@@ -2955,6 +2969,12 @@ function openAsk(t){
   find.value = '';
   $('#asknote').textContent = '';
   ask.classList.add('on');
+  if(!calm && !wasUp){
+    /* restarted rather than added: caught on its way out and brought straight
+       back, the class can still be there, and an animation does not replay
+       because it was asked for twice */
+    ask.classList.remove('came'); void ask.offsetWidth; ask.classList.add('came');
+  }
   renderSuggestions();
   renderAskFoot();
   placeFloaters();
@@ -2965,10 +2985,15 @@ function openAsk(t){
   frameOn(t, {forAsk:true, fly:true});
   requestAnimationFrame(placeFloaters);
 }
+/* off as soon as it has played, so the box spends its life as a plain element */
+ask.addEventListener('animationend', ev=>{
+  if(ev.animationName === 'askcome') ask.classList.remove('came');
+});
 let goingTimer = 0;
 function closeAsk(fade){
   const was = ask.classList.contains('on');
   ask.classList.remove('on');
+  ask.classList.remove('came');
   /* 'on' comes off first and stays off, so everything that asks whether the box
      is open gets the true answer while the last of it is still on the screen */
   clearTimeout(goingTimer);
