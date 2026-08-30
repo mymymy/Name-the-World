@@ -370,8 +370,10 @@ path.c.ctx.host{stroke-width:2.2;stroke-opacity:1;stroke:var(--ok)}
   box-shadow:0 10px 24px rgba(20,26,28,.22);
 }
 /* nothing to anchor to, so the question sits in the middle of its own accord */
-#mapwrap.flags #ask{left:50%!important;top:auto!important;bottom:74px!important;
-  transform:translate(-50%,0)!important}
+/* centred by being boxed in rather than by being shifted, for the same reason
+   the anchored box no longer carries a transform */
+#mapwrap.flags #ask{left:0!important;right:0!important;margin-inline:auto!important;
+  top:auto!important;bottom:74px!important;transform:none!important}
 #mapwrap.flags #tip{left:50%!important;top:auto!important;bottom:20px!important;
   transform:translate(-50%,0)!important}
 /* both carry a pointer aimed at a place on the map; here there is no place */
@@ -420,7 +422,12 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
   width:258px;max-width:calc(100vw - 20px);
   background:var(--panel);border:1px solid var(--ink);border-radius:8px;
   box-shadow:0 10px 26px rgba(20,26,28,.3);
-  transform:translate(-50%,-100%);
+  /* No transform. The box is placed by arithmetic that already knows its own
+     width, so shifting it half a width back in CSS was doing the same sum
+     twice - and a transform makes this a containing block and a layer of its
+     own, which is the standing suspect for why the strip of names inside it
+     cannot be scrolled by a finger on a phone. placeFloaters sets the left
+     edge now, not the middle. */
 }
 /* It fades in, and out again when it is let go of - panned away from,
    dismissed, put down. Not when it closes because its job is done and the next
@@ -437,7 +444,6 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
 #ask.on{display:block;animation:askcome .14s ease-out}
 #ask.going{display:block;pointer-events:none;animation:askgo .18s ease-out forwards}
 @media (prefers-reduced-motion: reduce){ #ask.on{animation:none} }
-#ask.below{transform:translate(-50%,0)}
 /* the tail sits where the place is, which placeFloaters works out; the middle
    of the box is only the fallback for before it has.
 
@@ -477,7 +483,9 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
 #find:focus{outline:0}
 #find::placeholder{color:var(--ink-3)}
 #shut{background:none;border:0;padding:2px 4px;color:var(--ink-3);font-size:18px;line-height:1}
-#sug{max-height:196px;overflow-y:auto;-webkit-overflow-scrolling:touch;border-radius:0 0 7px 7px;
+/* no -webkit-overflow-scrolling: it has done nothing since iOS 13 but ask for a
+   compositing layer, and a layer is the last thing this wants */
+#sug{max-height:196px;overflow-y:auto;border-radius:0 0 7px 7px;
   border-top:1px solid var(--rule)}
 /* with nothing to suggest and nothing left to explain, it takes no room */
 #sug:empty{display:none}
@@ -686,28 +694,17 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
 
 @media (max-width:760px){
   :root{--pad:12px}
-  /* Suggestions as chips rather than as a list, because a list of five eats the
-     little map that is left once the keyboard is up.
+  /* One line of chips that scrolls sideways: with every match shown rather than
+     the first five, wrapping would put a dozen names between the keyboard and
+     the country being asked about.
 
-     They used to sit on one line and scroll sideways, and on a phone that line
-     could not be scrolled - so the fourth and fifth names were not merely
-     awkward to reach, they could not be reached at all. Two goes at making the
-     gesture work failed against an engine there is no way to try here, which is
-     the point at which the gesture is the wrong thing to be relying on: it was
-     hiding answers behind a swipe to save a row of height.
-
-     So they wrap. Five chips take two lines, about 30px more than one - against
-     a five-deep list, which is 190 - and every name is on screen with nothing to
-     find. Nothing scrolls, so there is nothing to fail.
-
-     align-items so a chip keeps its own height rather than being stretched to
-     its line's; align-content so the two lines sit together at the top rather
-     than being spread down a box sized for something else. */
-  #sug{display:flex;flex-wrap:wrap;gap:6px;align-items:center;align-content:flex-start;
-       max-height:none;padding:6px 8px}
+     align-items, so a chip keeps its own height rather than being stretched to
+     the line's. pan-x, because sideways is the strip's own gesture and up and
+     down belongs to whatever is underneath. */
+  #sug{display:flex;gap:6px;align-items:center;max-height:none;
+       overflow-x:auto;overflow-y:hidden;touch-action:pan-x;padding:6px 8px}
   #sug .row{
-    width:auto;flex:0 1 auto;max-width:100%;
-    border:1px solid var(--rule);border-radius:999px;
+    width:auto;flex:0 0 auto;border:1px solid var(--rule);border-radius:999px;
     padding:7px 12px;background:#fff;
   }
   /* Down the list, the last row wants no line under it - there is nothing below
@@ -860,7 +857,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 aug · v132</span>
+      <span id="build" class="caps">build 29 aug · v133</span>
     </div>
   </div>
 </div>
@@ -2879,7 +2876,9 @@ function placeFloaters(){
     else if(top.x > hi) mid += top.x - hi;
     /* on the screen whatever happens, across and down alike */
     mid = Math.max(w/2 + 8, Math.min(r.width - w/2 - 8, mid));
-    ask.style.left = mid + 'px';
+    /* the left edge, not the middle: there is no transform to take the half
+       width back off again */
+    ask.style.left = (mid - w/2) + 'px';
     ask.style.top = Math.max(46, Math.min(r.height - h - 6,
                                           (bot ? bot.y : top.y) + 8)) + 'px';
     /* Where the point wants to be is simply where the place is. Where the base
@@ -3031,8 +3030,20 @@ function renderSuggestions(){
      the strip takes no room at all. */
   if(!q){ sug.innerHTML = ''; return; }
   const spent = spentNames();
-  const hits = rank(q).slice(0, 5);
-  if(!hits.length){ sug.innerHTML = '<p class="note">Nothing matches that.</p>'; return; }
+  const all = rank(q);
+  if(!all.length){ sug.innerHTML = '<p class="note">Nothing matches that.</p>'; return; }
+  /* Everything that matches, not the first five of it. Five was a number that
+     suited one line of chips, and it was spent before it was sorted: late in a
+     game a common letter could offer five names of which four were already
+     given, which is the moment the list is least use and was working hardest
+     against you.
+     Names already given still show - that Togo has gone is worth knowing, and
+     the map only says so if Togo is on screen - but they are not answers, so
+     they go after the ones that are. Each group keeps its own ranking, so
+     nothing else about the order moves. */
+  const live = [], done = [];
+  for(const h of all) (spent.has(h.e.name) ? done : live).push(h);
+  const hits = live.concat(done);
   const frag = document.createDocumentFragment();
   let i = 0;
   hits.forEach(({e})=>{
@@ -3061,7 +3072,10 @@ find.addEventListener('keydown', ev=>{
     ev.preventDefault();
     S.cursor = Math.max(0, Math.min(rows.length-1, S.cursor + (ev.key === 'ArrowDown' ? 1 : -1)));
     renderSuggestions();
-    const el = sug.querySelector('.cursor'); if(el) el.scrollIntoView({block:'nearest'});
+    /* inline as well as block: down the list the cursor moves vertically, across
+       as chips it moves sideways, and only one of those is a scroll here */
+    const el = sug.querySelector('.cursor');
+    if(el) el.scrollIntoView({block:'nearest', inline:'nearest'});
     return;
   }
   if(ev.key === 'Escape'){ closeAsk(true); hideTip(); }
