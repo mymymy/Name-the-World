@@ -562,7 +562,19 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
 #sheet.on{display:flex}
 #sheetbox{background:var(--panel);border:1px solid var(--ink);border-radius:8px;overflow:hidden;
   max-width:420px;width:100%;max-height:82vh;display:flex;flex-direction:column}
-#sheethead{padding:16px var(--pad) 12px;border-bottom:1px solid var(--ink);position:relative}
+/* Centred, and down to two things: what you named and how long it took.
+
+   In that order, and with the score the larger of the two, because that is the
+   order the run is actually judged in - the board sorts by score and only uses
+   the clock to separate runs that tied. A time is not worth much on its own
+   either: four minutes is a triumph over two hundred and nothing at all over
+   three, so the number it qualifies has to be read first.
+
+   What used to trail off the score - the help taken, the round number - is true
+   but is not what the card is for, so it goes underneath in small type rather
+   than lengthening the line that matters. */
+#sheethead{padding:18px var(--pad) 16px;border-bottom:1px solid var(--ink);
+  position:relative;text-align:center}
 /* Close was a button in the row of things you might want to do next, which is
    the wrong company: everything else there is a choice, and this is only the
    way out. A cross in the corner, tapping the sheet's own shadow, or Escape. */
@@ -573,12 +585,16 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
 #claimwhere:empty,#claimrank:empty{display:none}
 /* The misses were a list with nothing saying what it was a list of. */
 #misshead{margin:12px var(--pad) 0;color:var(--ink-3)}
-#score{font-size:30px;line-height:1;margin:6px 0 0}
-/* This line does not fit across a narrow phone at any size worth reading - it
-   did not with the face before this one either, and 12px still wrapped at 360.
-   So it is allowed to wrap, but only between the two phrases: breaking 'with
-   suggestions' in half is the part that looked like a mistake. */
-#score small{font-size:15px;color:var(--ink-2);white-space:nowrap}
+#score{font-size:34px;line-height:1;margin:10px 0 0}
+/* the label sits under its number rather than trailing after it, which is what
+   lets both numbers be read as one shape down the middle of the card */
+#scorewhat{margin:6px 0 0;color:var(--ink-2)}
+/* Second, and second in size: large enough to be one of the two things the card
+   is about, small enough that it is plainly the qualifier and not the claim. */
+#sheettime{margin:12px 0 0;font-size:20px;line-height:1;color:var(--ink-2)}
+#sheettime b{color:var(--ink);font-weight:600}
+#scoreaside{margin:8px 0 0;font-size:13px;color:var(--ink-2)}
+#scoreaside:empty{display:none}
 /* The list is the one part of the card that gives, so the card fits the screen
    however long it gets. It was not giving: the card is a flex column and this
    sits two levels down inside #sheetmiss, which took its full content height
@@ -602,8 +618,6 @@ circle.dot.sel{stroke:var(--live);stroke-width:2.4}
 #sheetfoot{padding:11px var(--pad);border-top:1px solid var(--rule);display:flex;gap:8px;flex-wrap:wrap}
 #sheetfoot button{background:none;border:1px solid var(--ink);border-radius:4px;padding:7px 11px}
 #sheetfoot button.key{background:var(--live);border-color:var(--live);color:#fff}
-#sheettime{margin:6px 0 0;color:var(--ink-2);font-size:12px;letter-spacing:.08em}
-#sheettime b{color:var(--ink);font-weight:700}
 
 /* claiming a run: name it and it goes on the board */
 #claim{padding:12px var(--pad);border-bottom:1px solid var(--rule);background:var(--paper)}
@@ -866,7 +880,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 30 aug · v135</span>
+      <span id="build" class="caps">build 3 sep · v136</span>
     </div>
   </div>
 </div>
@@ -877,7 +891,9 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
       <span class="caps" id="scoretitle">Result</span>
       <button id="sheetx" aria-label="Close">×</button>
       <p id="score" class="serif"></p>
-      <p id="sheettime" class="caps"></p>
+      <p id="scorewhat" class="caps"></p>
+      <p id="sheettime"></p>
+      <p id="scoreaside"></p>
     </div>
     <form id="claim" hidden autocomplete="off">
       <p id="claimwhere"></p>
@@ -3597,11 +3613,13 @@ function openSheet(){
      suggestions says it. Named as the switch in Setup names it, since that is
      the same thing the button in the ask box lends you for one place. */
   const helped = t.filter(e=>{ const a = S.ans[e.code]; return a && a.ok && a.aid; }).length;
-  const aside = !S.list && helped
-    ? ` <small>· ${helped} with suggestions</small>` : '';
-  $('#score').innerHTML = `${right} of ${t.length} <small>named correctly</small>` + aside
-    + (S.scope === 'random' ? ` <small>· round ${S.round}</small>` : '');
+  const aside = [];
+  if(!S.list && helped) aside.push(`${helped} with suggestions`);
+  if(S.scope === 'random') aside.push(`round ${S.round}`);
+  $('#score').textContent = `${right} of ${t.length}`;
+  $('#scorewhat').textContent = 'named correctly';
   $('#sheettime').innerHTML = `in <b>${clockText(ms)}</b>`;
+  $('#scoreaside').textContent = aside.join(' · ');
   const list = $('#sheetlist');
   list.innerHTML = '';
   /* nothing to list when nothing was missed: the score says it, and the line
