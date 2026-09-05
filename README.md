@@ -34,7 +34,10 @@ Side experiments, not part of the game.
   round is cut afresh: one shape or two out of balls, rounded pebbles, sharp
   shards, broad slabs, rounded tiles and planks, and sticks that come to rest
   across one another like a dropped handful — in sizes drawn lopsided upwards, so
-  a few pieces are larger than the rest, and in four colours of its own. Behind it is a
+  a few pieces are larger than the rest, and in four colours of its own. It pours
+  until the pit is full rather than to a guess at how many that takes: the line it
+  fills to is measured off the box that asks the question, and what counts as full
+  is a couple of pieces of the heap itself standing near it. Behind it is a
   small rigid-body engine: convex outlines, separating-axis tests clipped down to
   two-point contacts, and impulses that carry across the substeps of a frame rather
   than starting from nothing each one, which is the difference between a heap that

@@ -176,15 +176,18 @@ function palette(){
    out sharp, some are drawn round them and come out organic; a stick is just a
    very long one. All of them are cut to the same area, so a round of sticks and
    a round of pebbles fill the pit alike */
+/* `most` is how many of a kind the pit will take. It falls with how long the pieces
+   are: two elongated pieces deep into one another are the case the separating-axis
+   test gets wrong, and a heap of them jams rather than settling */
 const KINDS = {
-  ball:   { disc:16,                                 draw:'circle', pack:.76 },
-  pebble: { n:[9,13], jitter:.30, stretch:[1,1.6],   draw:'smooth', pack:.74 },
-  shard:  { n:[3,5],  jitter:.55, stretch:[1,2.1],   draw:'sharp',  pack:.64 },
-  slab:   { n:[4,6],  jitter:.14, stretch:[1.2,2.9], draw:'sharp',  pack:.70 },
-  petal:  { n:[7,9],  jitter:.24, stretch:[1.9,3.3], draw:'smooth', pack:.64 },
-  tile:   { aspect:[1.05,2.4], round:.24,            draw:'round',  pack:.78 },
-  plank:  { aspect:[2.6,4.6],  round:.10,            draw:'round',  pack:.60 },
-  stick:  { aspect:[5,11],                           draw:'sharp',  pack:.46 }
+  ball:   { disc:16,                                 draw:'circle', pack:.76, most:44 },
+  pebble: { n:[9,13], jitter:.30, stretch:[1,1.6],   draw:'smooth', pack:.74, most:44 },
+  tile:   { aspect:[1.05,2.4], round:.24,            draw:'round',  pack:.78, most:40 },
+  shard:  { n:[3,5],  jitter:.55, stretch:[1,2.1],   draw:'sharp',  pack:.64, most:36 },
+  slab:   { n:[4,6],  jitter:.14, stretch:[1.2,2.9], draw:'sharp',  pack:.70, most:32 },
+  petal:  { n:[7,9],  jitter:.24, stretch:[1.9,3.3], draw:'smooth', pack:.64, most:28 },
+  plank:  { aspect:[2.4,3.8],  round:.10,            draw:'round',  pack:.60, most:26 },
+  stick:  { aspect:[4.5,8],                          draw:'sharp',  pack:.46, most:22 }
 };
 const KEYS = Object.keys(KINDS);
 const MAXV = 16;
@@ -322,7 +325,8 @@ function template(kind, area, skin){
 /* ------------------------------------------------------------- the world */
 const G_PER_PX   = 280;    /* gravity, px/s² per px of size: a piece is 7cm across */
 const SUB        = 5;      /* substeps a frame, */
-const ITER       = 5;      /* and passes over the contacts within each */
+const ITER       = 8;     /* and passes over the contacts within each: a deep
+                              heap needs them, since each substep starts cold */
 const BETA       = 0.3;    /* how briskly an overlap is pushed out, */
 const SLOP       = 0.1;    /* down to this much, which is left alone */
 const MU_PIECE   = 0.28;   /* sliding friction, piece on piece. These turn, so unlike
@@ -344,6 +348,8 @@ const POUR_MAX   = 5;
 const HOLD_BACK  = 0.28;   /* how often the last piece is kept back for a beat, */
 const HOLD_WAIT  = [0.5, 1.2];  /* and how long the pit is left quiet before it lands */
 const SETTLE_MAX = 4.5;
+const CAP        = 44;     /* as deep a heap as the solver holds without pieces
+                              being squeezed into one another */
 
 const cv = document.getElementById('pit');
 const ctx = cv.getContext('2d', { alpha: false });
@@ -353,7 +359,7 @@ let W = 0, H = 0, dpr = 1, bg = null, ground = [];
 let N = 0, live = 0, SIZE = 20;            /* SIZE: the radius a piece would have as a disc */
 let bx, by, ba, vx, vy, va, pvx, pvy, pva, sx, sy, sa, tpl, col;
 let invM, invI, bound;
-let TPL = [], fills = [], rims = [], flats = [], lineW = 1;
+let TPL = [], rims = [], flats = [], lineW = 1, resting = null;
 
 /* world outlines, rebuilt every substep */
 let wv, wn, wcount;
@@ -362,14 +368,14 @@ let wv, wn, wcount;
 let cell = 0, cols = 0, rows = 0, originY = 0, starts, cursor, items, pairA, pairB, np = 0;
 
 /* contacts found by the position pass, replayed by the velocity pass */
-let cA, cB, cnx, cny, crax, cray, crbx, crby, cdep, cwn, cwt, cjn, cjt, ctar, cpn, ckey,
-    keyjn, keyjt, wallKey = 0, nc = 0, maxC = 0;
+let cA, cB, cnx, cny, crax, cray, crbx, crby, cdep, cwn, cwt, cjn, cjt, ctar, cpn, ckey, cfeat,
+    keyjn, keyjt, keyFeat, keyAge, wallKey = 0, nc = 0, maxC = 0, tick = 0;
 
 let G = 0, vmax = 0, wmax = 0, bounceMin = 0, damp = DRAG, maxBound = 0;
 
 /* ------------------------------------------------------------------ round */
 let phase = 'idle';
-let pourT = 0, pourTime = 0, pourTo = 0, calm = 0, simTime = 0, settleUntil = 0, judged = false,
+let pourT = 0, pourTime = 0, pourTo = 0, topAcc = 0, stuck = 0, fixed = false, cap = 0, ceil = 0, calm = 0, simTime = 0, settleUntil = 0, judged = false,
     asked = false, busy = Infinity, deck = null, deckAt = 0;
 let holdOne = false, holdAt = -1, holdWait = 0;
 
@@ -397,33 +403,39 @@ function fit(){
   for (let i=0;i<12;i++) ground.push(mix(a, b, i/11));
 }
 
-/* a sheet of speckle in each colour, so a fill has some tooth to it. It is laid
-   in the piece's own frame, so the grain turns with the piece */
 function inks(colours){
-  fills = []; rims = []; flats = [];
+  rims = []; flats = [];
   for (const c of colours){
-    const t = document.createElement('canvas');
-    t.width = t.height = 96;
-    const g = t.getContext('2d');
-    g.fillStyle = css(c); g.fillRect(0,0,96,96);
-    const img = g.getImageData(0,0,96,96), d = img.data;
-    for (let i=0;i<d.length;i+=4){
-      const n = (Math.random()-.5)*Math.random()*18;
-      d[i] = clamp(d[i]+n,0,255); d[i+1] = clamp(d[i+1]+n,0,255); d[i+2] = clamp(d[i+2]+n,0,255);
-    }
-    g.putImageData(img,0,0);
-    fills.push(ctx.createPattern(t,'repeat'));
     rims.push(mix(c,[0,0,0],.28));
     flats.push(css(c));
   }
 }
 
+/* One sheet of speckle over the whole picture rather than a pattern carried by
+   every piece. Filling each outline through a pattern is the single most expensive
+   thing the frame does — it halved the frame rate — and laid over everything at
+   once the grain reads as the paper this is printed on, which is truer anyway */
+let grain = null;
+function makeGrain(){
+  grain = document.createElement('canvas');
+  grain.width = grain.height = 256;
+  const g = grain.getContext('2d');
+  const img = g.createImageData(256,256), d = img.data;
+  for (let i=0;i<d.length;i+=4){
+    const v = Math.random() < .5 ? 0 : 255;
+    d[i] = d[i+1] = d[i+2] = v;
+    d[i+3] = Math.random()*Math.random()*26;
+  }
+  g.putImageData(img,0,0);
+}
+
 function allocate(n){
-  N = n; live = 0;
+  cap = n; N = n; live = 0;
   const f = () => new Float32Array(n);
   bx=f(); by=f(); ba=f(); vx=f(); vy=f(); va=f(); pvx=f(); pvy=f(); pva=f(); sx=f(); sy=f(); sa=f();
   invM=f(); invI=f(); bound=f();
   tpl = new Uint8Array(n); col = new Uint8Array(n); wcount = new Uint8Array(n);
+  resting = new Uint8Array(n);
   wv = new Float32Array(n*MAXV*2); wn = new Float32Array(n*MAXV*2);
   maxC = n*10 + 64;
   cA = new Int32Array(maxC); cB = new Int32Array(maxC);
@@ -432,10 +444,13 @@ function allocate(n){
   crbx = new Float32Array(maxC); crby = new Float32Array(maxC);
   cdep = new Float32Array(maxC); cwn = new Float32Array(maxC); cwt = new Float32Array(maxC);
   cjn = new Float32Array(maxC); cjt = new Float32Array(maxC); ctar = new Float32Array(maxC);
-  cpn = new Float32Array(maxC); ckey = new Int32Array(maxC);
+  cpn = new Float32Array(maxC); ckey = new Int32Array(maxC); cfeat = new Int32Array(maxC);
   wallKey = n*n*2;
   keyjn = new Float32Array(wallKey + n*MAXV*3);
   keyjt = new Float32Array(keyjn.length);
+  keyFeat = new Int32Array(keyjn.length);
+  keyAge = new Int32Array(keyjn.length);
+  tick = 0;
   pairA = new Int32Array(n*14); pairB = new Int32Array(n*14);
   deck = new Uint8Array(n);
   for (let i=0;i<n;i++) deck[i] = i & 3;
@@ -456,14 +471,48 @@ function grid(){
   if (!items || items.length < N) items = new Int32Array(N);
 }
 
+function roof(){
+  const was = guessCard.hidden;
+  if (was){ guessCard.style.visibility = 'hidden'; guessCard.hidden = false; }
+  const r = guessCard.getBoundingClientRect();
+  if (was){ guessCard.hidden = true; guessCard.style.visibility = ''; }
+  return (r.height ? r.bottom : 96) + Math.max(14, SIZE*0.4);
+}
+
+/* full enough: a couple of pieces of the heap itself standing above the line. What
+   makes a piece part of the heap is that it touched something this step — a piece
+   on its way down touches nothing, and judging it by speed instead lets the pour
+   run on past full, which squeezes the heap until it bursts through the floor */
+function brimming(){
+  let n = 0;
+  for (let i=0;i<live;i++){
+    if (!resting[i] || Math.hypot(vx[i],vy[i]) > SIZE*5) continue;   /* two pieces meeting
+                                                                       in mid-air are not
+                                                                       the heap either */
+    if (by[i] - bound[i] < ceil + SIZE && ++n > 1) return true;   /* headroom for what
+                                            is still in the air on its way down */
+  }
+  return false;
+}
+
 function newRound(){
   fit();
   const minDim = Math.min(W,H);
-  SIZE = Math.round((0.030 + Math.random()*0.040) * minDim * 2)/2;
-  const area = Math.PI*SIZE*SIZE;
 
   /* one kind in play, or two — never a jumble of everything */
   const kinds = shuffle(KEYS.slice()).slice(0, Math.random() < .35 ? 1 : 2);
+
+  /* long thin pieces are the hard case for any solver of this kind: deep in, the
+     axis that parts two of them is not the one the test finds, and a heap of them
+     jams. They get a lower ceiling than the rest, which costs those rounds a little
+     of the fill: cutting them larger to make up for it puts the jam back */
+  let pack = 1, lim = CAP;
+  for (const k of kinds){
+    pack = Math.min(pack, KINDS[k].pack);
+    lim = Math.min(lim, KINDS[k].most || CAP);
+  }
+  SIZE = Math.round((0.064 + Math.random()*0.034) * minDim * 2)/2;
+  const area = Math.PI*SIZE*SIZE;
 
   /* and how far the pieces differ in size within the round: a few rounds are cut
      all of a size, the rest hold some larger ones among the smaller. The draw is
@@ -484,19 +533,25 @@ function newRound(){
   mean /= TPL.length;                        /* what the count has to be reckoned on */
   inks(palette());
 
-  let pack = 1;
-  for (const k of kinds) pack = Math.min(pack, KINDS[k].pack);
-  const fill = 0.50 + Math.random()*0.26;
-  let n = Math.round(W*H*fill*pack*0.94/mean * (0.97 + Math.random()*0.06));
-  n = Math.max(20, Math.min(200, n));
+  ceil = roof();
+
+  /* aim a little under the room there is and let the trickle at the end of the
+     pour finish the job, so the pit ends up full without the estimate having to
+     be right about how loosely a heap of this shape packs */
+  const fill = 0.80 + Math.random()*0.12;
+  let n = Math.round(W*(H-ceil)*fill*pack/mean * (0.97 + Math.random()*0.06));
+  n = Math.max(12, Math.min(lim, n));
+  const room = Math.min(lim, Math.round(n*1.6) + 12);
 
   G = G_PER_PX * SIZE;
-  vmax = SIZE * 70;
+  vmax = SIZE * 40;   /* how fast a piece may fall: it lands the softer for it, and
+                         a soft landing is one the solver can stop in a substep */
   wmax = 25;
   bounceMin = 0.5*Math.sqrt(G*SIZE);
 
-  allocate(n);
-  for (let i=0;i<n;i++){
+  allocate(room);
+  N = n;
+  for (let i=0;i<room;i++){
     const t = i % TPL.length;
     tpl[i] = t;
     invM[i] = 1/TPL[t].area;
@@ -505,7 +560,7 @@ function newRound(){
     wcount[i] = TPL[t].count;
   }
   shuffle(tpl);
-  for (let i=0;i<n;i++){                     /* keep the rest in step with the shuffle */
+  for (let i=0;i<room;i++){                  /* keep the rest in step with the shuffle */
     const t = tpl[i];
     invM[i] = 1/TPL[t].area; invI[i] = 1/TPL[t].inertia;
     bound[i] = TPL[t].bound; wcount[i] = TPL[t].count;
@@ -514,32 +569,69 @@ function newRound(){
   pour();
 }
 
-function pour(){
-  live = 0; deckAt = 0; pourT = 0; calm = 0; simTime = 0; damp = DRAG; busy = Infinity;
+/* a re-pour after the window changes shape has to put back exactly the pieces the
+   round already has: the count is the answer, and it may already have been given */
+function pour(again){
+  fixed = !!again;
+  live = 0; deckAt = 0; pourT = 0; stuck = 0; calm = 0; simTime = 0; damp = DRAG; busy = Infinity;
   asked = false;
   pourTime = Math.min(POUR_MAX, Math.max(POUR_MIN, N/POUR_RATE));
   holdOne = N > 3 && Math.random() < HOLD_BACK;
   holdAt = -1;
   holdWait = HOLD_WAIT[0] + Math.random()*(HOLD_WAIT[1]-HOLD_WAIT[0]);
   pourTo = N - (holdOne ? 1 : 0);
-  if (holdOne){                              /* and let it be the biggest cut of the round */
-    let big = 0;
-    for (let i=1;i<TPL.length;i++) if (TPL[i].area > TPL[big].area) big = i;
-    const last = N-1;
-    tpl[last] = big;
-    invM[last] = 1/TPL[big].area; invI[last] = 1/TPL[big].inertia;
-    bound[last] = TPL[big].bound; wcount[last] = TPL[big].count;
-  }
+  topAcc = 0;
   phase = 'dropping';
+}
+
+/* give the next piece out the largest cut of the round */
+function biggest(){
+  if (live >= cap) return false;
+  let big = 0;
+  for (let i=1;i<TPL.length;i++) if (TPL[i].area > TPL[big].area) big = i;
+  tpl[live] = big;
+  invM[live] = 1/TPL[big].area; invI[live] = 1/TPL[big].inertia;
+  bound[live] = TPL[big].bound; wcount[live] = TPL[big].count;
+  return true;
+}
+
+/* A piece found deep inside another is lifted back over the pit and let go again.
+   Nothing gets a piece out of a jam it is already in — the way out is not to leave
+   it there. While the pit is still filling, nobody can tell one from a piece that
+   had not landed yet */
+function unjam(){
+  let worst = SIZE*0.35, k = -1;
+  for (let c=0;c<nc;c++) if (cA[c] >= 0 && cB[c] >= 0 && cdep[c] > worst){ worst = cdep[c]; k = c; }
+  if (k < 0) return;
+  const i = by[cA[k]] < by[cB[k]] ? cA[k] : cB[k], b = bound[i];
+  const lo = Math.min(b*1.1, W/2), hi = Math.max(W - b*1.1, W/2);
+  for (let t=0;t<12;t++){
+    const px = lo + Math.random()*(hi-lo);
+    const py = -maxBound*1.6 - Math.random()*maxBound*4;
+    let ok = true;
+    for (let j=0;j<live;j++){
+      if (j === i) continue;
+      const dx = bx[j]-px, dy = by[j]-py, r = bound[j] + b;
+      if (dx*dx + dy*dy < r*r*1.15){ ok = false; break; }
+    }
+    if (!ok) continue;
+    bx[i]=px; by[i]=py; ba[i]=Math.random()*6.2832;
+    vx[i]=0; vy[i]=Math.sqrt(G*SIZE)*.2; va[i]=(Math.random()-.5)*3;
+    return;
+  }
 }
 
 function spawnOne(){
   const b = bound[live], lo = Math.min(b*1.1, W/2), hi = Math.max(W - b*1.1, W/2);
   for (let t=0;t<14;t++){
     const px = lo + Math.random()*(hi-lo);
-    const py = -maxBound*2 - Math.random()*maxBound*2.5;
+    const py = -maxBound*1.6 - Math.random()*maxBound*4;   /* deep enough that a big
+                                            piece can always find somewhere to start */
+    /* against everything, not just the last few dropped: once the heap reaches the
+       band a piece would otherwise be let go inside it, and a piece begun a hundred
+       pixels inside another is not something the solver can talk its way out of */
     let ok = true;
-    for (let k=Math.max(0,live-48); k<live; k++){
+    for (let k=0; k<live; k++){
       const dx = bx[k]-px, dy = by[k]-py, r = bound[k] + b;
       if (dx*dx + dy*dy < r*r*1.15){ ok = false; break; }
     }
@@ -680,10 +772,23 @@ function manifold(A, B){
   if (db > 0){ cpx[n]=bx2; cpy[n]=by2; cpd[n]=db; n++; }
   if (!n) return 0;
 
-  /* hand the normal back pointing from A to B, whichever way round it was found */
-  const nx = flip ? -rnx : rnx, ny = flip ? -rny : rny;
+  /* hand the normal back pointing from A to B, whichever way round it was found.
+     Deep in, though, the least separating axis stops being the way out — for two
+     pieces well through one another it can point further through, and a pair pushed
+     that way never parts. Past a certain depth, straight apart is the only safe
+     answer, and using it here rather than only when the pit stops is what keeps a
+     jam from setting in the first place */
+  let nx = flip ? -rnx : rnx, ny = flip ? -rny : rny;
+  if (A >= 0 && B >= 0 && Math.max(cpd[0], n > 1 ? cpd[1] : 0) > SIZE*0.35){
+    const dx = bx[B]-bx[A], dy = by[B]-by[A], d = Math.hypot(dx,dy);
+    if (d > 1e-3){ nx = dx/d; ny = dy/d; }
+  }
+  /* keyed on how many pieces were made room for, not on how many the round turned
+     out to hold: with the stride wrong the keys collide and a contact is handed the
+     push belonging to another pair entirely */
   const lo = A < B ? A : B, hi = A < B ? B : A;
-  for (let k=0;k<n;k++) record(A, B, nx, ny, cpx[k], cpy[k], cpd[k], (lo*N+hi)*2+k);
+  const feat = (rf*MAXV + inc)*2 + (flip ? 1 : 0) + 1;
+  for (let k=0;k<n;k++) record(A, B, nx, ny, cpx[k], cpy[k], cpd[k], (lo*cap+hi)*2+k, feat);
   return n;
 }
 
@@ -691,7 +796,7 @@ function manifold(A, B){
    to the impulse it has already spent. Shoving positions apart instead and reading
    the velocity back off them leaves a pile buzzing: every push it has not yet
    converged on comes back as speed */
-function record(A, B, nx, ny, px, py, depth, key){
+function record(A, B, nx, ny, px, py, depth, key, feat){
   if (nc >= maxC) return;
   const rax = A < 0 ? 0 : px-bx[A], ray = A < 0 ? 0 : py-by[A];
   const rbx = B < 0 ? 0 : px-bx[B], rby = B < 0 ? 0 : py-by[B];
@@ -709,6 +814,8 @@ function record(A, B, nx, ny, px, py, depth, key){
   crax[nc]=rax; cray[nc]=ray; crbx[nc]=rbx; crby[nc]=rby;
   cdep[nc]=depth; cwn[nc]=w;
   cwt[nc]=imA + iiA*ta*ta + imB + iiB*tb*tb;
+  if (A >= 0) resting[A] = 1;
+  if (B >= 0) resting[B] = 1;
   ckey[nc]=key; cpn[nc]=0;
   ctar[nc] = vn < -bounceMin ? -REST*vn : 0;
 
@@ -716,8 +823,9 @@ function record(A, B, nx, ny, px, py, depth, key){
      back to the pieces now. Carrying the number without spending it is the same
      as starting from nothing: the pile has to hold itself up from scratch every
      substep, and never quite manages */
-  const jn = keyjn[key], jt = keyjt[key];
-  cjn[nc] = jn; cjt[nc] = jt;
+  const fresh = keyFeat[key] === feat && tick - keyAge[key] <= 2;
+  const jn = fresh ? keyjn[key] : 0, jt = fresh ? keyjt[key] : 0;
+  cjn[nc] = jn; cjt[nc] = jt; cfeat[nc] = feat;
   if (jn !== 0 || jt !== 0){
     const ix = nx*jn + tx*jt, iy = ny*jn + ty*jt;
     if (A >= 0){ vx[A] -= ix*imA; vy[A] -= iy*imA; va[A] -= iiA*(rax*iy - ray*ix); }
@@ -734,9 +842,9 @@ function walls(){
     for (let k=0;k<n;k++){
       const px = wv[o+k*2], py = wv[o+k*2+1];
       const key = wallKey + (i*MAXV + k)*3;
-      if (px < 0)      record(-1, i,  1, 0, px, py, -px, key);
-      else if (px > W) record(-1, i, -1, 0, px, py, px-W, key+1);
-      if (py > H)      record(-1, i,  0,-1, px, py, py-H, key+2);
+      if (px < 0)      record(-1, i,  1, 0, px, py, -px, key, 1);
+      else if (px > W) record(-1, i, -1, 0, px, py, px-W, key+1, 1);
+      if (py > H)      record(-1, i,  0,-1, px, py, py-H, key+2, 1);
     }
   }
 }
@@ -748,9 +856,12 @@ function walls(){
    iterations have not yet resolved is handed back as speed */
 function solve(h){
   const push = BETA/h;
+  /* once the pouring has stopped there is frame to spare, and the passes are what
+     squeeze the last of the overlap out of a wedged piece */
+  const iters = damp === DRAG_REST ? ITER*2 : ITER;
   for (let i=0;i<live;i++){ pvx[i]=0; pvy[i]=0; pva[i]=0; }
   for (let k=0;k<nc;k++) cpn[k] = 0;
-  for (let it=0; it<ITER; it++){
+  for (let it=0; it<iters; it++){
     for (let k=0;k<nc;k++){
       const A = cA[k], B = cB[k], nx = cnx[k], ny = cny[k];
       const rax = crax[k], ray = cray[k], rbx = crbx[k], rby = crby[k];
@@ -802,7 +913,7 @@ function solve(h){
    and the odd jammed contact leaves rather more, and the pit is about to be looked
    at rather than simulated */
 function separate(){
-  keyjn.fill(0); keyjt.fill(0);
+  keyAge.fill(-9);                           /* nothing carried into a still pit */
   const until = performance.now() + 60 + live*0.5;   /* a one-off, on a pit about to stop */
   for (let pass=0; pass<90 && performance.now() < until; pass++){
     broad();
@@ -814,7 +925,15 @@ function separate(){
     for (let k=0;k<nc;k++) if (cdep[k] > worst) worst = cdep[k];
     if (worst < 0.05) return;
     for (let k=0;k<nc;k++){
-      const A = cA[k], B = cB[k], nx = cnx[k], ny = cny[k];
+      const A = cA[k], B = cB[k];
+      let nx = cnx[k], ny = cny[k];
+      /* deep in, the least separating axis is no longer the way out — for two long
+         pieces crossed through one another it points along their length, and pushing
+         that way never parts them. Straight apart, centre from centre, does */
+      if (cdep[k] > SIZE*0.5 && A >= 0 && B >= 0){
+        const dx = bx[B]-bx[A], dy = by[B]-by[A], d = Math.hypot(dx,dy);
+        if (d > 1e-3){ nx = dx/d; ny = dy/d; }
+      }
       const rax = crax[k], ray = cray[k], rbx = crbx[k], rby = crby[k];
       const imA = A < 0 ? 0 : invM[A], iiA = A < 0 ? 0 : invI[A];
       const imB = B < 0 ? 0 : invM[B], iiB = B < 0 ? 0 : invI[B];
@@ -831,7 +950,13 @@ function separate(){
 function step(dt){
   const h = dt/SUB, dl = Math.max(0, 1 - damp*h), dA = Math.max(0, 1 - (damp+DRAG_SPIN)*h);
   const gh = G*h, creep = damp === DRAG_REST, slow = SIZE*0.5;
-  keyjn.fill(0); keyjt.fill(0);              /* a frame starts with nothing spent */
+  resting.fill(0);
+  /* the pushes carry across substeps and across frames, which is what lets a deep
+     heap hold itself up in a handful of passes. Each is picked up again only where
+     the same two faces are still meeting and it was made within the last frame or
+     two — the stamp is what keeps a stale push from being handed to whatever turns
+     up at that corner later */
+  tick++;
   for (let s=0;s<SUB;s++){
     for (let i=0;i<live;i++){
       vy[i] = (vy[i] + gh)*dl; vx[i] *= dl; va[i] *= dA;
@@ -848,7 +973,10 @@ function step(dt){
     for (let k=0;k<np;k++) manifold(pairA[k], pairB[k]);
     walls();
     solve(h);
-    for (let k=0;k<nc;k++){ keyjn[ckey[k]] = cjn[k]; keyjt[ckey[k]] = cjt[k]; }
+    for (let k=0;k<nc;k++){
+      const key = ckey[k];
+      keyjn[key] = cjn[k]; keyjt[key] = cjt[k]; keyFeat[key] = cfeat[k]; keyAge[key] = tick;
+    }
     for (let i=0;i<live;i++){
       bx[i]+=(vx[i]+pvx[i])*h; by[i]+=(vy[i]+pvy[i])*h; ba[i]+=(va[i]+pva[i])*h;
     }
@@ -922,6 +1050,7 @@ function draw(){
   ctx.lineWidth = lineW;
   ctx.lineJoin = 'round';
   const moat = lineW + 3;
+  ctx.fillStyle = flats[0];
   for (let i=0;i<live;i++){
     if (by[i] + bound[i] < 0) continue;
     const t = TPL[tpl[i]];
@@ -934,12 +1063,14 @@ function draw(){
     ctx.strokeStyle = ground[clamp((by[i]/H*11)|0, 0, 11)];
     ctx.stroke(t.path);
     ctx.lineWidth = lineW;
-    ctx.fillStyle = fills[col[i]];
+    ctx.fillStyle = flats[col[i]];
     ctx.fill(t.path);
     ctx.strokeStyle = rims[col[i]];
     ctx.stroke(t.path);
     ctx.restore();
   }
+  if (!grain) makeGrain();
+  for (let y=0;y<H;y+=256) for (let x=0;x<W;x+=256) ctx.drawImage(grain, x, y);
   for (const b of bits){
     ctx.save();
     ctx.translate(b.x, b.y);
@@ -961,12 +1092,30 @@ function advance(dt){
        either end and half again over the mean in the middle */
     pourT += dt;
     const p = Math.min(1, pourT/pourTime);
-    const due = Math.round(pourTo * p*p*(3 - 2*p));
-    while (live < due && spawnOne());
+    const most = Math.min(cap, Math.round(pourTo*1.4) + 4);
+    let due = Math.round(pourTo * p*p*(3 - 2*p));
+    if (p >= 1){
+      topAcc += dt*Math.max(5, cap/9);       /* the tail of the same taper */
+      due = pourTo + Math.floor(topAcc);
+    }
+    let placed = true;
+    while (live < Math.min(due, most) && (placed = spawnOne()));
+    stuck = placed ? 0 : stuck + dt;         /* nowhere left to let one go: full */
+
     step(dt);
-    if (live >= pourTo) settle('settling');
+    unjam();
+    const full = !fixed && (live >= most || stuck > 1.5 || (live > 3 && brimming()));
+    if (full || (fixed && live >= pourTo) || live >= cap){
+      if (!fixed){
+        if (live >= cap) holdOne = false;    /* nothing left to hold back */
+        N = live + (holdOne ? 1 : 0);        /* the answer is what it took to fill it */
+        pourTo = live;
+      }
+      settle('settling');
+    }
   } else if (phase === 'settling'){
     step(dt);
+    unjam();
     busy = travelled();
     calm = busy < SIZE*STILL ? calm + dt : 0;
 
@@ -974,11 +1123,16 @@ function advance(dt){
     if (holdOne){
       if (holdAt < 0 && busy < SIZE*STILL) holdAt = simTime;
       const due = (holdAt >= 0 && simTime - holdAt > holdWait) || simTime > settleUntil;
-      if (due && spawnOne()){
-        holdOne = false;
-        calm = 0;
-        settleUntil = simTime + SETTLE_MAX;
-        snapAt = -1;
+      if (due){
+        if (biggest() && spawnOne()){
+          holdOne = false;
+          calm = 0;
+          settleUntil = simTime + SETTLE_MAX;
+          snapAt = -1;
+        } else if (live >= cap || simTime > settleUntil){
+          holdOne = false;                   /* no room left for the joke */
+          N = live;
+        }
       }
     }
 
@@ -1011,6 +1165,16 @@ function ask(){
 }
 
 function rest(){
+  /* one last look for a piece jammed in another — a jam formed in the closing
+     moments has had no time to be lifted out — then the overlap is pushed away */
+  for (let a=0; a<2; a++){
+    separate();
+    let worst = 0;
+    for (let k=0;k<nc;k++) if (cA[k] >= 0 && cB[k] >= 0 && cdep[k] > worst) worst = cdep[k];
+    if (worst < SIZE*0.3) break;
+    unjam();
+    for (let t=0;t<150;t++) step(1/60);
+  }
   separate();
   phase = judged ? 'result' : 'guess';
   needsDraw = true;
@@ -1140,20 +1304,21 @@ addEventListener('resize', () => {
     SIZE = Math.max(3, SIZE*k);
     maxBound = 0;
     lineW = Math.max(.8, SIZE*.05);
+    ceil = roof();
     const skin = lineW/2 + Math.max(1.5, SIZE*0.05);
     TPL = TPL.map(t => {
       const s = template(t.kind, t.area*k*k, skin);
       maxBound = Math.max(maxBound, s.bound);
       return s;
     });
-    G = G_PER_PX*SIZE; vmax = SIZE*70; bounceMin = 0.5*Math.sqrt(G*SIZE);
+    G = G_PER_PX*SIZE; vmax = SIZE*40; bounceMin = 0.5*Math.sqrt(G*SIZE);
     for (let i=0;i<N;i++){
       const t = tpl[i];
       invM[i] = 1/TPL[t].area; invI[i] = 1/TPL[t].inertia;
       bound[i] = TPL[t].bound; wcount[i] = TPL[t].count;
     }
     grid();
-    pour();
+    pour(true);
     hurry = true;
     setStatus('filling');
   }, 160);
@@ -1174,9 +1339,11 @@ if (new URLSearchParams(location.search).has('debug')){
         if (px > hiX) hiX = px;
       }
     }
+    let maxdep = 0;
+    for (let k=0;k<nc;k++) if (cdep[k] > maxdep) maxdep = cdep[k];
     const speeds = [];
     for (let i=0;i<live;i++) speeds.push(Math.hypot(vx[i],vy[i]) + Math.abs(va[i])*bound[i]);
-    return { phase, asked, count: N, live, r: SIZE, w: W, h: H, busiest: busy, speeds,
+    return { phase, asked, count: N, live, r: SIZE, w: W, h: H, busiest: busy, speeds, ceil, cap, maxdep, nc,
              kinds: [...new Set(TPL.map(t => t.kind))],
              highest: lo, lowest: hiY, leftmost: loX, rightmost: hiX,
              xs: Array.from(bx.subarray(0,live)), ys: Array.from(by.subarray(0,live)) };
