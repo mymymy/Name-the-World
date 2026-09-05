@@ -315,7 +315,9 @@ const LAST       = 1.2;    /* seconds it may take to get there */
 const POUR_RATE  = 45;     /* pieces a second, enough of them in the air to read as rain */
 const POUR_MIN   = 2;
 const POUR_MAX   = 5;
-const SETTLE_MAX = 6;
+const HOLD_BACK  = 0.28;   /* how often the last piece is kept back for a beat, */
+const HOLD_WAIT  = [0.5, 1.2];  /* and how long the pit is left quiet before it lands */
+const SETTLE_MAX = 4.5;
 
 const cv = document.getElementById('pit');
 const ctx = cv.getContext('2d', { alpha: false });
@@ -341,8 +343,9 @@ let G = 0, vmax = 0, wmax = 0, bounceMin = 0, damp = DRAG, maxBound = 0;
 
 /* ------------------------------------------------------------------ round */
 let phase = 'idle';
-let spawnAcc = 0, spawnRate = 0, calm = 0, simTime = 0, settleUntil = 0, judged = false,
+let pourT = 0, pourTime = 0, pourTo = 0, calm = 0, simTime = 0, settleUntil = 0, judged = false,
     asked = false, busy = Infinity, deck = null, deckAt = 0;
+let holdOne = false, holdAt = -1, holdWait = 0;
 
 const el = id => document.getElementById(id);
 const statusEl = el('status'), startCard = el('startCard'), skipBtn = el('skipBtn'),
@@ -477,9 +480,21 @@ function newRound(){
 }
 
 function pour(){
-  live = 0; deckAt = 0; spawnAcc = 0; calm = 0; simTime = 0; damp = DRAG; busy = Infinity;
+  live = 0; deckAt = 0; pourT = 0; calm = 0; simTime = 0; damp = DRAG; busy = Infinity;
   asked = false;
-  spawnRate = N/Math.min(POUR_MAX, Math.max(POUR_MIN, N/POUR_RATE));
+  pourTime = Math.min(POUR_MAX, Math.max(POUR_MIN, N/POUR_RATE));
+  holdOne = N > 3 && Math.random() < HOLD_BACK;
+  holdAt = -1;
+  holdWait = HOLD_WAIT[0] + Math.random()*(HOLD_WAIT[1]-HOLD_WAIT[0]);
+  pourTo = N - (holdOne ? 1 : 0);
+  if (holdOne){                              /* and let it be the biggest cut of the round */
+    let big = 0;
+    for (let i=1;i<TPL.length;i++) if (TPL[i].area > TPL[big].area) big = i;
+    const last = N-1;
+    tpl[last] = big;
+    invM[last] = 1/TPL[big].area; invI[last] = 1/TPL[big].inertia;
+    bound[last] = TPL[big].bound; wcount[last] = TPL[big].count;
+  }
   phase = 'dropping';
 }
 
@@ -820,18 +835,33 @@ function setStatus(t){ statusEl.textContent = t; }
 
 function advance(dt){
   if (phase === 'dropping'){
-    spawnAcc += dt*spawnRate;
-    while (spawnAcc >= 1 && live < N){
-      spawnAcc -= 1;
-      if (!spawnOne()){ spawnAcc = 0; break; }
-    }
+    /* the rain swells and thins rather than running flat out and stopping dead:
+       the count due by now follows a smooth curve, so the rate is nothing at
+       either end and half again over the mean in the middle */
+    pourT += dt;
+    const p = Math.min(1, pourT/pourTime);
+    const due = Math.round(pourTo * p*p*(3 - 2*p));
+    while (live < due && spawnOne());
     step(dt);
-    if (live >= N) settle('settling');
+    if (live >= pourTo) settle('settling');
   } else if (phase === 'settling'){
     step(dt);
     busy = travelled();
     calm = busy < SIZE*STILL ? calm + dt : 0;
-    if (!asked && (calm > HOLD || simTime > settleUntil)) ask();
+
+    /* one piece kept back: let the pit go quiet, leave a beat, then drop it */
+    if (holdOne){
+      if (holdAt < 0 && busy < SIZE*STILL) holdAt = simTime;
+      const due = (holdAt >= 0 && simTime - holdAt > holdWait) || simTime > settleUntil;
+      if (due && spawnOne()){
+        holdOne = false;
+        calm = 0;
+        settleUntil = simTime + SETTLE_MAX;
+        snapAt = -1;
+      }
+    }
+
+    if (!asked && !holdOne && (calm > HOLD || simTime > settleUntil)) ask();
     if (asked && (busy < SIZE*DEAD || simTime > settleUntil + LAST)) rest();
   }
 }

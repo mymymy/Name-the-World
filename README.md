@@ -40,8 +40,10 @@ Side experiments, not part of the game.
   than starting from nothing each one, which is the difference between a heap that
   holds itself up and a heap that shivers. Stillness is judged by how far the
   furthest piece has actually travelled, not by its speed: a pile of long pieces
-  buzzes in place long after it has stopped going anywhere. `?debug` gives the
-  answer away. Self-contained: open the file anywhere.
+  buzzes in place long after it has stopped going anywhere. The rain swells and
+  thins rather than running flat out and stopping dead, and now and then the last
+  piece — the largest cut of the round — is kept back until the pit has gone quiet,
+  for the beat before it lands. `?debug` gives the answer away. Self-contained: open the file anywhere.
 
 ## server/
 
