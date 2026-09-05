@@ -35,8 +35,10 @@ Side experiments, not part of the game.
   pit is never twice the same and counting is the only way through. The piling is a
   small position-based solver: eight substeps a frame, a uniform grid one ball wide
   for finding contacts, and friction and bounce put back into the velocities
-  afterwards — which is what lets a heap stand up in a slope instead of spreading
-  flat. `?debug` gives the answer away. Self-contained: open the file anywhere.
+  afterwards. The friction between two balls is a rolling number and a low one,
+  because these balls do not spin: give them a sliding number instead and they
+  stand on one another's crowns rather than rolling off. `?debug` gives the answer
+  away. Self-contained: open the file anywhere.
 
 ## server/
 
