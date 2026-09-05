@@ -34,7 +34,10 @@ Side experiments, not part of the game.
   round is cut afresh: one shape or two out of balls, rounded pebbles, sharp
   shards, broad slabs, rounded tiles and planks, and sticks that come to rest
   across one another like a dropped handful — in sizes drawn lopsided upwards, so
-  a few pieces are larger than the rest, and in four colours of its own. It pours
+  a few pieces are larger than the rest, and in four colours of its own. How big a
+  piece is varies most of all: a round of small ones holds seven or eight times the
+  pieces of a round of large, and comes out a shallower heap for it, since a deep
+  heap of small pieces is exactly what squeezes them into one another. It pours
   until the pit is full rather than to a guess at how many that takes: the line it
   fills to is measured off the box that asks the question, and what counts as full
   is a couple of pieces of the heap itself standing near it. Behind it is a

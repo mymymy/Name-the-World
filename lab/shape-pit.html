@@ -176,18 +176,21 @@ function palette(){
    out sharp, some are drawn round them and come out organic; a stick is just a
    very long one. All of them are cut to the same area, so a round of sticks and
    a round of pebbles fill the pit alike */
-/* `most` is how many of a kind the pit will take. It falls with how long the pieces
-   are: two elongated pieces deep into one another are the case the separating-axis
-   test gets wrong, and a heap of them jams rather than settling */
+/* `deep` is how many pieces thick the heap may get. What jams a pit is depth in
+   pieces rather than a count of them — the pressure at the bottom, and the odds of
+   two pieces ending up well through one another — so the limit is expressed that way
+   and a round of small pieces can hold a great many without going any deeper. It
+   falls with how long the pieces are: two elongated pieces deep into one another are
+   the case the separating-axis test gets wrong */
 const KINDS = {
-  ball:   { disc:16,                                 draw:'circle', pack:.76, most:44 },
-  pebble: { n:[9,13], jitter:.30, stretch:[1,1.6],   draw:'smooth', pack:.74, most:44 },
-  tile:   { aspect:[1.05,2.4], round:.24,            draw:'round',  pack:.78, most:40 },
-  shard:  { n:[3,5],  jitter:.55, stretch:[1,2.1],   draw:'sharp',  pack:.64, most:36 },
-  slab:   { n:[4,6],  jitter:.14, stretch:[1.2,2.9], draw:'sharp',  pack:.70, most:32 },
-  petal:  { n:[7,9],  jitter:.24, stretch:[1.9,3.3], draw:'smooth', pack:.64, most:28 },
-  plank:  { aspect:[2.4,3.8],  round:.10,            draw:'round',  pack:.60, most:26 },
-  stick:  { aspect:[4.5,8],                          draw:'sharp',  pack:.46, most:22 }
+  ball:   { disc:16,                                 draw:'circle', pack:.76, deep:17 },
+  pebble: { n:[9,13], jitter:.30, stretch:[1,1.6],   draw:'smooth', pack:.74, deep:17 },
+  tile:   { aspect:[1.05,2.4], round:.24,            draw:'round',  pack:.78, deep:15 },
+  shard:  { n:[3,5],  jitter:.55, stretch:[1,2.1],   draw:'sharp',  pack:.64, deep:14 },
+  slab:   { n:[4,6],  jitter:.14, stretch:[1.2,2.9], draw:'sharp',  pack:.70, deep:13 },
+  petal:  { n:[7,9],  jitter:.24, stretch:[1.9,3.3], draw:'smooth', pack:.64, deep:12 },
+  plank:  { aspect:[2.4,3.8],  round:.10,            draw:'round',  pack:.60, deep:10 },
+  stick:  { aspect:[4.5,8],                          draw:'sharp',  pack:.46, deep:9 }
 };
 const KEYS = Object.keys(KINDS);
 const MAXV = 16;
@@ -348,8 +351,7 @@ const POUR_MAX   = 5;
 const HOLD_BACK  = 0.28;   /* how often the last piece is kept back for a beat, */
 const HOLD_WAIT  = [0.5, 1.2];  /* and how long the pit is left quiet before it lands */
 const SETTLE_MAX = 4.5;
-const CAP        = 44;     /* as deep a heap as the solver holds without pieces
-                              being squeezed into one another */
+const CAP        = 140;    /* as many pieces as a frame can carry at full effort */
 
 const cv = document.getElementById('pit');
 const ctx = cv.getContext('2d', { alpha: false });
@@ -375,7 +377,8 @@ let G = 0, vmax = 0, wmax = 0, bounceMin = 0, damp = DRAG, maxBound = 0;
 
 /* ------------------------------------------------------------------ round */
 let phase = 'idle';
-let pourT = 0, pourTime = 0, pourTo = 0, topAcc = 0, stuck = 0, fixed = false, cap = 0, ceil = 0, calm = 0, simTime = 0, settleUntil = 0, judged = false,
+let pourT = 0, pourTime = 0, pourTo = 0, topAcc = 0, stuck = 0, fixed = false, cap = 0, ceil = 0,
+    deep = 12, calm = 0, simTime = 0, settleUntil = 0, judged = false,
     asked = false, busy = Infinity, deck = null, deckAt = 0;
 let holdOne = false, holdAt = -1, holdWait = 0;
 
@@ -506,12 +509,18 @@ function newRound(){
      axis that parts two of them is not the one the test finds, and a heap of them
      jams. They get a lower ceiling than the rest, which costs those rounds a little
      of the fill: cutting them larger to make up for it puts the jam back */
-  let pack = 1, lim = CAP;
+  let pack = 1;
+  deep = 99;
   for (const k of kinds){
     pack = Math.min(pack, KINDS[k].pack);
-    lim = Math.min(lim, KINDS[k].most || CAP);
+    deep = Math.min(deep, KINDS[k].deep);
   }
-  SIZE = Math.round((0.064 + Math.random()*0.034) * minDim * 2)/2;
+  /* the size of a piece is what varies most between rounds: a round of small ones
+     holds seven or eight times the pieces of a round of large ones. A round of small
+     pieces runs into its count ceiling before the heap reaches the fill line, so it
+     comes out shallower — which is also what keeps it standing: a deep heap of small
+     pieces is precisely what squeezes them into one another */
+  SIZE = Math.round((0.022 + Math.random()*0.076) * minDim * 2)/2;
   const area = Math.PI*SIZE*SIZE;
 
   /* and how far the pieces differ in size within the round: a few rounds are cut
@@ -533,19 +542,21 @@ function newRound(){
   mean /= TPL.length;                        /* what the count has to be reckoned on */
   inks(palette());
 
-  ceil = roof();
+  ceil = Math.max(roof(), H - deep*SIZE*1.7);   /* the card, or the depth limit */
 
   /* aim a little under the room there is and let the trickle at the end of the
      pour finish the job, so the pit ends up full without the estimate having to
      be right about how loosely a heap of this shape packs */
   const fill = 0.80 + Math.random()*0.12;
   let n = Math.round(W*(H-ceil)*fill*pack/mean * (0.97 + Math.random()*0.06));
-  n = Math.max(12, Math.min(lim, n));
-  const room = Math.min(lim, Math.round(n*1.6) + 12);
+  n = Math.max(12, Math.min(CAP, n));
+  const room = Math.min(CAP, Math.round(n*1.6) + 12);
 
   G = G_PER_PX * SIZE;
-  vmax = SIZE * 40;   /* how fast a piece may fall: it lands the softer for it, and
-                         a soft landing is one the solver can stop in a substep */
+  /* how fast a piece may fall. A landing the solver cannot stop within a substep is
+     the trigger for almost every jam, and the more pieces there are the less room
+     there is for one to be pushed back out of, so a crowded round falls gentler */
+  vmax = SIZE * (n > 70 ? 26 : 40);
   wmax = 25;
   bounceMin = 0.5*Math.sqrt(G*SIZE);
 
@@ -857,7 +868,9 @@ function walls(){
 function solve(h){
   const push = BETA/h;
   /* once the pouring has stopped there is frame to spare, and the passes are what
-     squeeze the last of the overlap out of a wedged piece */
+     squeeze the last of the overlap out of a wedged piece. Spending fewer of them
+     where the contacts are many is precisely the wrong economy: those are the pits
+     that jam, and it took the jams from two rounds in ten to five */
   const iters = damp === DRAG_REST ? ITER*2 : ITER;
   for (let i=0;i<live;i++){ pvx[i]=0; pvy[i]=0; pva[i]=0; }
   for (let k=0;k<nc;k++) cpn[k] = 0;
@@ -1095,7 +1108,7 @@ function advance(dt){
     const most = Math.min(cap, Math.round(pourTo*1.4) + 4);
     let due = Math.round(pourTo * p*p*(3 - 2*p));
     if (p >= 1){
-      topAcc += dt*Math.max(5, cap/9);       /* the tail of the same taper */
+      topAcc += dt*Math.max(8, cap/4);       /* the tail of the same taper */
       due = pourTo + Math.floor(topAcc);
     }
     let placed = true;
@@ -1300,11 +1313,14 @@ addEventListener('resize', () => {
     }
     guessCard.hidden = true;
     resultCard.hidden = true;
-    const k = Math.sqrt((W*H)/(oldW*oldH));   /* keep the pit as full as it was */
+    /* the same pieces have to go back into a different shape of window, so they are
+       re-cut to the same share of it — and a little under, since the box that asks
+       the question takes more of a narrow window than a wide one */
+    const k = Math.sqrt((W*H)/(oldW*oldH))*0.92;
     SIZE = Math.max(3, SIZE*k);
     maxBound = 0;
     lineW = Math.max(.8, SIZE*.05);
-    ceil = roof();
+    ceil = Math.max(roof(), H - deep*SIZE*1.7);   /* the card, or the depth limit */
     const skin = lineW/2 + Math.max(1.5, SIZE*0.05);
     TPL = TPL.map(t => {
       const s = template(t.kind, t.area*k*k, skin);
