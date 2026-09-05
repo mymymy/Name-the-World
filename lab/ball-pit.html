@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<meta charset="utf-8">
+<title>Ball Pit</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Balls fall, pile up and fill the screen. Guess how many.">
+<style>
+/* light is the plain state; dark is redefined for a viewer whose system asks for it */
+:root{
+  --ink:#EDEAE1; --floor:#E3DDCE; --panel:#FBF8F1; --edge:#DAD3C4;
+  --dim:#6E6A5F; --text:#22262A; --hi:#9A6B1F; --shade:rgba(0,0,0,.07);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --ink:#12171A; --floor:#0C1013; --panel:#1B2226; --edge:#2C363B;
+    --dim:#7E8D94; --text:#DCE4E7; --hi:#E4B363; --shade:rgba(0,0,0,.35);
+  }
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; overflow:hidden; background:var(--ink); color:var(--text);
+  font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  -webkit-user-select:none; user-select:none;
+}
+.serif{font-family:"Iowan Old Style","Palatino Linotype",Palatino,"Hoefler Text",Georgia,serif}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+[hidden]{display:none!important}
+
+/* the heads-up layer sits over the pit and lets clicks through except on its own controls */
+.hud{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column;
+  padding:calc(18px + env(safe-area-inset-top)) 18px calc(18px + env(safe-area-inset-bottom));gap:14px}
+.bar{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.hud > *{pointer-events:none}
+.hud button,.hud input,.hud form{pointer-events:auto}
+
+.brand{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.brand h1{margin:0;font-size:20px;font-weight:500;letter-spacing:-.01em}
+.status{margin:0;font-size:12px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim)}
+.brand h1,.status{text-shadow:0 1px 0 var(--ink),0 0 12px var(--ink)}
+
+.centre{flex:1;display:flex;align-items:center;justify-content:center}
+/* the controls live up in the empty air above the pile, where they cover
+   nothing anyone has to count */
+.dock{display:flex;flex-direction:column;align-items:flex-end;gap:10px;margin-left:auto}
+
+.card{
+  pointer-events:auto;background:var(--panel);
+  background:color-mix(in srgb,var(--panel) 88%,transparent);
+  border:1px solid var(--edge);border-radius:12px;padding:18px 20px;
+  box-shadow:0 10px 34px var(--shade);
+  -webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px);
+  max-width:min(420px,calc(100vw - 36px));text-align:center;
+}
+.card h2{margin:0 0 8px;font-size:22px;font-weight:500;letter-spacing:-.01em}
+.card p{margin:0 0 14px;color:var(--dim);text-wrap:pretty}
+.card p:last-of-type{margin-bottom:14px}
+
+.row{display:flex;align-items:center;gap:10px;padding:12px 14px;text-align:left;flex-wrap:wrap;justify-content:center}
+.row label{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim)}
+input[type=number]{
+  font:inherit;font-size:20px;font-variant-numeric:tabular-nums;width:5.5ch;
+  color:var(--text);background:transparent;border:0;border-bottom:1px solid var(--edge);
+  padding:2px 4px;text-align:center;-moz-appearance:textfield;
+}
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+
+button{font:inherit;font-size:13px;color:var(--text);background:transparent;
+  border:1px solid var(--edge);border-radius:7px;padding:8px 14px;cursor:pointer}
+button:hover{border-color:var(--dim)}
+button.primary{background:var(--hi);border-color:var(--hi);color:var(--panel);font-weight:500}
+button.primary:hover{filter:brightness(1.08)}
+button.ghost{border-color:transparent;color:var(--dim);font-size:12px;
+  letter-spacing:.1em;text-transform:uppercase;background:color-mix(in srgb,var(--ink) 60%,transparent)}
+button.ghost:hover{color:var(--text)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--hi);outline-offset:3px}
+
+.verdict{margin:0 0 6px!important;font-size:24px;color:var(--text)!important;letter-spacing:-.01em}
+.detail{margin:0 0 4px!important}
+.detail b{color:var(--text);font-weight:500;font-variant-numeric:tabular-nums}
+.best{margin:0 0 14px!important;font-size:12px;color:var(--dim)!important;
+  font-variant-numeric:tabular-nums;min-height:1.2em}
+</style>
+
+<canvas id="pit"></canvas>
+
+<div class="hud">
+  <div class="bar">
+    <header class="brand">
+      <h1 class="serif">Ball Pit</h1>
+      <p class="status" id="status">a guessing game</p>
+    </header>
+
+    <div class="dock">
+      <button class="ghost" id="skipBtn" hidden>Settle them now</button>
+
+      <form class="card row" id="guessCard" hidden autocomplete="off">
+        <label for="guessInput">How many?</label>
+        <input id="guessInput" type="number" min="1" max="99999" step="1" inputmode="numeric" placeholder="?">
+        <button class="primary" type="submit">Guess</button>
+      </form>
+
+      <div class="card" id="resultCard" hidden aria-live="polite">
+        <p class="verdict serif" id="verdict"></p>
+        <p class="detail" id="detail"></p>
+        <p class="best" id="best"></p>
+        <button class="primary" id="againBtn">Again</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="centre">
+    <div class="card" id="startCard">
+      <h2 class="serif">How many balls?</h2>
+      <p>Balls rain down and pile up until the pit is full. Once they have all come
+         to rest, say how many there are. Every ball is the same size as every other
+         &mdash; but the size is a new one each round.</p>
+      <button class="primary" id="dropBtn">Drop the balls</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------------------------------------------------------------- palette */
+/* four primary-ish colours, each shaded from one hex: a lit face, the colour
+   itself, and a turned-away edge */
+const BASE = ['#D64431', '#EFB528', '#2C6BB3', '#3F9A55'];
+
+const hex = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+const mix = (c, t, k) => `rgb(${c.map((v,i) => Math.round(v + (t[i]-v)*k)).join(',')})`;
+
+/* ------------------------------------------------------------- the world */
+const G_PER_PX   = 280;    /* gravity, px/s² per px of radius: a ball is 7cm wide */
+const SUB        = 8;      /* substeps per frame — small steps make piles stand up */
+const MU_BALL    = 0.30;   /* Coulomb friction, ball on ball */
+const MU_WALL    = 0.45;   /* and on the floor and walls */
+const REST_BALL  = 0.18;   /* balls are lively; a pile of them is not */
+const REST_WALL  = 0.30;
+const DRAG       = 0.35;   /* air, per second */
+const PACKING    = 0.78;   /* poured discs, guessed low so the pit never overflows */
+const POUR_RATE  = 70;     /* balls a second: enough of them in the air to read as rain */
+const POUR_MIN   = 2;      /* but a small pit still gets a moment, */
+const POUR_MAX   = 7;      /* and a large one is not made to take all day */
+const SETTLE_MAX = 14;     /* give up waiting after this many simulated seconds */
+
+const cv = document.getElementById('pit');
+const ctx = cv.getContext('2d', { alpha: false });
+
+let W = 0, H = 0, dpr = 1, bg = null;
+
+/* particles: one radius for all of them, so everything below is flat arrays */
+let N = 0, live = 0, R = 20;
+let x, y, vx, vy, px, py, col, sprites;
+
+/* uniform grid, cell = one ball diameter, extended above the top edge to hold
+   the balls still falling in */
+let cell = 0, cols = 0, rows = 0, originY = 0, starts, cursor, items;
+
+/* contacts found by the position pass, replayed by the velocity pass */
+let ci, cj, cov, cvn, nc = 0, maxC = 0;
+
+/* per-ball wall contacts: depth and the speed carried into the wall */
+let wdX, wvX, wdY, wvY;
+
+let G = 0, vmax = 0, bounceMin = 0;
+
+/* ------------------------------------------------------------------ round */
+let phase = 'idle';         /* idle | dropping | settling | guess | result */
+let spawnAcc = 0, spawnRate = 0, calm = 0, simTime = 0, settleUntil = 0, judged = false,
+    deck = null, deckAt = 0;
+
+const el = id => document.getElementById(id);
+const statusEl = el('status'), startCard = el('startCard'), skipBtn = el('skipBtn'),
+      guessCard = el('guessCard'), guessInput = el('guessInput'), resultCard = el('resultCard');
+
+function fit(){
+  const w = Math.max(1, innerWidth), h = Math.max(1, innerHeight);
+  dpr = Math.min(devicePixelRatio || 1, 2);
+  W = w; H = h;
+  cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+  cv.style.width = W+'px'; cv.style.height = H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  bg = ctx.createLinearGradient(0,0,0,H);
+  const style = getComputedStyle(document.body);
+  bg.addColorStop(0, style.getPropertyValue('--ink').trim() || '#EDEAE1');
+  bg.addColorStop(1, style.getPropertyValue('--floor').trim() || '#E3DDCE');
+}
+
+function sprite(base){
+  const c = hex(base), pad = 1.5, s = Math.ceil((R+pad)*2*dpr);
+  const cn = document.createElement('canvas');
+  cn.width = cn.height = s;
+  const g = cn.getContext('2d');
+  g.scale(dpr,dpr);
+  const cx = R+pad, cy = R+pad;
+  const body = g.createRadialGradient(cx-R*.34, cy-R*.40, R*.06, cx, cy, R*1.05);
+  body.addColorStop(0, mix(c,[255,255,255],.45));
+  body.addColorStop(.42, base);
+  body.addColorStop(1, mix(c,[0,0,0],.34));
+  g.fillStyle = body;
+  g.beginPath(); g.arc(cx,cy,R,0,6.2832); g.fill();
+  /* a turned edge, so touching balls of one colour still read as two */
+  g.lineWidth = Math.max(.7, R*.055);
+  g.strokeStyle = 'rgba(0,0,0,.2)';
+  g.beginPath(); g.arc(cx,cy,R-g.lineWidth/2,0,6.2832); g.stroke();
+  /* the shine, in the same place on every ball because the light is */
+  const hx = cx-R*.33, hy = cy-R*.42, hr = R*.40;
+  const shine = g.createRadialGradient(hx,hy,0,hx,hy,hr);
+  shine.addColorStop(0,'rgba(255,255,255,.9)');
+  shine.addColorStop(.55,'rgba(255,255,255,.25)');
+  shine.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle = shine;
+  g.beginPath(); g.arc(hx,hy,hr,0,6.2832); g.fill();
+  return cn;
+}
+
+function allocate(n){
+  N = n; live = 0;
+  x = new Float32Array(n); y = new Float32Array(n);
+  vx = new Float32Array(n); vy = new Float32Array(n);
+  px = new Float32Array(n); py = new Float32Array(n);
+  col = new Uint8Array(n);
+  wdX = new Float32Array(n); wvX = new Float32Array(n);
+  wdY = new Float32Array(n); wvY = new Float32Array(n);
+  maxC = n*6 + 64;
+  ci = new Int32Array(maxC); cj = new Int32Array(maxC);
+  cov = new Float32Array(maxC); cvn = new Float32Array(maxC);
+  /* an even deck of colours, dealt shuffled, so no one colour runs away with it */
+  deck = new Uint8Array(n);
+  for (let i=0;i<n;i++) deck[i] = i & 3;
+  for (let i=n-1;i>0;i--){ const j = (Math.random()*(i+1))|0; const t = deck[i]; deck[i]=deck[j]; deck[j]=t; }
+  deckAt = 0;
+}
+
+function grid(){
+  cell = R*2;
+  cols = Math.max(1, Math.ceil(W/cell) + 1);
+  originY = -6*cell;
+  rows = Math.max(1, Math.ceil((H-originY)/cell) + 1);
+  const nCells = cols*rows;
+  if (!starts || starts.length !== nCells+1){
+    starts = new Int32Array(nCells+1);
+    cursor = new Int32Array(nCells+1);
+  }
+  if (!items || items.length < N) items = new Int32Array(N);
+}
+
+/* everything that follows from the size of a ball */
+function tune(r){
+  R = r;
+  G = G_PER_PX * R;
+  vmax = R * 60 * SUB * 0.8;             /* never move more than 0.8r in a substep */
+  bounceMin = 0.5 * Math.sqrt(G*R);      /* below this a knock is a nudge, not a bounce */
+  sprites = BASE.map(sprite);
+  grid();
+}
+
+function pour(){
+  live = 0; deckAt = 0; spawnAcc = 0; calm = 0; simTime = 0;
+  spawnRate = N/Math.min(POUR_MAX, Math.max(POUR_MIN, N/POUR_RATE));
+  phase = 'dropping';
+}
+
+function newRound(){
+  fit();
+  const minDim = Math.min(W,H);
+  const r = Math.round((0.022 + Math.random()*0.043) * minDim * 2)/2;
+  const fill = 0.44 + Math.random()*0.26;
+  let n = Math.round(W*H*fill*PACKING/(Math.PI*r*r) * (0.97 + Math.random()*0.06));
+  n = Math.max(24, Math.min(1100, n));
+  allocate(n);
+  tune(r);
+  pour();
+}
+
+/* pour from anywhere across the width, a little above the top edge, and only
+   into space that is actually free */
+function spawnOne(){
+  const lo = R*1.2, hi = W - R*1.2;
+  for (let t=0;t<14;t++){
+    const bx = lo + Math.random()*(hi-lo);
+    const by = -R*5 + Math.random()*R*3.5;
+    let ok = true;
+    for (let k=Math.max(0,live-48); k<live; k++){
+      const dx = x[k]-bx, dy = y[k]-by;
+      if (dx*dx + dy*dy < 4.4*R*R){ ok = false; break; }
+    }
+    if (!ok) continue;
+    const u = Math.sqrt(G*R);
+    x[live]=bx; y[live]=by;
+    vx[live]=(Math.random()-.5)*u*.35; vy[live]=u*.2;
+    px[live]=bx; py[live]=by;
+    col[live]=deck[deckAt++];
+    live++;
+    return true;
+  }
+  return false;
+}
+
+/* ----------------------------------------------------------------- solver */
+function build(){
+  const nCells = cols*rows, inv = 1/cell;
+  starts.fill(0);
+  for (let i=0;i<live;i++){
+    let cx = (x[i]*inv)|0; if (cx<0) cx=0; else if (cx>=cols) cx=cols-1;
+    let cy = ((y[i]-originY)*inv)|0; if (cy<0) cy=0; else if (cy>=rows) cy=rows-1;
+    starts[cy*cols+cx+1]++;
+  }
+  for (let c=0;c<nCells;c++) starts[c+1]+=starts[c];
+  cursor.set(starts);
+  for (let i=0;i<live;i++){
+    let cx = (x[i]*inv)|0; if (cx<0) cx=0; else if (cx>=cols) cx=cols-1;
+    let cy = ((y[i]-originY)*inv)|0; if (cy<0) cy=0; else if (cy>=rows) cy=rows-1;
+    items[cursor[cy*cols+cx]++] = i;
+  }
+}
+
+function pair(i,j){
+  const dx = x[j]-x[i], dy = y[j]-y[i];
+  const d2 = dx*dx + dy*dy, dm = R*2;
+  if (d2 >= dm*dm || d2 < 1e-9) return;
+  const d = Math.sqrt(d2), nx = dx/d, ny = dy/d, over = dm - d, c = over*.5;
+  x[i] -= nx*c; y[i] -= ny*c;
+  x[j] += nx*c; y[j] += ny*c;
+  if (nc < maxC){
+    ci[nc]=i; cj[nc]=j; cov[nc]=over;
+    cvn[nc] = (vx[j]-vx[i])*nx + (vy[j]-vy[i])*ny;   /* negative: closing */
+    nc++;
+  }
+}
+
+/* every contact lies within one cell of its partner, so each cell is checked
+   against itself and the four cells that come after it */
+function contacts(){
+  nc = 0;
+  for (let cy=0; cy<rows; cy++){
+    const up = cy+1 < rows;
+    for (let cx=0; cx<cols; cx++){
+      const c = cy*cols+cx, a0 = starts[c], a1 = starts[c+1];
+      if (a0 === a1) continue;
+      for (let a=a0; a<a1; a++){
+        const i = items[a];
+        for (let b=a+1; b<a1; b++) pair(i, items[b]);
+        if (cx+1 < cols){ const s=starts[c+1], e=starts[c+2]; for (let b=s;b<e;b++) pair(i, items[b]); }
+        if (up){
+          const base = c+cols;
+          const from = cx>0 ? base-1 : base, to = cx+1<cols ? base+1 : base;
+          const s = starts[from], e = starts[to+1];
+          for (let b=s;b<e;b++) pair(i, items[b]);
+        }
+      }
+    }
+  }
+}
+
+function walls(){
+  const right = W-R, floor = H-R;
+  for (let i=0;i<live;i++){
+    wdX[i]=0; wdY[i]=0;
+    if (x[i] < R){ wdX[i] = R - x[i]; wvX[i] = -vx[i]; x[i] = R; }
+    else if (x[i] > right){ wdX[i] = x[i]-right; wvX[i] = vx[i]; x[i] = right; }
+    if (y[i] > floor){ wdY[i] = y[i]-floor; wvY[i] = vy[i]; y[i] = floor; }
+  }
+}
+
+/* restitution and friction both belong to velocity, and both need the speeds
+   the bodies had before the positions were pushed apart */
+function velocities(h){
+  for (let k=0;k<nc;k++){
+    const i = ci[k], j = cj[k];
+    const dx = x[j]-x[i], dy = y[j]-y[i];
+    const d = Math.sqrt(dx*dx+dy*dy) || 1;
+    const nx = dx/d, ny = dy/d;
+    let rx = vx[j]-vx[i], ry = vy[j]-vy[i];
+    const pre = cvn[k];
+    if (pre < -bounceMin){
+      const want = -REST_BALL*pre, vn = rx*nx + ry*ny;
+      if (vn < want){
+        const dv = (want-vn)*.5;
+        vx[i]-=nx*dv; vy[i]-=ny*dv; vx[j]+=nx*dv; vy[j]+=ny*dv;
+        rx = vx[j]-vx[i]; ry = vy[j]-vy[i];
+      }
+    }
+    const vn2 = rx*nx + ry*ny;
+    let tx = rx - vn2*nx, ty = ry - vn2*ny;
+    const tl = Math.sqrt(tx*tx+ty*ty);
+    if (tl > 1e-6){
+      /* the normal push of this substep is worth overlap/h of speed; friction
+         may spend µ of it against the slide */
+      const dv = Math.min(tl, MU_BALL*cov[k]/h)*.5;
+      tx/=tl; ty/=tl;
+      vx[i]+=tx*dv; vy[i]+=ty*dv; vx[j]-=tx*dv; vy[j]-=ty*dv;
+    }
+  }
+  for (let i=0;i<live;i++){
+    if (wdY[i] > 0){
+      if (wvY[i] > bounceMin){ const want = -REST_WALL*wvY[i]; if (vy[i] > want) vy[i] = want; }
+      const lim = MU_WALL*wdY[i]/h, s = Math.min(Math.abs(vx[i]), lim);
+      vx[i] -= Math.sign(vx[i])*s;
+    }
+    if (wdX[i] > 0){
+      const into = wvX[i];
+      if (into > bounceMin){
+        const want = REST_WALL*into*(x[i] < W*.5 ? 1 : -1);
+        if (x[i] < W*.5 ? vx[i] < want : vx[i] > want) vx[i] = want;
+      }
+      const lim = MU_WALL*wdX[i]/h, s = Math.min(Math.abs(vy[i]), lim);
+      vy[i] -= Math.sign(vy[i])*s;
+    }
+  }
+}
+
+function step(dt){
+  const h = dt/SUB, drag = Math.max(0, 1 - DRAG*h), gh = G*h, cap = vmax;
+  for (let s=0;s<SUB;s++){
+    for (let i=0;i<live;i++){
+      vy[i] = (vy[i] + gh)*drag; vx[i] *= drag;
+      const sp = Math.abs(vx[i]) + Math.abs(vy[i]);
+      if (sp > cap){ const k = cap/sp; vx[i]*=k; vy[i]*=k; }
+      px[i]=x[i]; py[i]=y[i];
+      x[i]+=vx[i]*h; y[i]+=vy[i]*h;
+    }
+    build();
+    contacts();
+    walls();
+    const ih = 1/h;
+    for (let i=0;i<live;i++){ vx[i]=(x[i]-px[i])*ih; vy[i]=(y[i]-py[i])*ih; }
+    velocities(h);
+  }
+  simTime += dt;
+}
+
+function busiest(){
+  let m = 0;
+  for (let i=0;i<live;i++){
+    const s = vx[i]*vx[i] + vy[i]*vy[i];
+    if (s > m) m = s;
+  }
+  return Math.sqrt(m);
+}
+
+/* ---------------------------------------------------------------- drawing */
+function draw(){
+  ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
+  if (!live) return;
+  const pad = 1.5, half = R+pad, size = half*2, top = -size;
+  for (let i=0;i<live;i++){
+    const yy = y[i]-half;
+    if (yy < top) continue;
+    ctx.drawImage(sprites[col[i]], x[i]-half, yy, size, size);
+  }
+}
+
+/* ------------------------------------------------------------------- game */
+function setStatus(t){ statusEl.textContent = t; }
+
+function advance(dt){
+  if (phase === 'dropping'){
+    spawnAcc += dt*spawnRate;
+    while (spawnAcc >= 1 && live < N){
+      spawnAcc -= 1;
+      if (!spawnOne()){ spawnAcc = 0; break; }
+    }
+    step(dt);
+    if (live >= N) settle('settling');
+  } else if (phase === 'settling'){
+    step(dt);
+    calm = busiest() < R*0.35 ? calm + dt : 0;
+    if (calm > 0.35 || simTime > settleUntil) rest();
+  }
+}
+
+function settle(label){
+  phase = 'settling';
+  calm = 0;
+  settleUntil = simTime + SETTLE_MAX;
+  setStatus(label);
+}
+
+function rest(){
+  needsDraw = true;
+  skipBtn.hidden = true;
+  if (judged){                       /* the pit was only disturbed; the answer stands */
+    phase = 'result';
+    resultCard.hidden = false;
+    setStatus('there were ' + N);
+    return;
+  }
+  phase = 'guess';
+  guessCard.hidden = false;
+  setStatus('count them');
+  if (!matchMedia('(hover: none)').matches) guessInput.focus();
+}
+
+let last = 0, hurry = false, needsDraw = true;
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt = Math.min(1/30, last ? (now-last)/1000 : 1/60);
+  last = now;
+  const moving = phase === 'dropping' || phase === 'settling';
+  if (!moving && !needsDraw) return;
+  needsDraw = false;
+  if (moving){
+    if (hurry){
+      /* fast-forward in fixed steps, a slice of a frame at a time, so the page
+         still answers while the pit fills itself */
+      const until = performance.now() + 13;
+      do { advance(1/60); }
+      while ((phase === 'dropping' || phase === 'settling') && performance.now() < until);
+    } else {
+      advance(dt);
+    }
+  }
+  draw();
+}
+
+function start(){
+  startCard.hidden = true;
+  resultCard.hidden = true;
+  guessCard.hidden = true;
+  newRound();
+  judged = false;
+  guessInput.value = '';
+  hurry = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  skipBtn.hidden = hurry;
+  setStatus(hurry ? 'filling' : 'dropping');
+}
+
+function verdictFor(pct){
+  if (pct === 0) return 'Spot on.';
+  if (pct <= 1)  return 'All but exact.';
+  if (pct <= 3)  return 'Remarkably close.';
+  if (pct <= 7)  return 'Close.';
+  if (pct <= 15) return 'Near enough.';
+  if (pct <= 30) return 'Some way off.';
+  return 'Miles off.';
+}
+
+const BEST = 'ballpit.best';
+function readBest(){
+  try {
+    const v = JSON.parse(localStorage.getItem(BEST));
+    return v && Number.isFinite(v.pct) && Number.isFinite(v.n) ? v : null;
+  } catch { return null; }
+}
+function writeBest(v){ try { localStorage.setItem(BEST, JSON.stringify(v)); } catch { /* private window */ } }
+
+function judge(guess){
+  const err = Math.abs(guess - N), pct = err/N*100;
+  phase = 'result';
+  judged = true;
+  guessCard.hidden = true;
+  resultCard.hidden = false;
+  setStatus('there were ' + N);
+  el('verdict').textContent = verdictFor(pct);
+  el('detail').innerHTML = err === 0
+    ? `Both of us say <b>${N}</b>.`
+    : `You said <b>${guess}</b>. There were <b>${N}</b> — ${err} ${err===1?'ball':'balls'} ` +
+      `${guess > N ? 'over' : 'under'}, ${pct < 10 ? pct.toFixed(1) : Math.round(pct)}%.`;
+
+  const was = readBest();
+  const pretty = v => v === 0 ? 'exact' : (v < 10 ? v.toFixed(1) : Math.round(v)) + '% off';
+  if (!was || pct < was.pct) writeBest({ pct, n: N });
+  el('best').textContent = !was ? ''
+    : pct < was.pct ? `A new best: ${pretty(pct)}, where it was ${pretty(was.pct)}.`
+    : `Best so far: ${pretty(was.pct)}, out of ${was.n}.`;
+  el('againBtn').focus();
+}
+
+el('dropBtn').addEventListener('click', start);
+el('againBtn').addEventListener('click', start);
+skipBtn.addEventListener('click', () => { hurry = true; skipBtn.hidden = true; setStatus('filling'); });
+
+guessCard.addEventListener('submit', e => {
+  e.preventDefault();
+  const g = Math.round(Number(guessInput.value));
+  if (!Number.isFinite(g) || g < 1){ guessInput.focus(); return; }
+  judge(g);
+});
+
+/* the pit is the window; if the window changes shape, let the pile find its
+   new level rather than leaving balls buried in a wall */
+let resizeTimer = 0;
+addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  needsDraw = true;
+  resizeTimer = setTimeout(() => {
+    const oldW = W, oldH = H;
+    fit();
+    if (phase === 'idle') return;
+    needsDraw = true;
+    if (Math.abs(W-oldW) < 2 && Math.abs(H-oldH) < 2) return;
+    grid();
+    const small = W === oldW && Math.abs(H-oldH) < oldH*0.15;
+    if (small){
+      for (let i=0;i<live;i++) y[i] = Math.min(y[i], H-R);
+      if (phase !== 'dropping') for (let k=0;k<40 && busiest() > R*0.35; k++) step(1/60);
+      return;
+    }
+    /* a real change of shape: squeezing a settled pile sideways only jams it,
+       so pour the same balls again into the new room, at a size that keeps the
+       pit as full as it was */
+    guessCard.hidden = true;
+    resultCard.hidden = true;
+    tune(Math.max(3, R*Math.sqrt((W*H)/(oldW*oldH))));
+    pour();
+    hurry = true;
+    setStatus('filling');
+  }, 160);
+});
+
+/* ?debug hands over the answer, for anyone poking at the simulation */
+if (new URLSearchParams(location.search).has('debug')){
+  window.pit = () => {
+    let lo = Infinity, hiX = -Infinity, loX = Infinity, hiY = -Infinity;
+    for (let i=0;i<live;i++){
+      if (y[i] < lo) lo = y[i];
+      if (y[i] > hiY) hiY = y[i];
+      if (x[i] < loX) loX = x[i];
+      if (x[i] > hiX) hiX = x[i];
+    }
+    return { phase, count: N, live, r: R, w: W, h: H, busiest: busiest(),
+             highest: lo, lowest: hiY, leftmost: loX, rightmost: hiX };
+  };
+}
+
+fit();
+draw();
+requestAnimationFrame(frame);
+})();
+</script>
