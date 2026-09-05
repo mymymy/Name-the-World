@@ -135,9 +135,10 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--hi);outline-off
 'use strict';
 
 /* ---------------------------------------------------------------- palette */
-/* four primary-ish colours, each shaded from one hex: a lit face, the colour
-   itself, and a turned-away edge */
-const BASE = ['#D64431', '#EFB528', '#2C6BB3', '#3F9A55'];
+/* four primary-ish colours, held back a little so they sit on the paper: each
+   is a flat fill, with a darker line of itself around the edge — without it two
+   touching balls of one colour read as one shape, which is the whole game */
+const BASE = ['#C5544A', '#DCA83E', '#43719D', '#56905B'];
 
 const hex = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
 const mix = (c, t, k) => `rgb(${c.map((v,i) => Math.round(v + (t[i]-v)*k)).join(',')})`;
@@ -150,11 +151,16 @@ const MU_WALL    = 0.45;   /* and on the floor and walls */
 const REST_BALL  = 0.18;   /* balls are lively; a pile of them is not */
 const REST_WALL  = 0.30;
 const DRAG       = 0.35;   /* air, per second */
+const DRAG_REST  = 1.2;    /* and the pit itself, once the pouring has stopped */
+const STILL      = 0.8;    /* radii a second: below this nothing is going anywhere */
+const HOLD       = 0.2;    /* seconds of that before the pit counts as at rest */
+const TAIL       = 8;      /* radii a second: under this, the pit is only shuffling */
+const TAIL_SPEED = 3;      /* so play that part out at triple time */
 const PACKING    = 0.78;   /* poured discs, guessed low so the pit never overflows */
 const POUR_RATE  = 70;     /* balls a second: enough of them in the air to read as rain */
 const POUR_MIN   = 2;      /* but a small pit still gets a moment, */
-const POUR_MAX   = 7;      /* and a large one is not made to take all day */
-const SETTLE_MAX = 14;     /* give up waiting after this many simulated seconds */
+const POUR_MAX   = 5;      /* and a large one is not made to take all day */
+const SETTLE_MAX = 8;      /* give up waiting after this many simulated seconds */
 
 const cv = document.getElementById('pit');
 const ctx = cv.getContext('2d', { alpha: false });
@@ -175,12 +181,12 @@ let ci, cj, cov, cvn, nc = 0, maxC = 0;
 /* per-ball wall contacts: depth and the speed carried into the wall */
 let wdX, wvX, wdY, wvY;
 
-let G = 0, vmax = 0, bounceMin = 0;
+let G = 0, vmax = 0, bounceMin = 0, damp = DRAG;
 
 /* ------------------------------------------------------------------ round */
 let phase = 'idle';         /* idle | dropping | settling | guess | result */
 let spawnAcc = 0, spawnRate = 0, calm = 0, simTime = 0, settleUntil = 0, judged = false,
-    deck = null, deckAt = 0;
+    busy = Infinity, deck = null, deckAt = 0;
 
 const el = id => document.getElementById(id);
 const statusEl = el('status'), startCard = el('startCard'), skipBtn = el('skipBtn'),
@@ -206,24 +212,12 @@ function sprite(base){
   const g = cn.getContext('2d');
   g.scale(dpr,dpr);
   const cx = R+pad, cy = R+pad;
-  const body = g.createRadialGradient(cx-R*.34, cy-R*.40, R*.06, cx, cy, R*1.05);
-  body.addColorStop(0, mix(c,[255,255,255],.45));
-  body.addColorStop(.42, base);
-  body.addColorStop(1, mix(c,[0,0,0],.34));
-  g.fillStyle = body;
+  const line = Math.max(.8, R*.05);
+  g.fillStyle = base;
   g.beginPath(); g.arc(cx,cy,R,0,6.2832); g.fill();
-  /* a turned edge, so touching balls of one colour still read as two */
-  g.lineWidth = Math.max(.7, R*.055);
-  g.strokeStyle = 'rgba(0,0,0,.2)';
-  g.beginPath(); g.arc(cx,cy,R-g.lineWidth/2,0,6.2832); g.stroke();
-  /* the shine, in the same place on every ball because the light is */
-  const hx = cx-R*.33, hy = cy-R*.42, hr = R*.40;
-  const shine = g.createRadialGradient(hx,hy,0,hx,hy,hr);
-  shine.addColorStop(0,'rgba(255,255,255,.9)');
-  shine.addColorStop(.55,'rgba(255,255,255,.25)');
-  shine.addColorStop(1,'rgba(255,255,255,0)');
-  g.fillStyle = shine;
-  g.beginPath(); g.arc(hx,hy,hr,0,6.2832); g.fill();
+  g.lineWidth = line;
+  g.strokeStyle = mix(c,[0,0,0],.3);
+  g.beginPath(); g.arc(cx,cy,R-line/2,0,6.2832); g.stroke();
   return cn;
 }
 
@@ -269,7 +263,7 @@ function tune(r){
 }
 
 function pour(){
-  live = 0; deckAt = 0; spawnAcc = 0; calm = 0; simTime = 0;
+  live = 0; deckAt = 0; spawnAcc = 0; calm = 0; simTime = 0; damp = DRAG; busy = Infinity;
   spawnRate = N/Math.min(POUR_MAX, Math.max(POUR_MIN, N/POUR_RATE));
   phase = 'dropping';
 }
@@ -424,7 +418,7 @@ function velocities(h){
 }
 
 function step(dt){
-  const h = dt/SUB, drag = Math.max(0, 1 - DRAG*h), gh = G*h, cap = vmax;
+  const h = dt/SUB, drag = Math.max(0, 1 - damp*h), gh = G*h, cap = vmax;
   for (let s=0;s<SUB;s++){
     for (let i=0;i<live;i++){
       vy[i] = (vy[i] + gh)*drag; vx[i] *= drag;
@@ -478,13 +472,15 @@ function advance(dt){
     if (live >= N) settle('settling');
   } else if (phase === 'settling'){
     step(dt);
-    calm = busiest() < R*0.35 ? calm + dt : 0;
-    if (calm > 0.35 || simTime > settleUntil) rest();
+    busy = busiest();
+    calm = busy < R*STILL ? calm + dt : 0;
+    if (calm > HOLD || simTime > settleUntil) rest();
   }
 }
 
 function settle(label){
   phase = 'settling';
+  damp = DRAG_REST;
   calm = 0;
   settleUntil = simTime + SETTLE_MAX;
   setStatus(label);
@@ -520,6 +516,11 @@ function frame(now){
       const until = performance.now() + 13;
       do { advance(1/60); }
       while ((phase === 'dropping' || phase === 'settling') && performance.now() < until);
+    } else if (phase === 'settling' && busy < R*TAIL){
+      /* what is left is a slow shuffle into the hollows. Damping it away would
+         freeze the pile half-packed, so run the same motion at triple time
+         instead — the pit lands where it would have, sooner */
+      for (let k=0; k<TAIL_SPEED && phase === 'settling'; k++) advance(1/60);
     } else {
       advance(dt);
     }
@@ -613,7 +614,7 @@ addEventListener('resize', () => {
     const small = W === oldW && Math.abs(H-oldH) < oldH*0.15;
     if (small){
       for (let i=0;i<live;i++) y[i] = Math.min(y[i], H-R);
-      if (phase !== 'dropping') for (let k=0;k<40 && busiest() > R*0.35; k++) step(1/60);
+      if (phase !== 'dropping') for (let k=0;k<40 && busiest() > R*STILL; k++) step(1/60);
       return;
     }
     /* a real change of shape: squeezing a settled pile sideways only jams it,
