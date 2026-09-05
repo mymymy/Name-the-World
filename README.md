@@ -35,16 +35,22 @@ Side experiments, not part of the game.
   shards, broad slabs, rounded tiles and planks, and sticks that come to rest
   across one another like a dropped handful — in sizes drawn lopsided upwards, so
   a few pieces are larger than the rest, and in four colours of its own. How big a
-  piece is varies most of all: a round of small ones holds seven or eight times the
-  pieces of a round of large, and comes out a shallower heap for it, since a deep
-  heap of small pieces is exactly what squeezes them into one another. It pours
-  until the pit is full rather than to a guess at how many that takes: the line it
-  fills to is measured off the box that asks the question, and what counts as full
-  is a couple of pieces of the heap itself standing near it. Behind it is a
+  piece is varies most of all: a round of small ones holds fifteen or twenty times
+  the pieces of a round of large — anything from about twenty to three hundred. It
+  pours until the pit is full rather than to a guess at how many that takes: the
+  line it fills to is measured off the box that asks the question, and what counts
+  as full is a couple of pieces of the heap itself standing near it. Behind it is a
   small rigid-body engine: convex outlines, separating-axis tests clipped down to
   two-point contacts, and impulses that carry across the substeps of a frame rather
   than starting from nothing each one, which is the difference between a heap that
-  holds itself up and a heap that shivers. No two pieces ever share a pixel: they
+  holds itself up and a heap that shivers. The frame is spent on twenty short steps
+  of three passes rather than five long ones of eight, which for the same work leaves
+  a heap twenty-five pieces deep about a tenth as far into itself; the contacts are
+  solved from the floor upwards, so what holds the bottom up reaches the top in one
+  pass instead of one level per pass; and the broad phase now keeps every piece and
+  every pair it finds rather than quietly dropping whatever ran past the end of its
+  lists, which was the far corner of the pit each time, and those pieces fell
+  through whatever they met. No two pieces ever share a pixel: they
   collide on an outline a hair larger than the one drawn, so a soft solver's
   penetration is spent in the gap rather than on screen, the last of it is pushed
   out at the moment the pit stops, and each piece cuts a thin moat of the ground
