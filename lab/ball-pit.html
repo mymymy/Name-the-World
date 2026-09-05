@@ -6,16 +6,24 @@
 <meta name="color-scheme" content="light dark">
 <meta name="description" content="Balls fall, pile up and fill the screen. Guess how many.">
 <style>
-/* light is the plain state; dark is redefined for a viewer whose system asks for it */
+/* light is the plain state; dark is redefined twice, once for a system that
+   asks for it and once for a viewer that has said so outright */
 :root{
+  color-scheme:light;
   --ink:#EDEAE1; --floor:#E3DDCE; --panel:#FBF8F1; --edge:#DAD3C4;
   --dim:#6E6A5F; --text:#22262A; --hi:#9A6B1F; --shade:rgba(0,0,0,.07);
 }
 @media (prefers-color-scheme: dark){
-  :root{
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
     --ink:#12171A; --floor:#0C1013; --panel:#1B2226; --edge:#2C363B;
     --dim:#7E8D94; --text:#DCE4E7; --hi:#E4B363; --shade:rgba(0,0,0,.35);
   }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --ink:#12171A; --floor:#0C1013; --panel:#1B2226; --edge:#2C363B;
+  --dim:#7E8D94; --text:#DCE4E7; --hi:#E4B363; --shade:rgba(0,0,0,.35);
 }
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -582,6 +590,12 @@ guessCard.addEventListener('submit', e => {
   if (!Number.isFinite(g) || g < 1){ guessInput.focus(); return; }
   judge(g);
 });
+
+/* the ground and the pit are painted from the stylesheet, so a change of theme
+   means reading it again */
+const repaint = () => { fit(); needsDraw = true; };
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', repaint);
+new MutationObserver(repaint).observe(document.documentElement, { attributeFilter: ['data-theme'] });
 
 /* the pit is the window; if the window changes shape, let the pile find its
    new level rather than leaving balls buried in a wall */
