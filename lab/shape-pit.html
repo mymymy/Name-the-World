@@ -327,7 +327,7 @@ let W = 0, H = 0, dpr = 1, bg = null;
 let N = 0, live = 0, SIZE = 20;            /* SIZE: the radius a piece would have as a disc */
 let bx, by, ba, vx, vy, va, pvx, pvy, pva, sx, sy, sa, tpl, col;
 let invM, invI, bound;
-let TPL = [], fills = [], rims = [], lineW = 1;
+let TPL = [], fills = [], rims = [], flats = [], lineW = 1;
 
 /* world outlines, rebuilt every substep */
 let wv, wn, wcount;
@@ -367,7 +367,7 @@ function fit(){
 /* a sheet of speckle in each colour, so a fill has some tooth to it. It is laid
    in the piece's own frame, so the grain turns with the piece */
 function inks(colours){
-  fills = []; rims = [];
+  fills = []; rims = []; flats = [];
   for (const c of colours){
     const t = document.createElement('canvas');
     t.width = t.height = 96;
@@ -381,6 +381,7 @@ function inks(colours){
     g.putImageData(img,0,0);
     fills.push(ctx.createPattern(t,'repeat'));
     rims.push(mix(c,[0,0,0],.28));
+    flats.push(css(c));
   }
 }
 
@@ -811,6 +812,38 @@ function travelled(){
   return m/span;
 }
 
+/* -------------------------------------------------------------- confetti */
+/* only for an exact answer, and only where the viewer will have movement: it is
+   a shower of the round's own colours, tumbling on its way past */
+const bits = [];
+function shower(){
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const s = Math.min(1.4, Math.min(W,H)/620);
+  for (let i=0;i<220;i++){
+    bits.push({
+      x: Math.random()*W, y: -20 - Math.random()*H*0.6,
+      vx: (Math.random()-.5)*90, vy: 90 + Math.random()*230,
+      w: (5 + Math.random()*8)*s, h: (3 + Math.random()*6)*s,
+      a: Math.random()*6.2832, spin: (Math.random()-.5)*8,
+      turn: Math.random()*6.2832, rate: 3 + Math.random()*5,
+      sway: Math.random()*6.2832,
+      c: flats[Math.random()*flats.length|0]
+    });
+  }
+}
+
+function flutter(dt){
+  for (let i=bits.length-1;i>=0;i--){
+    const b = bits[i];
+    b.sway += dt*b.rate;
+    b.vy = (b.vy + 380*dt)*(1 - 1.3*dt);
+    b.vx = (b.vx + Math.sin(b.sway)*70*dt)*(1 - 1.1*dt);
+    b.x += b.vx*dt; b.y += b.vy*dt;
+    b.a += b.spin*dt; b.turn += b.rate*dt;
+    if (b.y > H + 40) bits.splice(i,1);
+  }
+}
+
 /* ---------------------------------------------------------------- drawing */
 function draw(){
   ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
@@ -826,6 +859,15 @@ function draw(){
     ctx.fill(t.path);
     ctx.strokeStyle = rims[col[i]];
     ctx.stroke(t.path);
+    ctx.restore();
+  }
+  for (const b of bits){
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(b.a);
+    ctx.scale(Math.cos(b.turn), 1);         /* the flat of it turning over */
+    ctx.fillStyle = b.c;
+    ctx.fillRect(-b.w/2, -b.h/2, b.w, b.h);
     ctx.restore();
   }
 }
@@ -900,8 +942,9 @@ function frame(now){
   const dt = Math.min(1/30, last ? (now-last)/1000 : 1/60);
   last = now;
   const moving = phase === 'dropping' || phase === 'settling';
-  if (!moving && !needsDraw) return;
+  if (!moving && !bits.length && !needsDraw) return;
   needsDraw = false;
+  if (bits.length) flutter(dt);
   if (moving){
     if (hurry){
       /* fast-forward in fixed steps, a slice of a frame at a time, so the page
@@ -922,6 +965,7 @@ function frame(now){
 }
 
 function start(){
+  bits.length = 0;
   startCard.hidden = true;
   resultCard.hidden = true;
   guessCard.hidden = true;
@@ -960,6 +1004,7 @@ function judge(guess){
   resultCard.hidden = false;
   setStatus('there were ' + N);
   el('verdict').textContent = verdictFor(pct);
+  if (err === 0) shower();
   el('detail').innerHTML = err === 0
     ? `Both of us say <b>${N}</b>.`
     : `You said <b>${guess}</b>. There were <b>${N}</b> — ${err} ${err===1?'piece':'pieces'} ` +

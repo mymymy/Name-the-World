@@ -43,7 +43,8 @@ Side experiments, not part of the game.
   buzzes in place long after it has stopped going anywhere. The rain swells and
   thins rather than running flat out and stopping dead, and now and then the last
   piece — the largest cut of the round — is kept back until the pit has gone quiet,
-  for the beat before it lands. `?debug` gives the answer away. Self-contained: open the file anywhere.
+  for the beat before it lands. An exact answer is showered with confetti, cut from
+  the round's own four colours. `?debug` gives the answer away. Self-contained: open the file anywhere.
 
 ## server/
 
