@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en-GB">
 <meta charset="utf-8">
-<title>Ball Pit</title>
+<title>Shape Pit</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
 <meta name="description" content="Shapes fall, pile up and fill the screen. Guess how many.">
@@ -97,7 +97,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--hi);outline-off
 <div class="hud">
   <div class="bar">
     <header class="brand">
-      <h1 class="serif">Ball Pit</h1>
+      <h1 class="serif">Shape Pit</h1>
       <p class="status" id="status">a guessing game</p>
     </header>
 
@@ -882,10 +882,10 @@ function verdictFor(pct){
   return 'Miles off.';
 }
 
-const BEST = 'ballpit.best';
+const BEST = 'shapepit.best', WAS = 'ballpit.best';   /* it was called Ball Pit once */
 function readBest(){
   try {
-    const v = JSON.parse(localStorage.getItem(BEST));
+    const v = JSON.parse(localStorage.getItem(BEST) ?? localStorage.getItem(WAS));
     return v && Number.isFinite(v.pct) && Number.isFinite(v.n) ? v : null;
   } catch { return null; }
 }

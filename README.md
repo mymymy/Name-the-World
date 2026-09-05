@@ -29,7 +29,7 @@ Side experiments, not part of the game.
   explains the technique, including why snapping keeps neighbouring countries welded
   along their shared borders where thinning by index does not. Self-contained: open
   the file anywhere.
-- **`lab/ball-pit.html`** — a different guessing game. Pieces rain into the window,
+- **`lab/shape-pit.html`** — a different guessing game. Pieces rain into the window,
   pile up and settle, and once nothing is moving you say how many there are. Every
   piece in a round is cut to the same area, but the shapes are drawn afresh each
   time — rounded pebbles, sharp shards, slabs, and sticks that come to rest across
