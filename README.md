@@ -38,8 +38,13 @@ Side experiments, not part of the game.
   small rigid-body engine: convex outlines, separating-axis tests clipped down to
   two-point contacts, and impulses that carry across the substeps of a frame rather
   than starting from nothing each one, which is the difference between a heap that
-  holds itself up and a heap that shivers. Stillness is judged by how far the
-  furthest piece has actually travelled, not by its speed: a pile of long pieces
+  holds itself up and a heap that shivers. No two pieces ever share a pixel: they
+  collide on an outline a hair larger than the one drawn, so a soft solver's
+  penetration is spent in the gap rather than on screen, the last of it is pushed
+  out at the moment the pit stops, and each piece cuts a thin moat of the ground
+  round itself as it is drawn, which settles the matter whatever the physics did.
+  Stillness is judged by how far the furthest piece has actually travelled, not by
+  its speed: a pile of long pieces
   buzzes in place long after it has stopped going anywhere. The rain swells and
   thins rather than running flat out and stopping dead, and now and then the last
   piece — the largest cut of the round — is kept back until the pit has gone quiet,
