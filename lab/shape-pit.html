@@ -813,19 +813,26 @@ function travelled(){
 }
 
 /* -------------------------------------------------------------- confetti */
-/* only for an exact answer, and only where the viewer will have movement: it is
-   a shower of the round's own colours, tumbling on its way past */
+/* only for an exact answer, and only where the viewer will have movement. It is
+   fired from inside the answer card, in a fan aimed away from the corner it sits
+   in — and since the card is a layer above the canvas, every piece starts hidden
+   behind it and appears at its edges */
 const bits = [];
 function shower(){
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const s = Math.min(1.4, Math.min(W,H)/620);
+  const r = resultCard.getBoundingClientRect();
+  const ox = r.width ? r.left : W*0.7, oy = r.height ? r.top : 20;
+  const cw = r.width || 200, ch = r.height || 90;
+  const s = Math.min(1.4, Math.min(W,H)/620), reach = Math.hypot(W,H);
   for (let i=0;i<220;i++){
+    const a = 2.44 + (Math.random()-.5)*2.6;   /* down, left, and up over the pit */
+    const v = (0.25 + Math.pow(Math.random(), .7))*reach*0.75;
     bits.push({
-      x: Math.random()*W, y: -20 - Math.random()*H*0.6,
-      vx: (Math.random()-.5)*90, vy: 90 + Math.random()*230,
+      x: ox + Math.random()*cw, y: oy + Math.random()*ch,
+      vx: Math.cos(a)*v, vy: Math.sin(a)*v,
       w: (5 + Math.random()*8)*s, h: (3 + Math.random()*6)*s,
-      a: Math.random()*6.2832, spin: (Math.random()-.5)*8,
-      turn: Math.random()*6.2832, rate: 3 + Math.random()*5,
+      a: Math.random()*6.2832, spin: (Math.random()-.5)*14,
+      turn: Math.random()*6.2832, rate: 4 + Math.random()*7,
       sway: Math.random()*6.2832,
       c: flats[Math.random()*flats.length|0]
     });
@@ -836,11 +843,11 @@ function flutter(dt){
   for (let i=bits.length-1;i>=0;i--){
     const b = bits[i];
     b.sway += dt*b.rate;
-    b.vy = (b.vy + 380*dt)*(1 - 1.3*dt);
-    b.vx = (b.vx + Math.sin(b.sway)*70*dt)*(1 - 1.1*dt);
+    b.vy = (b.vy + 380*dt)*(1 - 1.8*dt);
+    b.vx = (b.vx + Math.sin(b.sway)*70*dt)*(1 - 1.8*dt);
     b.x += b.vx*dt; b.y += b.vy*dt;
     b.a += b.spin*dt; b.turn += b.rate*dt;
-    if (b.y > H + 40) bits.splice(i,1);
+    if (b.y > H + 40 || b.x < -60 || b.x > W + 60) bits.splice(i,1);
   }
 }
 
