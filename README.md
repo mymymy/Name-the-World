@@ -30,11 +30,11 @@ Side experiments, not part of the game.
   along their shared borders where thinning by index does not. Self-contained: open
   the file anywhere.
 - **`lab/shape-pit.html`** — a different guessing game. Pieces rain into the window,
-  pile up and settle, and once nothing is moving you say how many there are. Every
-  piece in a round is cut to the same area, but the shapes are drawn afresh each
-  time — balls, rounded pebbles, sharp shards, broad slabs, rounded tiles and
-  planks, and sticks that come to rest across one another like a dropped handful —
-  and so are the four colours. Behind it is a
+  pile up and settle, and once nothing is moving you say how many there are. Each
+  round is cut afresh: one shape or two out of balls, rounded pebbles, sharp
+  shards, broad slabs, rounded tiles and planks, and sticks that come to rest
+  across one another like a dropped handful — in sizes drawn lopsided upwards, so
+  a few pieces are larger than the rest, and in four colours of its own. Behind it is a
   small rigid-body engine: convex outlines, separating-axis tests clipped down to
   two-point contacts, and impulses that carry across the substeps of a frame rather
   than starting from nothing each one, which is the difference between a heap that
