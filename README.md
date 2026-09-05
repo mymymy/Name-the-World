@@ -32,8 +32,9 @@ Side experiments, not part of the game.
 - **`lab/shape-pit.html`** — a different guessing game. Pieces rain into the window,
   pile up and settle, and once nothing is moving you say how many there are. Every
   piece in a round is cut to the same area, but the shapes are drawn afresh each
-  time — rounded pebbles, sharp shards, slabs, and sticks that come to rest across
-  one another like a dropped handful — and so are the four colours. Behind it is a
+  time — balls, rounded pebbles, sharp shards, broad slabs, rounded tiles and
+  planks, and sticks that come to rest across one another like a dropped handful —
+  and so are the four colours. Behind it is a
   small rigid-body engine: convex outlines, separating-axis tests clipped down to
   two-point contacts, and impulses that carry across the substeps of a frame rather
   than starting from nothing each one, which is the difference between a heap that

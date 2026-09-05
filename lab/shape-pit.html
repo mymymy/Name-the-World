@@ -176,11 +176,14 @@ function palette(){
    very long one. All of them are cut to the same area, so a round of sticks and
    a round of pebbles fill the pit alike */
 const KINDS = {
-  pebble: { n:[9,13], jitter:.30, stretch:[1,1.3],   smooth:true,  pack:.74 },
-  shard:  { n:[3,5],  jitter:.55, stretch:[1,1.7],   smooth:false, pack:.64 },
-  slab:   { n:[4,6],  jitter:.14, stretch:[1.3,2.4], smooth:false, pack:.70 },
-  petal:  { n:[7,9],  jitter:.24, stretch:[1.9,3.0], smooth:true,  pack:.64 },
-  stick:  { aspect:[5,11],                           smooth:false, pack:.46 }
+  ball:   { disc:12,                                 draw:'circle', pack:.76 },
+  pebble: { n:[9,13], jitter:.30, stretch:[1,1.6],   draw:'smooth', pack:.74 },
+  shard:  { n:[3,5],  jitter:.55, stretch:[1,2.1],   draw:'sharp',  pack:.64 },
+  slab:   { n:[4,6],  jitter:.14, stretch:[1.2,2.9], draw:'sharp',  pack:.70 },
+  petal:  { n:[7,9],  jitter:.24, stretch:[1.9,3.3], draw:'smooth', pack:.64 },
+  tile:   { aspect:[1.05,2.4], round:.24,            draw:'round',  pack:.78 },
+  plank:  { aspect:[2.6,4.6],  round:.10,            draw:'round',  pack:.60 },
+  stick:  { aspect:[5,11],                           draw:'sharp',  pack:.46 }
 };
 const KEYS = Object.keys(KINDS);
 const MAXV = 14;
@@ -197,11 +200,18 @@ function hull(p){                            /* monotone chain */
 
 function template(kind, area){
   const k = KINDS[kind];
-  let p;
-  if (kind === 'stick'){
+  let p, corner = 0;
+  if (k.aspect){
     const a = k.aspect[0] + Math.random()*(k.aspect[1]-k.aspect[0]);
     const w = Math.sqrt(area/a), l = a*w;
     p = [[-l/2,-w/2],[l/2,-w/2],[l/2,w/2],[-l/2,w/2]];
+    corner = (k.round || 0)*w;
+  } else if (k.disc){
+    p = [];
+    for (let i=0;i<k.disc;i++){
+      const a = i/k.disc*6.2832;
+      p.push([Math.cos(a), Math.sin(a)]);
+    }
   } else {
     const n = k.n[0] + (Math.random()*(k.n[1]-k.n[0]+1)|0);
     const sx = k.stretch[0] + Math.random()*(k.stretch[1]-k.stretch[0]);
@@ -224,7 +234,7 @@ function template(kind, area){
   cx /= 3*a2; cy /= 3*a2;
   for (const q of p){ q[0] -= cx; q[1] -= cy; }
 
-  if (kind !== 'stick'){                     /* cut every piece to the same area */
+  if (!k.aspect){                            /* cut every piece to the same area */
     const s = Math.sqrt(area/(a2/2));
     for (const q of p){ q[0] *= s; q[1] *= s; }
   }
@@ -251,9 +261,21 @@ function template(kind, area){
     nrm[i*2] = nx; nrm[i*2+1] = ny;
   }
 
-  /* the drawn outline: through the corners, or round them */
+  /* the drawn outline: through the corners, round them, or off them entirely.
+     A ball is a twelve-sided piece drawn as the circle between its two radii,
+     so it neither bites into its neighbour nor stands off it */
   const path = new Path2D();
-  if (k.smooth){
+  if (k.draw === 'circle'){
+    path.arc(0, 0, bound*(1 + Math.cos(Math.PI/k.disc))/2, 0, 6.2832);
+  } else if (k.draw === 'round'){
+    const w = p[1][0]-p[0][0], h = p[2][1]-p[1][1], r = Math.min(corner, w/2, h/2);
+    const x = -w/2, y = -h/2;
+    path.moveTo(x+r, y);
+    path.lineTo(x+w-r, y);   path.arcTo(x+w, y,   x+w, y+r,   r);
+    path.lineTo(x+w, y+h-r); path.arcTo(x+w, y+h, x+w-r, y+h, r);
+    path.lineTo(x+r, y+h);   path.arcTo(x, y+h,   x, y+h-r,   r);
+    path.lineTo(x, y+r);     path.arcTo(x, y,     x+r, y,     r);
+  } else if (k.draw === 'smooth'){
     const mid = (i,j) => [(p[i][0]+p[j][0])/2, (p[i][1]+p[j][1])/2];
     let m = mid(p.length-1, 0);
     path.moveTo(m[0], m[1]);
@@ -275,7 +297,7 @@ function template(kind, area){
 const G_PER_PX   = 280;    /* gravity, px/s² per px of size: a piece is 7cm across */
 const SUB        = 5;      /* substeps a frame, */
 const ITER       = 5;      /* and passes over the contacts within each */
-const BETA       = 0.2;    /* how briskly an overlap is pushed out, */
+const BETA       = 0.3;    /* how briskly an overlap is pushed out, */
 const SLOP       = 0.4;    /* down to this much, which is left alone */
 const MU_PIECE   = 0.28;   /* sliding friction, piece on piece. These turn, so unlike
                               a ball that cannot, a real sliding number belongs here */
