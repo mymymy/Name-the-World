@@ -4,7 +4,7 @@
 <title>Ball Pit</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="description" content="Balls fall, pile up and fill the screen. Guess how many.">
+<meta name="description" content="Shapes fall, pile up and fill the screen. Guess how many.">
 <style>
 /* light is the plain state; dark is redefined twice, once for a system that
    asks for it and once for a viewer that has said so outright */
@@ -121,11 +121,11 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--hi);outline-off
 
   <div class="centre">
     <div class="card" id="startCard">
-      <h2 class="serif">How many balls?</h2>
-      <p>Balls rain down and pile up until the pit is full. Once they have all come
-         to rest, say how many there are. Every ball is the same size as every other
-         &mdash; but the size is a new one each round.</p>
-      <button class="primary" id="dropBtn">Drop the balls</button>
+      <h2 class="serif">How many pieces?</h2>
+      <p>Pieces rain down and pile up until the pit is full. Once they have all come
+         to rest, say how many there are. Every piece in a round is cut to the same
+         area &mdash; but the shapes, the size and the colours are new each time.</p>
+      <button class="primary" id="dropBtn">Drop them in</button>
     </div>
   </div>
 </div>
@@ -134,63 +134,191 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--hi);outline-off
 (() => {
 'use strict';
 
-/* ---------------------------------------------------------------- palette */
-/* four colours off a room: butter, chartreuse, coral and a deep blue, each a flat
-   fill under a little grain, with a darker line of itself around the edge — without
-   that line two touching balls of one colour read as one shape, which is the game */
-const BASE = ['#E86368', '#F0D385', '#3C618E', '#ADAC2D'];
-const GRAINS = 3;          /* a few printings of the grain, dealt out per ball */
+/* ---------------------------------------------------------------- colour */
+/* a palette is four colours off one hue wheel, each given its own lightness so
+   no two pieces ever sit at the same value — and now and then, a set taken from
+   somewhere real instead */
+const ROOMS = [
+  [[232,99,104],[240,211,133],[60,97,142],[173,172,45]],    /* a blue room with a coral ceiling */
+  [[201,93,74],[233,196,140],[58,88,84],[139,155,120]],     /* terracotta and verdigris */
+  [[86,110,150],[222,180,90],[173,88,96],[126,148,131]]     /* a wet afternoon */
+];
+const WHEELS = [[0,28,56,84], [0,120,240,40], [0,150,205,32], [0,66,186,246]];
 
-const hex = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
-const mix = (c, t, k) => `rgb(${c.map((v,i) => Math.round(v + (t[i]-v)*k)).join(',')})`;
+const shuffle = a => { for (let i=a.length-1;i>0;i--){ const j=Math.random()*(i+1)|0; [a[i],a[j]]=[a[j],a[i]]; } return a; };
+const clamp = (v,lo,hi) => v < lo ? lo : v > hi ? hi : v;
+
+function hsl(h, s, l){                       /* h 0-360, s and l 0-100 */
+  s/=100; l/=100;
+  const k = n => (n + h/30) % 12;
+  const a = s*Math.min(l, 1-l);
+  const f = n => Math.round(255*(l - a*Math.max(-1, Math.min(k(n)-3, Math.min(9-k(n), 1)))));
+  return [f(0), f(8), f(4)];
+}
+const css = c => `rgb(${c[0]},${c[1]},${c[2]})`;
+const mix = (c, t, k) => css(c.map((v,i) => Math.round(v + (t[i]-v)*k)));
+
+function palette(){
+  if (Math.random() < .25) return ROOMS[Math.random()*ROOMS.length|0].map(c => c.slice());
+  const base = Math.random()*360, wheel = WHEELS[Math.random()*WHEELS.length|0];
+  const ls = shuffle([76, 64, 53, 42]);
+  return wheel.map((d, i) => {
+    const h = (base + d + (Math.random()-.5)*14 + 360) % 360;
+    /* yellows want to be light and blues dark, or the set looks mixed up */
+    const l = clamp(ls[i] + 9*Math.cos((h-52)*Math.PI/180), 28, 86);
+    return hsl(h, 30 + Math.random()*24, l);
+  });
+}
+
+/* ---------------------------------------------------------------- shapes */
+/* every piece is a convex outline. Some are drawn through their corners and come
+   out sharp, some are drawn round them and come out organic; a stick is just a
+   very long one. All of them are cut to the same area, so a round of sticks and
+   a round of pebbles fill the pit alike */
+const KINDS = {
+  pebble: { n:[9,13], jitter:.30, stretch:[1,1.3],   smooth:true,  pack:.74 },
+  shard:  { n:[3,5],  jitter:.55, stretch:[1,1.7],   smooth:false, pack:.64 },
+  slab:   { n:[4,6],  jitter:.14, stretch:[1.3,2.4], smooth:false, pack:.70 },
+  petal:  { n:[7,9],  jitter:.24, stretch:[1.9,3.0], smooth:true,  pack:.64 },
+  stick:  { aspect:[5,11],                           smooth:false, pack:.46 }
+};
+const KEYS = Object.keys(KINDS);
+const MAXV = 14;
+
+function hull(p){                            /* monotone chain */
+  p = p.slice().sort((a,b) => a[0]-b[0] || a[1]-b[1]);
+  const x = (o,a,b) => (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0]);
+  const lo = [], hi = [];
+  for (const q of p){ while (lo.length>1 && x(lo[lo.length-2],lo[lo.length-1],q) <= 0) lo.pop(); lo.push(q); }
+  for (let i=p.length-1;i>=0;i--){ const q=p[i]; while (hi.length>1 && x(hi[hi.length-2],hi[hi.length-1],q) <= 0) hi.pop(); hi.push(q); }
+  lo.pop(); hi.pop();
+  return lo.concat(hi);
+}
+
+function template(kind, area){
+  const k = KINDS[kind];
+  let p;
+  if (kind === 'stick'){
+    const a = k.aspect[0] + Math.random()*(k.aspect[1]-k.aspect[0]);
+    const w = Math.sqrt(area/a), l = a*w;
+    p = [[-l/2,-w/2],[l/2,-w/2],[l/2,w/2],[-l/2,w/2]];
+  } else {
+    const n = k.n[0] + (Math.random()*(k.n[1]-k.n[0]+1)|0);
+    const sx = k.stretch[0] + Math.random()*(k.stretch[1]-k.stretch[0]);
+    p = [];
+    for (let i=0;i<n;i++){
+      const a = (i + (Math.random()-.5)*.55)/n * 6.2832;
+      const r = 1 + (Math.random()-.5)*k.jitter*2;
+      p.push([Math.cos(a)*r*sx, Math.sin(a)*r/Math.sqrt(sx)]);
+    }
+    p = hull(p);
+  }
+
+  /* area, centroid and second moment, all from the outline */
+  let a2 = 0, cx = 0, cy = 0;
+  for (let i=0;i<p.length;i++){
+    const j = (i+1)%p.length, c = p[i][0]*p[j][1] - p[j][0]*p[i][1];
+    a2 += c; cx += (p[i][0]+p[j][0])*c; cy += (p[i][1]+p[j][1])*c;
+  }
+  if (a2 < 0){ p.reverse(); a2 = -a2; cx = -cx; cy = -cy; }
+  cx /= 3*a2; cy /= 3*a2;
+  for (const q of p){ q[0] -= cx; q[1] -= cy; }
+
+  if (kind !== 'stick'){                     /* cut every piece to the same area */
+    const s = Math.sqrt(area/(a2/2));
+    for (const q of p){ q[0] *= s; q[1] *= s; }
+  }
+
+  let A = 0, J = 0, bound = 0;
+  for (let i=0;i<p.length;i++){
+    const j = (i+1)%p.length;
+    const c = p[i][0]*p[j][1] - p[j][0]*p[i][1];
+    A += c/2;
+    J += c*(p[i][0]*p[i][0] + p[i][0]*p[j][0] + p[j][0]*p[j][0] +
+            p[i][1]*p[i][1] + p[i][1]*p[j][1] + p[j][1]*p[j][1]);
+    bound = Math.max(bound, Math.hypot(p[i][0], p[i][1]));
+  }
+  J /= 12;
+
+  /* outward edge normals, settled once against the centroid */
+  const v = new Float32Array(MAXV*2), nrm = new Float32Array(MAXV*2);
+  for (let i=0;i<p.length;i++){
+    const j = (i+1)%p.length;
+    const ex = p[j][0]-p[i][0], ey = p[j][1]-p[i][1], el = Math.hypot(ex,ey) || 1;
+    let nx = ey/el, ny = -ex/el;
+    if (nx*(p[i][0]+p[j][0])*.5 + ny*(p[i][1]+p[j][1])*.5 < 0){ nx = -nx; ny = -ny; }
+    v[i*2] = p[i][0]; v[i*2+1] = p[i][1];
+    nrm[i*2] = nx; nrm[i*2+1] = ny;
+  }
+
+  /* the drawn outline: through the corners, or round them */
+  const path = new Path2D();
+  if (k.smooth){
+    const mid = (i,j) => [(p[i][0]+p[j][0])/2, (p[i][1]+p[j][1])/2];
+    let m = mid(p.length-1, 0);
+    path.moveTo(m[0], m[1]);
+    for (let i=0;i<p.length;i++){
+      const j = (i+1)%p.length;
+      m = mid(i, j);
+      path.quadraticCurveTo(p[i][0], p[i][1], m[0], m[1]);
+    }
+  } else {
+    path.moveTo(p[0][0], p[0][1]);
+    for (let i=1;i<p.length;i++) path.lineTo(p[i][0], p[i][1]);
+  }
+  path.closePath();
+
+  return { v, nrm, count: p.length, area: A, inertia: J, bound, path, kind };
+}
 
 /* ------------------------------------------------------------- the world */
-const G_PER_PX   = 280;    /* gravity, px/s² per px of radius: a ball is 7cm wide */
-const SUB        = 8;      /* substeps per frame — small steps make piles stand up */
-const MU_BALL    = 0.05;   /* these balls do not spin, so this stands in for rolling
-                              resistance, not sliding — and a smooth ball rolls off
-                              another's shoulder rather than standing on it. Raising it
-                              would heap the pit higher and leave balls perched */
-const MU_WALL    = 0.35;   /* sliding, on the floor and the walls */
-const REST_BALL  = 0.18;   /* balls are lively; a pile of them is not */
-const REST_WALL  = 0.30;
-const DRAG       = 0.35;   /* air, per second */
-const DRAG_REST  = 1.2;    /* and the pit itself, once the pouring has stopped */
-const STILL      = 0.8;    /* radii a second: below this nothing is going anywhere */
-const HOLD       = 0.2;    /* seconds of that before the pit counts as at rest */
-const TAIL       = 8;      /* radii a second: under this, the pit is only shuffling */
+const G_PER_PX   = 280;    /* gravity, px/s² per px of size: a piece is 7cm across */
+const SUB        = 5;      /* substeps a frame, */
+const ITER       = 5;      /* and passes over the contacts within each */
+const BETA       = 0.2;    /* how briskly an overlap is pushed out, */
+const SLOP       = 0.4;    /* down to this much, which is left alone */
+const MU_PIECE   = 0.28;   /* sliding friction, piece on piece. These turn, so unlike
+                              a ball that cannot, a real sliding number belongs here */
+const MU_WALL    = 0.40;
+const REST       = 0.12;   /* pieces are not lively; a pile of them is dead */
+const DRAG       = 0.30;   /* air, per second */
+const DRAG_SPIN  = 0.90;   /* and against turning */
+const DRAG_REST  = 1.20;   /* the pit itself, once the pouring has stopped */
+const STILL      = 0.8;    /* piece-widths a second: below this nothing is going anywhere */
+const HOLD       = 0.2;    /* seconds of that before the box goes up */
+const TAIL       = 8;      /* under this the pit is only shuffling, */
 const TAIL_SPEED = 3;      /* so play that part out at triple time */
-const DEAD       = 0.12;   /* radii a second: nothing is moving at all */
-const LAST       = 3;      /* seconds it may take to get there, once the box is up */
-const PACKING    = 0.78;   /* poured discs, guessed low so the pit never overflows */
-const POUR_RATE  = 70;     /* balls a second: enough of them in the air to read as rain */
-const POUR_MIN   = 2;      /* but a small pit still gets a moment, */
-const POUR_MAX   = 5;      /* and a large one is not made to take all day */
-const SETTLE_MAX = 8;      /* give up waiting after this many simulated seconds */
+const DEAD       = 0.35;   /* and it is properly at rest under this */
+const LAST       = 1.2;    /* seconds it may take to get there */
+const POUR_RATE  = 45;     /* pieces a second, enough of them in the air to read as rain */
+const POUR_MIN   = 2;
+const POUR_MAX   = 5;
+const SETTLE_MAX = 6;
 
 const cv = document.getElementById('pit');
 const ctx = cv.getContext('2d', { alpha: false });
 
 let W = 0, H = 0, dpr = 1, bg = null;
 
-/* particles: one radius for all of them, so everything below is flat arrays */
-let N = 0, live = 0, R = 20;
-let x, y, vx, vy, px, py, col, sprites;
+let N = 0, live = 0, SIZE = 20;            /* SIZE: the radius a piece would have as a disc */
+let bx, by, ba, vx, vy, va, pvx, pvy, pva, sx, sy, sa, tpl, col;
+let invM, invI, bound;
+let TPL = [], fills = [], rims = [], lineW = 1;
 
-/* uniform grid, cell = one ball diameter, extended above the top edge to hold
-   the balls still falling in */
-let cell = 0, cols = 0, rows = 0, originY = 0, starts, cursor, items;
+/* world outlines, rebuilt every substep */
+let wv, wn, wcount;
+
+/* the broad phase: a grid of bounding circles, and the pairs it turns up */
+let cell = 0, cols = 0, rows = 0, originY = 0, starts, cursor, items, pairA, pairB, np = 0;
 
 /* contacts found by the position pass, replayed by the velocity pass */
-let ci, cj, cov, cvn, nc = 0, maxC = 0;
+let cA, cB, cnx, cny, crax, cray, crbx, crby, cdep, cwn, cwt, cjn, cjt, ctar, cpn, ckey,
+    keyjn, keyjt, wallKey = 0, nc = 0, maxC = 0;
 
-/* per-ball wall contacts: depth and the speed carried into the wall */
-let wdX, wvX, wdY, wvY;
-
-let G = 0, vmax = 0, bounceMin = 0, damp = DRAG;
+let G = 0, vmax = 0, wmax = 0, bounceMin = 0, damp = DRAG, maxBound = 0;
 
 /* ------------------------------------------------------------------ round */
-let phase = 'idle';         /* idle | dropping | settling | guess | result */
+let phase = 'idle';
 let spawnAcc = 0, spawnRate = 0, calm = 0, simTime = 0, settleUntil = 0, judged = false,
     asked = false, busy = Infinity, deck = null, deckAt = 0;
 
@@ -211,63 +339,53 @@ function fit(){
   bg.addColorStop(1, style.getPropertyValue('--floor').trim() || '#E1D8C9');
 }
 
-/* one sheet of speckle, printed once and reused: light and dark grains at low
-   opacity, which read as tooth in the colour rather than as noise */
-let grain = null;
-function makeGrain(){
-  const n = document.createElement('canvas');
-  n.width = n.height = 128;
-  const g = n.getContext('2d'), img = g.createImageData(128,128), d = img.data;
-  for (let i=0;i<d.length;i+=4){
-    const v = Math.random() < .5 ? 0 : 255;
-    d[i]=d[i+1]=d[i+2]=v;
-    d[i+3] = Math.random()*Math.random()*54;
+/* a sheet of speckle in each colour, so a fill has some tooth to it. It is laid
+   in the piece's own frame, so the grain turns with the piece */
+function inks(colours){
+  fills = []; rims = [];
+  for (const c of colours){
+    const t = document.createElement('canvas');
+    t.width = t.height = 96;
+    const g = t.getContext('2d');
+    g.fillStyle = css(c); g.fillRect(0,0,96,96);
+    const img = g.getImageData(0,0,96,96), d = img.data;
+    for (let i=0;i<d.length;i+=4){
+      const n = (Math.random()-.5)*Math.random()*46;
+      d[i] = clamp(d[i]+n,0,255); d[i+1] = clamp(d[i+1]+n,0,255); d[i+2] = clamp(d[i+2]+n,0,255);
+    }
+    g.putImageData(img,0,0);
+    fills.push(ctx.createPattern(t,'repeat'));
+    rims.push(mix(c,[0,0,0],.28));
   }
-  g.putImageData(img,0,0);
-  return n;
-}
-
-function sprite(base, seed){
-  const c = hex(base), pad = 1.5, s = Math.ceil((R+pad)*2*dpr);
-  const cn = document.createElement('canvas');
-  cn.width = cn.height = s;
-  const g = cn.getContext('2d');
-  g.scale(dpr,dpr);
-  const cx = R+pad, cy = R+pad, w = (R+pad)*2;
-  const line = Math.max(.8, R*.05);
-  g.fillStyle = base;
-  g.beginPath(); g.arc(cx,cy,R,0,6.2832); g.fill();
-  g.save();
-  g.beginPath(); g.arc(cx,cy,R,0,6.2832); g.clip();
-  const ox = -(seed*43 % 128), oy = -(seed*79 % 128);
-  for (let ty=oy; ty<w; ty+=128) for (let tx=ox; tx<w; tx+=128) g.drawImage(grain, tx, ty);
-  g.restore();
-  g.lineWidth = line;
-  g.strokeStyle = mix(c,[0,0,0],.26);
-  g.beginPath(); g.arc(cx,cy,R-line/2,0,6.2832); g.stroke();
-  return cn;
 }
 
 function allocate(n){
   N = n; live = 0;
-  x = new Float32Array(n); y = new Float32Array(n);
-  vx = new Float32Array(n); vy = new Float32Array(n);
-  px = new Float32Array(n); py = new Float32Array(n);
-  col = new Uint8Array(n);
-  wdX = new Float32Array(n); wvX = new Float32Array(n);
-  wdY = new Float32Array(n); wvY = new Float32Array(n);
-  maxC = n*6 + 64;
-  ci = new Int32Array(maxC); cj = new Int32Array(maxC);
-  cov = new Float32Array(maxC); cvn = new Float32Array(maxC);
-  /* an even deck of colours, dealt shuffled, so no one colour runs away with it */
+  const f = () => new Float32Array(n);
+  bx=f(); by=f(); ba=f(); vx=f(); vy=f(); va=f(); pvx=f(); pvy=f(); pva=f(); sx=f(); sy=f(); sa=f();
+  invM=f(); invI=f(); bound=f();
+  tpl = new Uint8Array(n); col = new Uint8Array(n); wcount = new Uint8Array(n);
+  wv = new Float32Array(n*MAXV*2); wn = new Float32Array(n*MAXV*2);
+  maxC = n*10 + 64;
+  cA = new Int32Array(maxC); cB = new Int32Array(maxC);
+  cnx = new Float32Array(maxC); cny = new Float32Array(maxC);
+  crax = new Float32Array(maxC); cray = new Float32Array(maxC);
+  crbx = new Float32Array(maxC); crby = new Float32Array(maxC);
+  cdep = new Float32Array(maxC); cwn = new Float32Array(maxC); cwt = new Float32Array(maxC);
+  cjn = new Float32Array(maxC); cjt = new Float32Array(maxC); ctar = new Float32Array(maxC);
+  cpn = new Float32Array(maxC); ckey = new Int32Array(maxC);
+  wallKey = n*n*2;
+  keyjn = new Float32Array(wallKey + n*MAXV*3);
+  keyjt = new Float32Array(keyjn.length);
+  pairA = new Int32Array(n*14); pairB = new Int32Array(n*14);
   deck = new Uint8Array(n);
   for (let i=0;i<n;i++) deck[i] = i & 3;
-  for (let i=n-1;i>0;i--){ const j = (Math.random()*(i+1))|0; const t = deck[i]; deck[i]=deck[j]; deck[j]=t; }
+  shuffle(deck);
   deckAt = 0;
 }
 
 function grid(){
-  cell = R*2;
+  cell = Math.max(8, maxBound*2);
   cols = Math.max(1, Math.ceil(W/cell) + 1);
   originY = -6*cell;
   rows = Math.max(1, Math.ceil((H-originY)/cell) + 1);
@@ -279,16 +397,52 @@ function grid(){
   if (!items || items.length < N) items = new Int32Array(N);
 }
 
-/* everything that follows from the size of a ball */
-function tune(r){
-  R = r;
-  G = G_PER_PX * R;
-  vmax = R * 60 * SUB * 0.8;             /* never move more than 0.8r in a substep */
-  bounceMin = 0.5 * Math.sqrt(G*R);      /* below this a knock is a nudge, not a bounce */
-  if (!grain) grain = makeGrain();
-  sprites = [];
-  for (const base of BASE) for (let v=0; v<GRAINS; v++) sprites.push(sprite(base, v+1));
+function newRound(){
+  fit();
+  const minDim = Math.min(W,H);
+  SIZE = Math.round((0.030 + Math.random()*0.038) * minDim * 2)/2;
+  const area = Math.PI*SIZE*SIZE;
+
+  /* one, two or three kinds in play, and a dozen cuts of them */
+  const kinds = shuffle(KEYS.slice()).slice(0, 1 + (Math.random()*2.6|0));
+  TPL = [];
+  maxBound = 0;
+  for (let i=0;i<12;i++){
+    const t = template(kinds[i % kinds.length], area);
+    TPL.push(t);
+    maxBound = Math.max(maxBound, t.bound);
+  }
+  lineW = Math.max(.8, SIZE*.05);
+  inks(palette());
+
+  let pack = 1;
+  for (const k of kinds) pack = Math.min(pack, KINDS[k].pack);
+  const fill = 0.50 + Math.random()*0.26;
+  let n = Math.round(W*H*fill*pack*0.94/area * (0.97 + Math.random()*0.06));
+  n = Math.max(20, Math.min(200, n));
+
+  G = G_PER_PX * SIZE;
+  vmax = SIZE * 70;
+  wmax = 25;
+  bounceMin = 0.5*Math.sqrt(G*SIZE);
+
+  allocate(n);
+  for (let i=0;i<n;i++){
+    const t = i % TPL.length;
+    tpl[i] = t;
+    invM[i] = 1/TPL[t].area;
+    invI[i] = 1/TPL[t].inertia;
+    bound[i] = TPL[t].bound;
+    wcount[i] = TPL[t].count;
+  }
+  shuffle(tpl);
+  for (let i=0;i<n;i++){                     /* keep the rest in step with the shuffle */
+    const t = tpl[i];
+    invM[i] = 1/TPL[t].area; invI[i] = 1/TPL[t].inertia;
+    bound[i] = TPL[t].bound; wcount[i] = TPL[t].count;
+  }
   grid();
+  pour();
 }
 
 function pour(){
@@ -298,36 +452,21 @@ function pour(){
   phase = 'dropping';
 }
 
-function newRound(){
-  fit();
-  const minDim = Math.min(W,H);
-  const r = Math.round((0.022 + Math.random()*0.043) * minDim * 2)/2;
-  const fill = 0.44 + Math.random()*0.26;
-  let n = Math.round(W*H*fill*PACKING/(Math.PI*r*r) * (0.97 + Math.random()*0.06));
-  n = Math.max(24, Math.min(1100, n));
-  allocate(n);
-  tune(r);
-  pour();
-}
-
-/* pour from anywhere across the width, a little above the top edge, and only
-   into space that is actually free */
 function spawnOne(){
-  const lo = R*1.2, hi = W - R*1.2;
+  const b = bound[live], lo = Math.min(b*1.1, W/2), hi = Math.max(W - b*1.1, W/2);
   for (let t=0;t<14;t++){
-    const bx = lo + Math.random()*(hi-lo);
-    const by = -R*5 + Math.random()*R*3.5;
+    const px = lo + Math.random()*(hi-lo);
+    const py = -maxBound*2 - Math.random()*maxBound*2.5;
     let ok = true;
     for (let k=Math.max(0,live-48); k<live; k++){
-      const dx = x[k]-bx, dy = y[k]-by;
-      if (dx*dx + dy*dy < 4.4*R*R){ ok = false; break; }
+      const dx = bx[k]-px, dy = by[k]-py, r = bound[k] + b;
+      if (dx*dx + dy*dy < r*r*1.15){ ok = false; break; }
     }
     if (!ok) continue;
-    const u = Math.sqrt(G*R);
-    x[live]=bx; y[live]=by;
-    vx[live]=(Math.random()-.5)*u*.35; vy[live]=u*.2;
-    px[live]=bx; py[live]=by;
-    col[live]=deck[deckAt++]*GRAINS + (Math.random()*GRAINS|0);
+    const u = Math.sqrt(G*SIZE);
+    bx[live]=px; by[live]=py; ba[live]=Math.random()*6.2832;
+    vx[live]=(Math.random()-.5)*u*.35; vy[live]=u*.2; va[live]=(Math.random()-.5)*4;
+    col[live]=deck[deckAt++];
     live++;
     return true;
   }
@@ -335,41 +474,43 @@ function spawnOne(){
 }
 
 /* ----------------------------------------------------------------- solver */
-function build(){
+function outlines(){
+  for (let i=0;i<live;i++){
+    const t = TPL[tpl[i]], c = Math.cos(ba[i]), s = Math.sin(ba[i]);
+    const o = i*MAXV*2, x = bx[i], y = by[i];
+    for (let k=0;k<t.count;k++){
+      const px = t.v[k*2], py = t.v[k*2+1];
+      wv[o+k*2]   = x + px*c - py*s;
+      wv[o+k*2+1] = y + px*s + py*c;
+      const nx = t.nrm[k*2], ny = t.nrm[k*2+1];
+      wn[o+k*2]   = nx*c - ny*s;
+      wn[o+k*2+1] = nx*s + ny*c;
+    }
+  }
+}
+
+function broad(){
   const nCells = cols*rows, inv = 1/cell;
   starts.fill(0);
-  for (let i=0;i<live;i++){
-    let cx = (x[i]*inv)|0; if (cx<0) cx=0; else if (cx>=cols) cx=cols-1;
-    let cy = ((y[i]-originY)*inv)|0; if (cy<0) cy=0; else if (cy>=rows) cy=rows-1;
-    starts[cy*cols+cx+1]++;
-  }
+  const cellOf = i => {
+    let cx = (bx[i]*inv)|0; if (cx<0) cx=0; else if (cx>=cols) cx=cols-1;
+    let cy = ((by[i]-originY)*inv)|0; if (cy<0) cy=0; else if (cy>=rows) cy=rows-1;
+    return cy*cols+cx;
+  };
+  for (let i=0;i<live;i++) starts[cellOf(i)+1]++;
   for (let c=0;c<nCells;c++) starts[c+1]+=starts[c];
   cursor.set(starts);
-  for (let i=0;i<live;i++){
-    let cx = (x[i]*inv)|0; if (cx<0) cx=0; else if (cx>=cols) cx=cols-1;
-    let cy = ((y[i]-originY)*inv)|0; if (cy<0) cy=0; else if (cy>=rows) cy=rows-1;
-    items[cursor[cy*cols+cx]++] = i;
-  }
-}
+  for (let i=0;i<live;i++) items[cursor[cellOf(i)]++] = i;
 
-function pair(i,j){
-  const dx = x[j]-x[i], dy = y[j]-y[i];
-  const d2 = dx*dx + dy*dy, dm = R*2;
-  if (d2 >= dm*dm || d2 < 1e-9) return;
-  const d = Math.sqrt(d2), nx = dx/d, ny = dy/d, over = dm - d, c = over*.5;
-  x[i] -= nx*c; y[i] -= ny*c;
-  x[j] += nx*c; y[j] += ny*c;
-  if (nc < maxC){
-    ci[nc]=i; cj[nc]=j; cov[nc]=over;
-    cvn[nc] = (vx[j]-vx[i])*nx + (vy[j]-vy[i])*ny;   /* negative: closing */
-    nc++;
-  }
-}
-
-/* every contact lies within one cell of its partner, so each cell is checked
-   against itself and the four cells that come after it */
-function contacts(){
-  nc = 0;
+  np = 0;
+  const lim = pairA.length, slop = maxBound*0.12;
+  const add = (a,b) => {
+    if (np >= lim) return;
+    const i = a < b ? a : b, j = a < b ? b : a;
+    const dx = bx[j]-bx[i], dy = by[j]-by[i], r = bound[i]+bound[j]+slop;
+    if (dx*dx+dy*dy > r*r) return;
+    pairA[np]=i; pairB[np]=j; np++;
+  };
   for (let cy=0; cy<rows; cy++){
     const up = cy+1 < rows;
     for (let cx=0; cx<cols; cx++){
@@ -377,114 +518,269 @@ function contacts(){
       if (a0 === a1) continue;
       for (let a=a0; a<a1; a++){
         const i = items[a];
-        for (let b=a+1; b<a1; b++) pair(i, items[b]);
-        if (cx+1 < cols){ const s=starts[c+1], e=starts[c+2]; for (let b=s;b<e;b++) pair(i, items[b]); }
+        for (let b=a+1; b<a1; b++) add(i, items[b]);
+        if (cx+1 < cols){ for (let b=starts[c+1]; b<starts[c+2]; b++) add(i, items[b]); }
         if (up){
           const base = c+cols;
           const from = cx>0 ? base-1 : base, to = cx+1<cols ? base+1 : base;
-          const s = starts[from], e = starts[to+1];
-          for (let b=s;b<e;b++) pair(i, items[b]);
+          for (let b=starts[from]; b<starts[to+1]; b++) add(i, items[b]);
         }
       }
     }
   }
 }
 
+/* how far apart A and B are along A's least favourable face normal */
+let satFace = 0;
+function separation(A, B){
+  const oa = A*MAXV*2, ob = B*MAXV*2, na = wcount[A], nb = wcount[B];
+  let best = -Infinity, face = 0;
+  for (let i=0;i<na;i++){
+    const nx = wn[oa+i*2], ny = wn[oa+i*2+1];
+    let lo = Infinity;
+    for (let j=0;j<nb;j++){
+      const d = wv[ob+j*2]*nx + wv[ob+j*2+1]*ny;
+      if (d < lo) lo = d;
+    }
+    const s = lo - (wv[oa+i*2]*nx + wv[oa+i*2+1]*ny);
+    if (s > best){ best = s; face = i; }
+  }
+  satFace = face;
+  return best;
+}
+
+/* the contact points: clip the incident face against the reference face's sides,
+   which is what gives a flat piece two points to rest on instead of one */
+const cpx = [0,0], cpy = [0,0], cpd = [0,0];
+function manifold(A, B){
+  const sa = separation(A,B); if (sa >= 0) return 0;
+  const fa = satFace;
+  const sb = separation(B,A); if (sb >= 0) return 0;
+  const fb = satFace;
+
+  let R, I, rf, flip;
+  if (sa > sb - 1e-3){ R = A; I = B; rf = fa; flip = false; }
+  else               { R = B; I = A; rf = fb; flip = true;  }
+
+  const or_ = R*MAXV*2, oi = I*MAXV*2, nr = wcount[R], ni = wcount[I];
+  const rnx = wn[or_+rf*2], rny = wn[or_+rf*2+1];
+  const r1x = wv[or_+rf*2], r1y = wv[or_+rf*2+1];
+  const rf2 = (rf+1)%nr;
+  const r2x = wv[or_+rf2*2], r2y = wv[or_+rf2*2+1];
+
+  let inc = 0, worst = Infinity;             /* the incident face turns to meet it */
+  for (let k=0;k<ni;k++){
+    const d = wn[oi+k*2]*rnx + wn[oi+k*2+1]*rny;
+    if (d < worst){ worst = d; inc = k; }
+  }
+  const i2 = (inc+1)%ni;
+  let ax = wv[oi+inc*2], ay = wv[oi+inc*2+1];
+  let bx2 = wv[oi+i2*2], by2 = wv[oi+i2*2+1];
+
+  /* clip to the slab between the reference face's ends */
+  const ex = r2x-r1x, ey = r2y-r1y, el = Math.hypot(ex,ey) || 1;
+  const sx = ex/el, sy = ey/el;
+  const clip = (nx, ny, ox, oy) => {
+    const da = (ax-ox)*nx + (ay-oy)*ny, db = (bx2-ox)*nx + (by2-oy)*ny;
+    if (da >= 0 && db >= 0) return true;
+    if (da < 0 && db < 0) return false;
+    const t = da/(da-db);
+    const px = ax + (bx2-ax)*t, py = ay + (by2-ay)*t;
+    if (da < 0){ ax = px; ay = py; } else { bx2 = px; by2 = py; }
+    return true;
+  };
+  if (!clip(sx, sy, r1x, r1y)) return 0;
+  if (!clip(-sx, -sy, r2x, r2y)) return 0;
+
+  let n = 0;
+  const da = -((ax-r1x)*rnx + (ay-r1y)*rny);
+  if (da > 0){ cpx[n]=ax; cpy[n]=ay; cpd[n]=da; n++; }
+  const db = -((bx2-r1x)*rnx + (by2-r1y)*rny);
+  if (db > 0){ cpx[n]=bx2; cpy[n]=by2; cpd[n]=db; n++; }
+  if (!n) return 0;
+
+  /* hand the normal back pointing from A to B, whichever way round it was found */
+  const nx = flip ? -rnx : rnx, ny = flip ? -rny : rny;
+  const lo = A < B ? A : B, hi = A < B ? B : A;
+  for (let k=0;k<n;k++) record(A, B, nx, ny, cpx[k], cpy[k], cpd[k], (lo*N+hi)*2+k);
+  return n;
+}
+
+/* a contact is written down once and then solved over and over, each pass adding
+   to the impulse it has already spent. Shoving positions apart instead and reading
+   the velocity back off them leaves a pile buzzing: every push it has not yet
+   converged on comes back as speed */
+function record(A, B, nx, ny, px, py, depth, key){
+  if (nc >= maxC) return;
+  const rax = A < 0 ? 0 : px-bx[A], ray = A < 0 ? 0 : py-by[A];
+  const rbx = B < 0 ? 0 : px-bx[B], rby = B < 0 ? 0 : py-by[B];
+  const imA = A < 0 ? 0 : invM[A], iiA = A < 0 ? 0 : invI[A];
+  const imB = B < 0 ? 0 : invM[B], iiB = B < 0 ? 0 : invI[B];
+  const ca = rax*ny - ray*nx, cb = rbx*ny - rby*nx;
+  const w = imA + iiA*ca*ca + imB + iiB*cb*cb;
+  if (w <= 0) return;
+  const tx = -ny, ty = nx;
+  const ta = rax*ty - ray*tx, tb = rbx*ty - rby*tx;
+  const vax = A < 0 ? 0 : vx[A] - va[A]*ray, vay = A < 0 ? 0 : vy[A] + va[A]*rax;
+  const vbx = B < 0 ? 0 : vx[B] - va[B]*rby, vby = B < 0 ? 0 : vy[B] + va[B]*rbx;
+  const vn = (vbx-vax)*nx + (vby-vay)*ny;
+  cA[nc]=A; cB[nc]=B; cnx[nc]=nx; cny[nc]=ny;
+  crax[nc]=rax; cray[nc]=ray; crbx[nc]=rbx; crby[nc]=rby;
+  cdep[nc]=depth; cwn[nc]=w;
+  cwt[nc]=imA + iiA*ta*ta + imB + iiB*tb*tb;
+  ckey[nc]=key; cpn[nc]=0;
+  ctar[nc] = vn < -bounceMin ? -REST*vn : 0;
+
+  /* pick up the push this contact was already making last substep, and hand it
+     back to the pieces now. Carrying the number without spending it is the same
+     as starting from nothing: the pile has to hold itself up from scratch every
+     substep, and never quite manages */
+  const jn = keyjn[key], jt = keyjt[key];
+  cjn[nc] = jn; cjt[nc] = jt;
+  if (jn !== 0 || jt !== 0){
+    const ix = nx*jn + tx*jt, iy = ny*jn + ty*jt;
+    if (A >= 0){ vx[A] -= ix*imA; vy[A] -= iy*imA; va[A] -= iiA*(rax*iy - ray*ix); }
+    if (B >= 0){ vx[B] += ix*imB; vy[B] += iy*imB; va[B] += iiB*(rbx*iy - rby*ix); }
+  }
+  nc++;
+}
+
+/* every corner outside a wall is its own contact, which is what lets a flat
+   piece lie down on the floor instead of rocking on a point */
 function walls(){
-  const right = W-R, floor = H-R;
   for (let i=0;i<live;i++){
-    wdX[i]=0; wdY[i]=0;
-    if (x[i] < R){ wdX[i] = R - x[i]; wvX[i] = -vx[i]; x[i] = R; }
-    else if (x[i] > right){ wdX[i] = x[i]-right; wvX[i] = vx[i]; x[i] = right; }
-    if (y[i] > floor){ wdY[i] = y[i]-floor; wvY[i] = vy[i]; y[i] = floor; }
+    const o = i*MAXV*2, n = wcount[i];
+    for (let k=0;k<n;k++){
+      const px = wv[o+k*2], py = wv[o+k*2+1];
+      const key = wallKey + (i*MAXV + k)*3;
+      if (px < 0)      record(-1, i,  1, 0, px, py, -px, key);
+      else if (px > W) record(-1, i, -1, 0, px, py, px-W, key+1);
+      if (py > H)      record(-1, i,  0,-1, px, py, py-H, key+2);
+    }
   }
 }
 
-/* restitution and friction both belong to velocity, and both need the speeds
-   the bodies had before the positions were pushed apart */
-function velocities(h){
-  for (let k=0;k<nc;k++){
-    const i = ci[k], j = cj[k];
-    const dx = x[j]-x[i], dy = y[j]-y[i];
-    const d = Math.sqrt(dx*dx+dy*dy) || 1;
-    const nx = dx/d, ny = dy/d;
-    let rx = vx[j]-vx[i], ry = vy[j]-vy[i];
-    const pre = cvn[k];
-    if (pre < -bounceMin){
-      const want = -REST_BALL*pre, vn = rx*nx + ry*ny;
-      if (vn < want){
-        const dv = (want-vn)*.5;
-        vx[i]-=nx*dv; vy[i]-=ny*dv; vx[j]+=nx*dv; vy[j]+=ny*dv;
-        rx = vx[j]-vx[i]; ry = vy[j]-vy[i];
-      }
-    }
-    const vn2 = rx*nx + ry*ny;
-    let tx = rx - vn2*nx, ty = ry - vn2*ny;
-    const tl = Math.sqrt(tx*tx+ty*ty);
-    if (tl > 1e-6){
-      /* the normal push of this substep is worth overlap/h of speed; friction
-         may spend µ of it against the slide */
-      const dv = Math.min(tl, MU_BALL*cov[k]/h)*.5;
-      tx/=tl; ty/=tl;
-      vx[i]+=tx*dv; vy[i]+=ty*dv; vx[j]-=tx*dv; vy[j]-=ty*dv;
-    }
-  }
-  for (let i=0;i<live;i++){
-    if (wdY[i] > 0){
-      if (wvY[i] > bounceMin){ const want = -REST_WALL*wvY[i]; if (vy[i] > want) vy[i] = want; }
-      const lim = MU_WALL*wdY[i]/h, s = Math.min(Math.abs(vx[i]), lim);
-      vx[i] -= Math.sign(vx[i])*s;
-    }
-    if (wdX[i] > 0){
-      const into = wvX[i];
-      if (into > bounceMin){
-        const want = REST_WALL*into*(x[i] < W*.5 ? 1 : -1);
-        if (x[i] < W*.5 ? vx[i] < want : vx[i] > want) vx[i] = want;
-      }
-      const lim = MU_WALL*wdX[i]/h, s = Math.min(Math.abs(vy[i]), lim);
-      vy[i] -= Math.sign(vy[i])*s;
+/* Two solves over the same contacts. The first is the real one — momentum, bounce
+   and friction. The second pushes the overlaps out through a pretend velocity that
+   moves the pieces and is then thrown away: send that push through the real
+   velocities instead and the pack never stops shivering, because every overlap the
+   iterations have not yet resolved is handed back as speed */
+function solve(h){
+  const push = BETA/h;
+  for (let i=0;i<live;i++){ pvx[i]=0; pvy[i]=0; pva[i]=0; }
+  for (let k=0;k<nc;k++) cpn[k] = 0;
+  for (let it=0; it<ITER; it++){
+    for (let k=0;k<nc;k++){
+      const A = cA[k], B = cB[k], nx = cnx[k], ny = cny[k];
+      const rax = crax[k], ray = cray[k], rbx = crbx[k], rby = crby[k];
+      const imA = A < 0 ? 0 : invM[A], iiA = A < 0 ? 0 : invI[A];
+      const imB = B < 0 ? 0 : invM[B], iiB = B < 0 ? 0 : invI[B];
+      const ca = rax*ny - ray*nx, cb = rbx*ny - rby*nx;
+
+      let vax = A < 0 ? 0 : vx[A] - va[A]*ray, vay = A < 0 ? 0 : vy[A] + va[A]*rax;
+      let vbx = B < 0 ? 0 : vx[B] - va[B]*rby, vby = B < 0 ? 0 : vy[B] + va[B]*rbx;
+      const vn = (vbx-vax)*nx + (vby-vay)*ny;
+
+
+      let dj = (ctar[k] - vn)/cwn[k];
+      const on = cjn[k];
+      cjn[k] = Math.max(0, on + dj);
+      dj = cjn[k] - on;
+      if (A >= 0){ vx[A] -= nx*dj*imA; vy[A] -= ny*dj*imA; va[A] -= iiA*ca*dj; }
+      if (B >= 0){ vx[B] += nx*dj*imB; vy[B] += ny*dj*imB; va[B] += iiB*cb*dj; }
+
+      const tx = -ny, ty = nx;
+      const ta = rax*ty - ray*tx, tb = rbx*ty - rby*tx;
+      vax = A < 0 ? 0 : vx[A] - va[A]*ray; vay = A < 0 ? 0 : vy[A] + va[A]*rax;
+      vbx = B < 0 ? 0 : vx[B] - va[B]*rby; vby = B < 0 ? 0 : vy[B] + va[B]*rbx;
+      const vt = (vbx-vax)*tx + (vby-vay)*ty;
+      let djt = -vt/cwt[k];
+      const lim = ((A < 0 || B < 0) ? MU_WALL : MU_PIECE)*cjn[k];
+      const ot = cjt[k];
+      cjt[k] = clamp(ot + djt, -lim, lim);
+      djt = cjt[k] - ot;
+      if (A >= 0){ vx[A] -= tx*djt*imA; vy[A] -= ty*djt*imA; va[A] -= iiA*ta*djt; }
+      if (B >= 0){ vx[B] += tx*djt*imB; vy[B] += ty*djt*imB; va[B] += iiB*tb*djt; }
+
+      const want = push*Math.max(0, cdep[k]-SLOP);
+      if (want <= 0) continue;
+      const pax = A < 0 ? 0 : pvx[A] - pva[A]*ray, pay = A < 0 ? 0 : pvy[A] + pva[A]*rax;
+      const pbx = B < 0 ? 0 : pvx[B] - pva[B]*rby, pby = B < 0 ? 0 : pvy[B] + pva[B]*rbx;
+      let dp = (want - ((pbx-pax)*nx + (pby-pay)*ny))/cwn[k];
+      const op = cpn[k];
+      cpn[k] = Math.max(0, op + dp);
+      dp = cpn[k] - op;
+      if (A >= 0){ pvx[A] -= nx*dp*imA; pvy[A] -= ny*dp*imA; pva[A] -= iiA*ca*dp; }
+      if (B >= 0){ pvx[B] += nx*dp*imB; pvy[B] += ny*dp*imB; pva[B] += iiB*cb*dp; }
     }
   }
 }
 
 function step(dt){
-  const h = dt/SUB, drag = Math.max(0, 1 - damp*h), gh = G*h, cap = vmax;
+  const h = dt/SUB, dl = Math.max(0, 1 - damp*h), dA = Math.max(0, 1 - (damp+DRAG_SPIN)*h);
+  const gh = G*h, creep = damp === DRAG_REST, slow = SIZE*0.5;
+  keyjn.fill(0); keyjt.fill(0);              /* a frame starts with nothing spent */
   for (let s=0;s<SUB;s++){
     for (let i=0;i<live;i++){
-      vy[i] = (vy[i] + gh)*drag; vx[i] *= drag;
-      const sp = Math.abs(vx[i]) + Math.abs(vy[i]);
-      if (sp > cap){ const k = cap/sp; vx[i]*=k; vy[i]*=k; }
-      px[i]=x[i]; py[i]=y[i];
-      x[i]+=vx[i]*h; y[i]+=vy[i]*h;
+      vy[i] = (vy[i] + gh)*dl; vx[i] *= dl; va[i] *= dA;
+      if (creep && Math.hypot(vx[i],vy[i]) + Math.abs(va[i])*bound[i] < slow){
+        vx[i] *= .88; vy[i] *= .88; va[i] *= .88;
+      }
+      const sp = Math.hypot(vx[i], vy[i]);
+      if (sp > vmax){ const k = vmax/sp; vx[i]*=k; vy[i]*=k; }
+      if (va[i] > wmax) va[i] = wmax; else if (va[i] < -wmax) va[i] = -wmax;
     }
-    build();
-    contacts();
+    broad();
+    outlines();
+    nc = 0;
+    for (let k=0;k<np;k++) manifold(pairA[k], pairB[k]);
     walls();
-    const ih = 1/h;
-    for (let i=0;i<live;i++){ vx[i]=(x[i]-px[i])*ih; vy[i]=(y[i]-py[i])*ih; }
-    velocities(h);
+    solve(h);
+    for (let k=0;k<nc;k++){ keyjn[ckey[k]] = cjn[k]; keyjt[ckey[k]] = cjt[k]; }
+    for (let i=0;i<live;i++){
+      bx[i]+=(vx[i]+pvx[i])*h; by[i]+=(vy[i]+pvy[i])*h; ba[i]+=(va[i]+pva[i])*h;
+    }
   }
   simTime += dt;
 }
 
-function busiest(){
+/* How still is it? Not by the speeds: a heap of long pieces buzzes in place long
+   after it has stopped going anywhere, and the eye sees the going-anywhere. So
+   take a copy every so often and ask how far the furthest piece actually travelled */
+let snapAt = -1;
+function snap(){
+  for (let i=0;i<live;i++){ sx[i]=bx[i]; sy[i]=by[i]; sa[i]=ba[i]; }
+  snapAt = simTime;
+}
+function travelled(){
+  const span = simTime - snapAt;
+  if (snapAt < 0 || live === 0){ snap(); return Infinity; }
+  if (span < 0.18) return busy;
   let m = 0;
   for (let i=0;i<live;i++){
-    const s = vx[i]*vx[i] + vy[i]*vy[i];
-    if (s > m) m = s;
+    const d = Math.hypot(bx[i]-sx[i], by[i]-sy[i]) + Math.abs(ba[i]-sa[i])*bound[i];
+    if (d > m) m = d;
   }
-  return Math.sqrt(m);
+  snap();
+  return m/span;
 }
 
 /* ---------------------------------------------------------------- drawing */
 function draw(){
   ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
-  if (!live) return;
-  const pad = 1.5, half = R+pad, size = half*2, top = -size;
+  ctx.lineWidth = lineW;
+  ctx.lineJoin = 'round';
   for (let i=0;i<live;i++){
-    const yy = y[i]-half;
-    if (yy < top) continue;
-    ctx.drawImage(sprites[col[i]], x[i]-half, yy, size, size);
+    if (by[i] + bound[i] < 0) continue;
+    const t = TPL[tpl[i]];
+    ctx.save();
+    ctx.translate(bx[i], by[i]);
+    ctx.rotate(ba[i]);
+    ctx.fillStyle = fills[col[i]];
+    ctx.fill(t.path);
+    ctx.strokeStyle = rims[col[i]];
+    ctx.stroke(t.path);
+    ctx.restore();
   }
 }
 
@@ -502,10 +798,10 @@ function advance(dt){
     if (live >= N) settle('settling');
   } else if (phase === 'settling'){
     step(dt);
-    busy = busiest();
-    calm = busy < R*STILL ? calm + dt : 0;
+    busy = travelled();
+    calm = busy < SIZE*STILL ? calm + dt : 0;
     if (!asked && (calm > HOLD || simTime > settleUntil)) ask();
-    if (asked && (busy < R*DEAD || simTime > settleUntil + LAST)) rest();
+    if (asked && (busy < SIZE*DEAD || simTime > settleUntil + LAST)) rest();
   }
 }
 
@@ -513,6 +809,7 @@ function settle(label){
   phase = 'settling';
   damp = DRAG_REST;
   calm = 0;
+  snapAt = -1;
   settleUntil = simTime + SETTLE_MAX;
   setStatus(label);
 }
@@ -551,7 +848,7 @@ function frame(now){
       const until = performance.now() + 13;
       do { advance(1/60); }
       while ((phase === 'dropping' || phase === 'settling') && performance.now() < until);
-    } else if (phase === 'settling' && !asked && busy < R*TAIL){
+    } else if (phase === 'settling' && !asked && busy < SIZE*TAIL){
       /* what is left is a slow shuffle into the hollows. Damping it away would
          freeze the pile half-packed, so run the same motion at triple time
          instead — the pit lands where it would have, sooner */
@@ -604,7 +901,7 @@ function judge(guess){
   el('verdict').textContent = verdictFor(pct);
   el('detail').innerHTML = err === 0
     ? `Both of us say <b>${N}</b>.`
-    : `You said <b>${guess}</b>. There were <b>${N}</b> — ${err} ${err===1?'ball':'balls'} ` +
+    : `You said <b>${guess}</b>. There were <b>${N}</b> — ${err} ${err===1?'piece':'pieces'} ` +
       `${guess > N ? 'over' : 'under'}, ${pct < 10 ? pct.toFixed(1) : Math.round(pct)}%.`;
 
   const was = readBest();
@@ -633,8 +930,8 @@ const repaint = () => { fit(); needsDraw = true; };
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', repaint);
 new MutationObserver(repaint).observe(document.documentElement, { attributeFilter: ['data-theme'] });
 
-/* the pit is the window; if the window changes shape, let the pile find its
-   new level rather than leaving balls buried in a wall */
+/* the pit is the window; if the window changes shape, tip the same pieces back in
+   rather than squeezing a settled pile sideways, which only jams it */
 let resizeTimer = 0;
 addEventListener('resize', () => {
   clearTimeout(resizeTimer);
@@ -643,21 +940,33 @@ addEventListener('resize', () => {
     const oldW = W, oldH = H;
     fit();
     if (phase === 'idle') return;
-    needsDraw = true;
     if (Math.abs(W-oldW) < 2 && Math.abs(H-oldH) < 2) return;
-    grid();
     const small = W === oldW && Math.abs(H-oldH) < oldH*0.15;
     if (small){
-      for (let i=0;i<live;i++) y[i] = Math.min(y[i], H-R);
-      if (phase !== 'dropping') for (let k=0;k<40 && busiest() > R*STILL; k++) step(1/60);
+      for (let i=0;i<live;i++) by[i] = Math.min(by[i], H-bound[i]);
+      grid();
+      if (phase !== 'dropping') for (let k=0;k<40; k++) step(1/60);
       return;
     }
-    /* a real change of shape: squeezing a settled pile sideways only jams it,
-       so pour the same balls again into the new room, at a size that keeps the
-       pit as full as it was */
     guessCard.hidden = true;
     resultCard.hidden = true;
-    tune(Math.max(3, R*Math.sqrt((W*H)/(oldW*oldH))));
+    const k = Math.sqrt((W*H)/(oldW*oldH));   /* keep the pit as full as it was */
+    SIZE = Math.max(3, SIZE*k);
+    const area = Math.PI*SIZE*SIZE;
+    maxBound = 0;
+    TPL = TPL.map(t => {
+      const s = template(t.kind, area);
+      maxBound = Math.max(maxBound, s.bound);
+      return s;
+    });
+    lineW = Math.max(.8, SIZE*.05);
+    G = G_PER_PX*SIZE; vmax = SIZE*70; bounceMin = 0.5*Math.sqrt(G*SIZE);
+    for (let i=0;i<N;i++){
+      const t = tpl[i];
+      invM[i] = 1/TPL[t].area; invI[i] = 1/TPL[t].inertia;
+      bound[i] = TPL[t].bound; wcount[i] = TPL[t].count;
+    }
+    grid();
     pour();
     hurry = true;
     setStatus('filling');
@@ -667,17 +976,24 @@ addEventListener('resize', () => {
 /* ?debug hands over the answer, for anyone poking at the simulation */
 if (new URLSearchParams(location.search).has('debug')){
   window.pit = () => {
-    if (!x) return { phase, asked, count: N, live: 0, r: R, w: W, h: H };
-    let lo = Infinity, hiX = -Infinity, loX = Infinity, hiY = -Infinity;
+    if (!bx) return { phase, asked, count: N, live: 0, r: SIZE, w: W, h: H };
+    let lo = Infinity, hiY = -Infinity, loX = Infinity, hiX = -Infinity;
     for (let i=0;i<live;i++){
-      if (y[i] < lo) lo = y[i];
-      if (y[i] > hiY) hiY = y[i];
-      if (x[i] < loX) loX = x[i];
-      if (x[i] > hiX) hiX = x[i];
+      const o = i*MAXV*2;
+      for (let k=0;k<wcount[i];k++){
+        const px = wv[o+k*2], py = wv[o+k*2+1];
+        if (py < lo) lo = py;
+        if (py > hiY) hiY = py;
+        if (px < loX) loX = px;
+        if (px > hiX) hiX = px;
+      }
     }
-    return { phase, asked, count: N, live, r: R, w: W, h: H, busiest: busiest(),
+    const speeds = [];
+    for (let i=0;i<live;i++) speeds.push(Math.hypot(vx[i],vy[i]) + Math.abs(va[i])*bound[i]);
+    return { phase, asked, count: N, live, r: SIZE, w: W, h: H, busiest: busy, speeds,
+             kinds: [...new Set(TPL.map(t => t.kind))],
              highest: lo, lowest: hiY, leftmost: loX, rightmost: hiX,
-             xs: Array.from(x.subarray(0,live)), ys: Array.from(y.subarray(0,live)) };
+             xs: Array.from(bx.subarray(0,live)), ys: Array.from(by.subarray(0,live)) };
   };
 }
 
