@@ -350,7 +350,7 @@ function inks(colours){
     g.fillStyle = css(c); g.fillRect(0,0,96,96);
     const img = g.getImageData(0,0,96,96), d = img.data;
     for (let i=0;i<d.length;i+=4){
-      const n = (Math.random()-.5)*Math.random()*46;
+      const n = (Math.random()-.5)*Math.random()*18;
       d[i] = clamp(d[i]+n,0,255); d[i+1] = clamp(d[i+1]+n,0,255); d[i+2] = clamp(d[i+2]+n,0,255);
     }
     g.putImageData(img,0,0);
