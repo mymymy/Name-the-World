@@ -29,49 +29,6 @@ Side experiments, not part of the game.
   explains the technique, including why snapping keeps neighbouring countries welded
   along their shared borders where thinning by index does not. Self-contained: open
   the file anywhere.
-- **`lab/shape-pit.html`** — a different guessing game. Pieces rain into the window,
-  pile up and settle, and once nothing is moving you say how many there are. Each
-  round is cut afresh: one shape or two out of balls, rounded pebbles, sharp
-  shards, broad slabs, rounded tiles and planks, and sticks that come to rest
-  across one another like a dropped handful — in sizes drawn lopsided upwards, so
-  a few pieces are larger than the rest, and in four colours of its own. How big a
-  piece is varies most of all, and is drawn evenly across the scales rather than
-  evenly across the pixels, so the hard rounds turn up as often as the easy ones.
-  Nothing caps how many pieces there are: the only limit is how small one may be
-  cut — seven pixels, which is about what can still be told apart and counted — and
-  the rest follows from the size of the window. A phone holds forty to seven hundred
-  of them, a desktop window rather more. It pours until the pit is full rather than
-  to a guess at how many that takes: the line it fills to is measured off the box
-  that asks the question, and what counts as full is a couple of pieces of the heap
-  standing near that line — with the depth of everything still falling added on, or
-  the rain that is already in the air carries the heap over the top of the window,
-  where it cannot be counted. On a pit filled
-  to the brim there is no corner for the box that always leaves the pieces clear, so
-  it can be dragged aside by its grip to see what is behind it, and stays where it is
-  put; the fill line keeps to where the box belongs rather than where it was left, so
-  how full a round comes out never depends on it. Behind it is a
-  small rigid-body engine: convex outlines, separating-axis tests clipped down to
-  two-point contacts, and impulses that carry across the substeps of a frame rather
-  than starting from nothing each one, which is the difference between a heap that
-  holds itself up and a heap that shivers. The frame is spent on twenty short steps
-  of three passes rather than five long ones of eight, which for the same work leaves
-  a heap twenty-five pieces deep about a tenth as far into itself; the contacts are
-  solved from the floor upwards, so what holds the bottom up reaches the top in one
-  pass instead of one level per pass; and the broad phase now keeps every piece and
-  every pair it finds rather than quietly dropping whatever ran past the end of its
-  lists, which was the far corner of the pit each time, and those pieces fell
-  through whatever they met. No two pieces ever share a pixel: they
-  collide on an outline a hair larger than the one drawn, so a soft solver's
-  penetration is spent in the gap rather than on screen, the last of it is pushed
-  out at the moment the pit stops, and each piece cuts a thin moat of the ground
-  round itself as it is drawn, which settles the matter whatever the physics did.
-  Stillness is judged by how far the furthest piece has actually travelled, not by
-  its speed: a pile of long pieces
-  buzzes in place long after it has stopped going anywhere. The rain swells and
-  thins rather than running flat out and stopping dead, and now and then the last
-  piece — the largest cut of the round — is kept back until the pit has gone quiet,
-  for the beat before it lands. An exact answer fires confetti out from behind the
-  answer card, cut from the round's own four colours. `?debug` gives the answer away. Self-contained: open the file anywhere.
 
 ## server/
 
