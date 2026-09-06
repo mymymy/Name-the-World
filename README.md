@@ -39,7 +39,11 @@ Side experiments, not part of the game.
   the pieces of a round of large — anything from about twenty to three hundred. It
   pours until the pit is full rather than to a guess at how many that takes: the
   line it fills to is measured off the box that asks the question, and what counts
-  as full is a couple of pieces of the heap itself standing near it. Behind it is a
+  as full is a couple of pieces of the heap itself standing near it. On a pit filled
+  to the brim there is no corner for the box that always leaves the pieces clear, so
+  it can be dragged aside by its grip to see what is behind it, and stays where it is
+  put; the fill line keeps to where the box belongs rather than where it was left, so
+  how full a round comes out never depends on it. Behind it is a
   small rigid-body engine: convex outlines, separating-axis tests clipped down to
   two-point contacts, and impulses that carry across the substeps of a frame rather
   than starting from nothing each one, which is the difference between a heap that
