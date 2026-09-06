@@ -1446,16 +1446,21 @@ function judge(guess){
   setStatus('there were ' + N);
   el('verdict').textContent = verdictFor(pct);
   el('detail').innerHTML = err === 0
-    ? `Both of us say <b>${N}</b>.`
+    ? `There are exactly <b>${N}</b>.`
     : `You said <b>${guess}</b>. There were <b>${N}</b> — ${err} ${err===1?'piece':'pieces'} ` +
       `${guess > N ? 'over' : 'under'}, ${pct < 10 ? pct.toFixed(1) : Math.round(pct)}%.`;
 
+  /* the record is still kept on a perfect round, but nothing is said about it: there
+     is no improving on right, and measuring it against a past near miss only takes
+     the shine off */
   const was = readBest();
   const pretty = v => v === 0 ? 'exact' : (v < 10 ? v.toFixed(1) : Math.round(v)) + '% off';
   if (!was || pct < was.pct) writeBest({ pct, n: N });
-  el('best').textContent = !was ? ''
+  const best = el('best');
+  best.textContent = err === 0 || !was ? ''
     : pct < was.pct ? `A new best: ${pretty(pct)}, where it was ${pretty(was.pct)}.`
     : `Best so far: ${pretty(was.pct)}, out of ${was.n}.`;
+  best.hidden = !best.textContent;           /* no empty line holding the card open */
   settleDock();                              /* once it is the size it is going to be, */
   if (err === 0) shower();                   /* and the confetti knows where to come from */
   el('againBtn').focus();
