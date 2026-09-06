@@ -191,18 +191,15 @@ function palette(){
    out sharp, some are drawn round them and come out organic; a stick is just a
    very long one. All of them are cut to the same area, so a round of sticks and
    a round of pebbles fill the pit alike */
-/* `deep` is how many pieces thick the heap may get: a limit on depth rather than on
-   count, so a round of small pieces may hold a great many of them. It falls a little
-   with how long the pieces are, since a heap of those settles looser and taller */
 const KINDS = {
-  ball:   { disc:16,                                 draw:'circle', pack:.76, deep:30 },
-  pebble: { n:[9,13], jitter:.30, stretch:[1,1.6],   draw:'smooth', pack:.74, deep:30 },
-  tile:   { aspect:[1.05,2.4], round:.24,            draw:'round',  pack:.78, deep:26 },
-  shard:  { n:[3,5],  jitter:.55, stretch:[1,2.1],   draw:'sharp',  pack:.64, deep:24 },
-  slab:   { n:[4,6],  jitter:.14, stretch:[1.2,2.9], draw:'sharp',  pack:.70, deep:22 },
-  petal:  { n:[7,9],  jitter:.24, stretch:[1.9,3.3], draw:'smooth', pack:.64, deep:21 },
-  plank:  { aspect:[2.4,3.8],  round:.10,            draw:'round',  pack:.60, deep:18 },
-  stick:  { aspect:[4.5,8],                          draw:'sharp',  pack:.46, deep:16 }
+  ball:   { disc:16,                                 draw:'circle', pack:.76 },
+  pebble: { n:[9,13], jitter:.30, stretch:[1,1.6],   draw:'smooth', pack:.74 },
+  tile:   { aspect:[1.05,2.4], round:.24,            draw:'round',  pack:.78 },
+  shard:  { n:[3,5],  jitter:.55, stretch:[1,2.1],   draw:'sharp',  pack:.64 },
+  slab:   { n:[4,6],  jitter:.14, stretch:[1.2,2.9], draw:'sharp',  pack:.70 },
+  petal:  { n:[7,9],  jitter:.24, stretch:[1.9,3.3], draw:'smooth', pack:.64 },
+  plank:  { aspect:[2.4,3.8],  round:.10,            draw:'round',  pack:.60 },
+  stick:  { aspect:[4.5,8],                          draw:'sharp',  pack:.46 }
 };
 const KEYS = Object.keys(KINDS);
 const MAXV = 16;
@@ -369,7 +366,12 @@ const POUR_MAX   = 5;
 const HOLD_BACK  = 0.28;   /* how often the last piece is kept back for a beat, */
 const HOLD_WAIT  = [0.5, 1.2];  /* and how long the pit is left quiet before it lands */
 const SETTLE_MAX = 4.5;
-const CAP        = 300;    /* as many pieces as a frame can carry at full effort */
+/* How small a piece may be cut, in screen pixels. This is the only limit on how many
+   there are: the rest follows from it and from the size of the window, since a round
+   is however many pieces of that size the pit holds. It is a limit on what can be
+   told apart and counted, which is the game, rather than a number picked to keep the
+   frame comfortable — a piece of this size is about fourteen pixels across */
+const MIN_PIECE  = 7;
 
 const cv = document.getElementById('pit');
 const ctx = cv.getContext('2d', { alpha: false });
@@ -390,15 +392,16 @@ let forced = null;      /* ?debug may pin a round's shape, to test one kind at a
 
 /* contacts found by the position pass, replayed by the velocity pass */
 let cA, cB, cnx, cny, crax, cray, crbx, crby, cdep, cwn, cwt, cjn, cjt, ctar, cpn, ckey, cfeat,
-    keyjn, keyjt, keyFeat, keyAge, wallKey = 0, ccy, order, bucket, nc = 0, maxC = 0, tick = 0;
+    keyId, keyjn, keyjt, keyFeat, keyAge, hMask = 0, cslot, ccy, order, bucket,
+    nc = 0, maxC = 0, tick = 0;
 
 let G = 0, vmax = 0, wmax = 0, bounceMin = 0, damp = DRAG, maxBound = 0;
 
 /* ------------------------------------------------------------------ round */
 let phase = 'idle';
-let rescues = 0, lifts = 0;
+let rescues = 0, lifts = 0, meanA = 1, packWas = 1;
 let pourT = 0, pourTime = 0, pourTo = 0, topAcc = 0, stuck = 0, fixed = false, cap = 0, ceil = 0,
-    deep = 12, calm = 0, simTime = 0, settleUntil = 0, judged = false,
+    calm = 0, simTime = 0, settleUntil = 0, judged = false,
     asked = false, busy = Infinity, deck = null, deckAt = 0;
 let holdOne = false, holdAt = -1, holdWait = 0;
 
@@ -471,11 +474,10 @@ function allocate(n){
   cjn = new Float32Array(maxC); cjt = new Float32Array(maxC); ctar = new Float32Array(maxC);
   cpn = new Float32Array(maxC); ckey = new Int32Array(maxC); cfeat = new Int32Array(maxC);
   ccy = new Float32Array(maxC); order = new Int32Array(maxC); bucket = new Int32Array(BINS+1);
-  wallKey = n*n*2;
-  keyjn = new Float32Array(wallKey + n*MAXV*3);
-  keyjt = new Float32Array(keyjn.length);
-  keyFeat = new Int32Array(keyjn.length);
-  keyAge = new Int32Array(keyjn.length);
+  cslot = new Int32Array(maxC);
+  hashRoom(maxC);
+  keyId.fill(0); keyAge.fill(-9);             /* last round's pushes belong to last
+                                                 round's pieces */
   tick = 0;
   pairA = new Int32Array(n*14); pairB = new Int32Array(n*14);
   deck = new Uint8Array(n);
@@ -520,13 +522,21 @@ function roof(){
    on its way down touches nothing, and judging it by speed instead lets the pour
    run on past full, which squeezes the heap until it bursts through the floor */
 function brimming(){
+  /* what is still falling has to be counted before it lands, not after. A heavy round
+     has a couple of hundred pieces in the air at the moment the heap reaches the line,
+     and left to arrive they carry it well over the top of the window — where they
+     cannot be counted, which is the game. So the line the heap is measured against is
+     lifted by the depth all that rain will add when it comes down */
+  let air = 0;
+  for (let i=0;i<live;i++) if (by[i] - bound[i] < 0) air++;
+  const line = ceil + SIZE + (air*meanA/packWas)/W;
   let n = 0;
   for (let i=0;i<live;i++){
     if (!resting[i] || Math.hypot(vx[i],vy[i]) > SIZE*5) continue;   /* two pieces meeting
                                                                        in mid-air are not
                                                                        the heap either */
-    if (by[i] - bound[i] < ceil + SIZE && ++n > 1) return true;   /* headroom for what
-                                            is still in the air on its way down */
+    if (by[i] - bound[i] < 0) continue;      /* nor is anything still over the top edge */
+    if (by[i] - bound[i] < line && ++n > 1) return true;
   }
   return false;
 }
@@ -539,17 +549,19 @@ function newRound(){
   const kinds = forced && forced.kinds ? forced.kinds.slice()
               : shuffle(KEYS.slice()).slice(0, Math.random() < .35 ? 1 : 2);
 
-  /* the shallowest kind in play sets the ceiling for the round */
+  /* how loosely a heap of this kind packs, which is what the count has to be reckoned
+     on. How deep it may get is not limited any more: it fills to the card and stops */
   let pack = 1;
-  deep = 99;
-  for (const k of kinds){
-    pack = Math.min(pack, KINDS[k].pack);
-    deep = Math.min(deep, KINDS[k].deep);
-  }
+  for (const k of kinds) pack = Math.min(pack, KINDS[k].pack);
   /* the size of a piece is what varies most between rounds: a round of small ones
      holds fifteen or twenty times the pieces of a round of large ones */
-  SIZE = Math.round((0.016 + Math.random()*0.082) * minDim * 2)/2;
-  if (forced){ if (forced.size) SIZE = forced.size; if (forced.deep) deep = forced.deep; }
+  /* drawn evenly across the scales rather than evenly across the pixels: a round
+     holds pieces by the square of their size, so an even draw of sizes is a lopsided
+     draw of difficulty — nearly every round comes out large and easy, and the ones
+     worth counting hardly ever turn up */
+  const big = Math.max(MIN_PIECE*1.5, 0.098*minDim);
+  SIZE = Math.round(MIN_PIECE * Math.pow(big/MIN_PIECE, Math.random()) * 2)/2;
+  if (forced && forced.size) SIZE = forced.size;
   const area = Math.PI*SIZE*SIZE;
 
   /* and how far the pieces differ in size within the round: a few rounds are cut
@@ -570,18 +582,18 @@ function newRound(){
     maxBound = Math.max(maxBound, t.bound);
   }
   mean /= TPL.length;                        /* what the count has to be reckoned on */
+  meanA = mean; packWas = pack;              /* and what the fill line needs too */
   inks(palette());
 
-  ceil = Math.max(roof(), H - deep*SIZE*1.7);   /* the card, or the depth limit */
+  ceil = roof();                             /* the pit fills to the card */
 
   /* aim a little under the room there is and let the trickle at the end of the
      pour finish the job, so the pit ends up full without the estimate having to
      be right about how loosely a heap of this shape packs */
   const fill = 0.80 + Math.random()*0.12;
   let n = Math.round(W*(H-ceil)*fill*pack/mean * (0.97 + Math.random()*0.06));
-  const capN = forced && forced.cap ? forced.cap : CAP;
-  n = Math.max(12, Math.min(capN, n));
-  const room = Math.min(capN, Math.round(n*1.6) + 12);
+  n = Math.max(12, n);                       /* and no ceiling over it */
+  const room = Math.round(n*3.2) + 16;       /* room for the pour to overrun into */
 
   G = G_PER_PX * SIZE;
   /* how fast a piece may fall. A landing the solver cannot stop within one step used
@@ -671,6 +683,7 @@ function unjam(force){
   jamKey = -1; jamFor = 0; jamC = -1;
   const i = by[cA[k]] < by[cB[k]] ? cA[k] : cB[k], b = bound[i];
   const lo = Math.min(b*1.1, W/2), hi = Math.max(W - b*1.1, W/2);
+  const wasX = bx[i];                        /* a try that did not come off moves it */
   const drop = (px, py) => {
     bx[i]=px; by[i]=py; ba[i]=Math.random()*6.2832;
     vx[i]=0; vy[i]=Math.sqrt(G*SIZE)*.2; va[i]=(Math.random()-.5)*3;
@@ -682,13 +695,7 @@ function unjam(force){
   for (let t=0;t<24;t++){
     const px = lo + Math.random()*(hi-lo);
     const py = -maxBound*(1.6 + Math.random()*2);
-    let ok = true;
-    for (let j=0;j<live;j++){
-      if (j === i) continue;
-      const dx = bx[j]-px, dy = by[j]-py, r = bound[j] + b;
-      if (dx*dx + dy*dy < r*r*1.15){ ok = false; break; }
-    }
-    if (ok){ drop(px, py); return; }
+    if (fits(i, px, py, Math.random()*6.2832)){ drop(px, py); return; }
   }
   let top = H;                               /* nowhere free at all: just clear of the
                                                 highest piece there is, and let it fall
@@ -696,26 +703,47 @@ function unjam(force){
                                                 a piece that spends the rest of the
                                                 round falling */
   for (let j=0;j<live;j++) if (j !== i && by[j] - bound[j] < top) top = by[j] - bound[j];
-  drop(bx[i], Math.min(top - b*1.3, -b*1.6));
+  drop(wasX, Math.min(top - b*1.3, -b*1.6));
+}
+
+/* Will this piece go here? Asked of the outline rather than of a circle round it.
+   A circle round a stick has the radius of its length, so two of them lying side by
+   side read as a clash when they are nowhere near touching — which is what stopped a
+   heavy round ever filling the pit: the spawner ran out of places it believed were
+   free while the band was mostly air. The circle is still the first question, since
+   it settles most pairs at once; the outlines are only consulted when it says no */
+function fits(i, px, py, pa){
+  bx[i] = px; by[i] = py; ba[i] = pa;
+  const t = TPL[tpl[i]], c = Math.cos(pa), sn = Math.sin(pa), o = i*MAXV*2;
+  for (let k=0;k<t.count;k++){
+    const vx0 = t.v[k*2], vy0 = t.v[k*2+1];
+    wv[o+k*2] = px + vx0*c - vy0*sn; wv[o+k*2+1] = py + vx0*sn + vy0*c;
+    const nx0 = t.nrm[k*2], ny0 = t.nrm[k*2+1];
+    wn[o+k*2] = nx0*c - ny0*sn;      wn[o+k*2+1] = nx0*sn + ny0*c;
+  }
+  const b = bound[i], gap = Math.max(1, SIZE*0.12);
+  for (let j=0;j<live;j++){
+    if (j === i) continue;
+    const dx = bx[j]-px, dy = by[j]-py, r = bound[j] + b;
+    if (dx*dx + dy*dy > r*r) continue;        /* nowhere near it */
+    if (Math.max(separation(i,j,gap), separation(j,i,gap)) < gap) return false;
+  }
+  return true;
 }
 
 function spawnOne(){
   const b = bound[live], lo = Math.min(b*1.1, W/2), hi = Math.max(W - b*1.1, W/2);
-  for (let t=0;t<14;t++){
+  for (let t=0;t<20;t++){
     const px = lo + Math.random()*(hi-lo);
-    const py = -maxBound*1.6 - Math.random()*maxBound*4;   /* deep enough that a big
-                                            piece can always find somewhere to start */
+    /* the band they are let go from, measured against the window rather than against
+       a piece: sized off the piece it came to about thirty pixels for small ones,
+       room for a couple of dozen, where a heavy round wants hundreds in the air */
+    const py = -maxBound*1.2 - Math.random()*Math.max(maxBound*4, H*0.5);
     /* against everything, not just the last few dropped: once the heap reaches the
        band a piece would otherwise be let go inside it, and a piece begun a hundred
        pixels inside another is not something the solver can talk its way out of */
-    let ok = true;
-    for (let k=0; k<live; k++){
-      const dx = bx[k]-px, dy = by[k]-py, r = bound[k] + b;
-      if (dx*dx + dy*dy < r*r*1.15){ ok = false; break; }
-    }
-    if (!ok) continue;
+    if (!fits(live, px, py, Math.random()*6.2832)) continue;
     const u = Math.sqrt(G*SIZE);
-    bx[live]=px; by[live]=py; ba[live]=Math.random()*6.2832;
     vx[live]=(Math.random()-.5)*u*.35; vy[live]=u*.2; va[live]=(Math.random()-.5)*4;
     col[live]=deck[deckAt++];
     live++;
@@ -791,6 +819,36 @@ function broad(){
   }
 }
 
+/* The push each contact was making last substep, to be picked up again this one, and
+   found by which two pieces are meeting. Keyed by pair, that used to mean an array
+   with a slot for every pair that could exist — n² of them, which is three megabytes
+   at three hundred pieces and a hundred and eighty at two and a half thousand, and
+   how many pieces there are is no longer ours to choose. So: a table a few times the
+   number of contacts, found by probing from a hash of the pair, and an entry nobody
+   has touched for a couple of frames belongs to whoever asks for it next */
+function hashRoom(contacts){
+  let size = 256;
+  while (size < contacts*4) size *= 2;
+  if (keyId && keyId.length >= size){ hMask = keyId.length - 1; return; }
+  keyId = new Int32Array(size); keyjn = new Float32Array(size); keyjt = new Float32Array(size);
+  keyFeat = new Int32Array(size); keyAge = new Int32Array(size).fill(-9);
+  hMask = size - 1;
+}
+
+function slotFor(id){
+  const h = (Math.imul(id, 0x9E3779B1) >>> 15) & hMask;
+  for (let probe = 0; probe < 8; probe++){
+    const at = (h + probe) & hMask;
+    const held = keyId[at];
+    if (held === id) return at;
+    if (held === 0 || tick - keyAge[at] > 2){   /* nobody's, or nobody's any more */
+      keyId[at] = id; keyjn[at] = 0; keyjt[at] = 0; keyFeat[at] = 0; keyAge[at] = -9;
+      return at;
+    }
+  }
+  return -1;                                 /* a full run of live entries: start cold */
+}
+
 /* and room for what those pairs will yield: two contact points each, plus the walls.
    Dropping a contact is the same silent failure as dropping a pair */
 function roomFor(need){
@@ -799,23 +857,32 @@ function roomFor(need){
   const f = () => new Float32Array(maxC), n = () => new Int32Array(maxC);
   cA = n(); cB = n(); cnx = f(); cny = f(); crax = f(); cray = f(); crbx = f(); crby = f();
   cdep = f(); cwn = f(); cwt = f(); cjn = f(); cjt = f(); ctar = f(); cpn = f();
-  ckey = n(); cfeat = n(); ccy = f(); order = n();
+  ckey = n(); cfeat = n(); ccy = f(); order = n(); cslot = n();
+  hashRoom(maxC);
 }
 
-/* how far apart A and B are along A's least favourable face normal */
+/* How far apart A and B are along A's least favourable face normal. Every pair the
+   broad phase turns up asks this twice, twenty times a frame, so it is where the
+   time goes — and most pairs are not touching at all. Two ways out early, both of
+   which only ever skip work whose answer is already settled: a face stops being
+   measured once it cannot beat the best found so far, and the whole thing stops once
+   the two are known to be further apart than the caller cares about */
 let satFace = 0;
-function separation(A, B){
+function separation(A, B, stopAt){
   const oa = A*MAXV*2, ob = B*MAXV*2, na = wcount[A], nb = wcount[B];
+  const enough = stopAt === undefined ? 0 : stopAt;
   let best = -Infinity, face = 0;
   for (let i=0;i<na;i++){
     const nx = wn[oa+i*2], ny = wn[oa+i*2+1];
+    const ref = wv[oa+i*2]*nx + wv[oa+i*2+1]*ny;
     let lo = Infinity;
     for (let j=0;j<nb;j++){
       const d = wv[ob+j*2]*nx + wv[ob+j*2+1]*ny;
-      if (d < lo) lo = d;
+      if (d < lo){ lo = d; if (lo - ref <= best) break; }
     }
-    const s = lo - (wv[oa+i*2]*nx + wv[oa+i*2+1]*ny);
-    if (s > best){ best = s; face = i; }
+    const sep = lo - ref;
+    if (sep > best){ best = sep; face = i; }
+    if (best >= enough){ satFace = i; return best; }
   }
   satFace = face;
   return best;
@@ -922,8 +989,10 @@ function record(A, B, nx, ny, px, py, depth, key, feat){
      back to the pieces now. Carrying the number without spending it is the same
      as starting from nothing: the pile has to hold itself up from scratch every
      substep, and never quite manages */
-  const fresh = keyFeat[key] === feat && tick - keyAge[key] <= 2;
-  const jn = fresh ? keyjn[key] : 0, jt = fresh ? keyjt[key] : 0;
+  const slot = slotFor(key);
+  cslot[nc] = slot;
+  const fresh = slot >= 0 && keyFeat[slot] === feat && tick - keyAge[slot] <= 2;
+  const jn = fresh ? keyjn[slot] : 0, jt = fresh ? keyjt[slot] : 0;
   cjn[nc] = jn; cjt[nc] = jt; cfeat[nc] = feat;
   if (jn !== 0 || jt !== 0){
     const ix = nx*jn + tx*jt, iy = ny*jn + ty*jt;
@@ -940,10 +1009,10 @@ function walls(){
     const o = i*MAXV*2, n = wcount[i];
     for (let k=0;k<n;k++){
       const px = wv[o+k*2], py = wv[o+k*2+1];
-      const key = wallKey + (i*MAXV + k)*3;
+      const key = -1 - (i*MAXV + k)*3;   /* under zero: a wall is nobody's pair */
       if (px < 0)      record(-1, i,  1, 0, px, py, -px, key, 1);
-      else if (px > W) record(-1, i, -1, 0, px, py, px-W, key+1, 1);
-      if (py > H)      record(-1, i,  0,-1, px, py, py-H, key+2, 1);
+      else if (px > W) record(-1, i, -1, 0, px, py, px-W, key-1, 1);
+      if (py > H)      record(-1, i,  0,-1, px, py, py-H, key-2, 1);
     }
   }
 }
@@ -1153,8 +1222,9 @@ function step(dt){
     sortContacts();
     solve(h);
     for (let k=0;k<nc;k++){
-      const key = ckey[k];
-      keyjn[key] = cjn[k]; keyjt[key] = cjt[k]; keyFeat[key] = cfeat[k]; keyAge[key] = tick;
+      const at = cslot[k];
+      if (at < 0) continue;
+      keyjn[at] = cjn[k]; keyjt[at] = cjt[k]; keyFeat[at] = cfeat[k]; keyAge[at] = tick;
     }
     for (let i=0;i<live;i++){
       bx[i]+=(vx[i]+pvx[i])*h; by[i]+=(vy[i]+pvy[i])*h; ba[i]+=(va[i]+pva[i])*h;
@@ -1271,13 +1341,20 @@ function advance(dt){
        either end and half again over the mean in the middle */
     pourT += dt;
     const p = Math.min(1, pourT/pourTime);
-    const most = Math.min(cap, Math.round(pourTo*1.4) + 4);
+    /* how many it is willing to pour at the outside. The count was reckoned from the
+       area of the pit over the area of a piece, and for small pieces that reckoning
+       comes out low — a piece takes up less room than its collision outline suggests,
+       and a heap of them leaves fewer voids than one of big ones. Held to a little
+       over the estimate the pour stopped with the pit half empty, so it is held to a
+       long way over instead, and what stops it is the pit being full */
+    const most = Math.min(cap, Math.round(pourTo*3) + 8);
     let due = Math.round(pourTo * p*p*(3 - 2*p));
     if (p >= 1){
       topAcc += dt*Math.max(8, cap/4);       /* the tail of the same taper */
       due = pourTo + Math.floor(topAcc);
     }
     let placed = true;
+    if (live < Math.min(due, most)) outlines();   /* what fits() reads */
     while (live < Math.min(due, most) && (placed = spawnOne()));
     stuck = placed ? 0 : stuck + dt;         /* nowhere left to let one go: full */
 
@@ -1572,7 +1649,7 @@ addEventListener('resize', () => {
     SIZE = Math.max(3, SIZE*k);
     maxBound = 0;
     lineW = Math.max(.8, SIZE*.05);
-    ceil = Math.max(roof(), H - deep*SIZE*1.7);   /* the card, or the depth limit */
+    ceil = roof();                             /* the pit fills to the card */
     const skin = lineW/2 + Math.max(1.5, SIZE*0.05);
     TPL = TPL.map(t => {
       const s = template(t.kind, t.area*k*k, skin);

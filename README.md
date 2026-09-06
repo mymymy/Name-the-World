@@ -35,11 +35,17 @@ Side experiments, not part of the game.
   shards, broad slabs, rounded tiles and planks, and sticks that come to rest
   across one another like a dropped handful — in sizes drawn lopsided upwards, so
   a few pieces are larger than the rest, and in four colours of its own. How big a
-  piece is varies most of all: a round of small ones holds fifteen or twenty times
-  the pieces of a round of large — anything from about twenty to three hundred. It
-  pours until the pit is full rather than to a guess at how many that takes: the
-  line it fills to is measured off the box that asks the question, and what counts
-  as full is a couple of pieces of the heap itself standing near it. On a pit filled
+  piece is varies most of all, and is drawn evenly across the scales rather than
+  evenly across the pixels, so the hard rounds turn up as often as the easy ones.
+  Nothing caps how many pieces there are: the only limit is how small one may be
+  cut — seven pixels, which is about what can still be told apart and counted — and
+  the rest follows from the size of the window. A phone holds forty to seven hundred
+  of them, a desktop window rather more. It pours until the pit is full rather than
+  to a guess at how many that takes: the line it fills to is measured off the box
+  that asks the question, and what counts as full is a couple of pieces of the heap
+  standing near that line — with the depth of everything still falling added on, or
+  the rain that is already in the air carries the heap over the top of the window,
+  where it cannot be counted. On a pit filled
   to the brim there is no corner for the box that always leaves the pieces clear, so
   it can be dragged aside by its grip to see what is behind it, and stays where it is
   put; the fill line keeps to where the box belongs rather than where it was left, so
