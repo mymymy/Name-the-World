@@ -880,7 +880,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 17 sep · v139</span>
+      <span id="build" class="caps">build 17 sep · v140</span>
     </div>
   </div>
 </div>
@@ -1989,12 +1989,19 @@ function buildMap(){
     p.setAttribute('d', e.d); p.setAttribute('class','c'); p.dataset.code = e.code;
     cty.appendChild(p); (nodes[e.code] = nodes[e.code]||[]).push(p);
   });
-  CTY_ENTRY.filter(e=>e.tiny).forEach(e=>{
-    const c = document.createElementNS(NS,'circle');
-    c.setAttribute('cx',e.c[0]); c.setAttribute('cy',e.c[1]); c.setAttribute('r',4);
-    c.setAttribute('class','dot'); c.dataset.code = e.code;
-    cty.appendChild(c); (nodes[e.code] = nodes[e.code]||[]).push(c);
-  });
+  /* The City of London had a dot here, being one pixel across on this board.
+     It has none now, for the reason the countries lost theirs: a filled circle
+     is a city, and on a map of counties it said the wrong thing twice over.
+
+     Nor is it magnified, which is what the small countries get instead. They
+     are islands with sea around them, and sea is nobody's - a shape grown into
+     it takes nothing from anyone. Counties tile. A county grown over its
+     neighbour is a border drawn where there is none, and a made-up border on a
+     map of borders is worse than a place too small to see.
+
+     So it is drawn true, at the size it really is, and reached for like every
+     other small thing here. Being asked to name it still flies you to it and
+     zooms, which is where it becomes something you can look at. */
   /* the frame goes on last, so no coastline can be drawn across it */
   for(const [id, cls] of [['ctyframe','frame'], ['ctyrule','rule']]){
     const r = document.createElementNS(NS,'rect');
@@ -2779,42 +2786,79 @@ svg.addEventListener('click', ev=>{
      meet along the middle. Nothing is taken from a shape you could have hit
      anyway: a direct hit on a held country wins outright, and the reach is gone
      the moment the map is zoomed in far enough to draw the place truly. */
-  if(!(hit && hit.held)){
-    const near = reachFor(ev.clientX, ev.clientY);
-    if(near){ select(entryForShape(near).code); return; }
+  /* Whichever is smaller wins. Landing on a shape is not the same as aiming at
+     it: the City of London is one pixel inside Greater London, and a finger put
+     on the City lands on both. It cannot be the bigger one that is meant - you
+     would not need to be that precise to hit Greater London - so the reach is
+     asked every time and taken whenever what it offers is smaller than what was
+     under the finger. A big shape only keeps a tap that nothing small wanted. */
+  const near = reachFor(ev.clientX, ev.clientY, hit && hit.play ? NUDGE_PX : REACH_PX);
+  if(near && (!hit || screenSize(near) < screenSize(hit))){
+    select(entryForShape(near).code); return;
   }
   if(!el){ closeAsk(true); hideTip(); S.sel = null; paintMap(); return; }
   const shape = hit; if(!shape) return;
   const t = entryForShape(shape); if(!t) return;
   select(t.code);
 });
-/* The nearest held island to a point on screen, if it is close enough to count.
-   Measured to where the island was actually drawn, not to where it truly is -
-   a magnified shape has moved, and the reach belongs to what you can see. */
+/* ============ reaching for a small target ============
+
+   A shape too small to aim at carries a reach: land within 22px of it and it is
+   yours, which is 44 across, the size a finger actually is. Every board needs
+   this, not just the globe - Rhode Island is 7px on the states, Bristol 8 on the
+   counties, the City of London 1 - so it is asked of whatever is being played.
+
+   Where two reaches would overlap there is no room to give both, so they are
+   settled by which is nearer: each keeps the ground closest to it and they meet
+   along the middle, which is as much as either can have.
+
+   Only the small ones have it, and only until they stop being small. A shape
+   already wider than a finger needs no help and would only be stealing from its
+   neighbours, so it is passed over; zoom in far enough and every shape passes
+   out of this the same way. */
 const REACH_PX = 22;
-function reachFor(cx, cy){
+/* Over open ground the reach is the full 22. Over another shape it is not: a
+   point inside North Yorkshire belongs to North Yorkshire, and West Yorkshire
+   being small next door is no claim on it. What survives there is the case the
+   reach exists for - something small directly under the finger, the City of
+   London inside Greater London, the Vatican inside Rome - which is near enough
+   to be covered by a nudge rather than a reach. */
+const NUDGE_PX = 10;
+/* Where a place can be grabbed, in board units. The globe records the middle of
+   each island as it was drawn - magnified shapes have moved, and the reach
+   belongs to what is on the screen rather than to what is underneath it. A board
+   is drawn once at a fixed size and keeps its own middle. */
+function grabPoints(e){
+  if(e.at && e.at.length) return e.at;
+  return e.c ? [e.c] : (e.cll && e.fr ? null : null);
+}
+/* how wide it is on screen, so a shape big enough to hit can be left alone */
+function screenSize(e){
+  const u = k * unitPx();
+  if(!u) return Infinity;
+  if(e.b) return Math.max(e.b[2]-e.b[0], e.b[3]-e.b[1]) * u;
+  if(e.held) return e.lifted ? 0 : Infinity;   // held shapes are small by definition
+  return Infinity;
+}
+function reachFor(cx, cy, limit){
   /* the scene's own matrix, which already carries the pan and the zoom - the
      same sum done by hand put the Caribbean in Algeria */
   const m = scene.getScreenCTM();
   if(!m) return null;
-  let best = null, bd = REACH_PX;
-  for(const e of DATA){
-    if(!e.held || !e.lifted || !e.at || !e.play) continue;
-    for(const [bx, by] of e.at){
+  let best = null, bd = limit || REACH_PX;
+  for(const e of basis()){
+    if(!e.play) continue;
+    if(screenSize(e) >= REACH_PX*2) continue;
+    const pts = grabPoints(e);
+    if(!pts) continue;
+    for(const [bx, by] of pts){
       const d = Math.hypot(m.a*bx + m.c*by + m.e - cx, m.b*bx + m.d*by + m.f - cy);
       if(d < bd){ bd = d; best = e; }
     }
   }
   return best;
 }
-/* The keys stop at the limits rather than stretching past them - there is no
-   gesture to give against, so there would be nothing to let go of. */
-function zoomStep(factor){
-  const r = wrap.getBoundingClientRect();
-  zoomAnchor = null;
-  easeZoom(Math.min(ZOOM_MAX, Math.max(zoomFloor(), k*factor)),
-           r.left + r.width/2, r.top + r.height/2);
-}
+
 $('#zin').onclick = ()=> zoomStep(1.6);
 $('#zout').onclick = ()=> zoomStep(1/1.6);
 /* The zoom the game opens at, whatever it happens to be looking at. */
