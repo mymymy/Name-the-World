@@ -880,7 +880,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 17 sep · v140</span>
+      <span id="build" class="caps">build 17 sep · v141</span>
     </div>
   </div>
 </div>
@@ -1792,7 +1792,27 @@ function heldPath(e, minU){
       const X = gx + (x-gx)*G, Y = gy + (y-gy)*G;      // the rigid part
       d += (n++ ? 'L' : '') + f1(cx + (X-cx)*(m/G)) + ',' + f1(cy + (Y-cy)*(m/G));
     }
-    if(n >= 3){ out += d + 'Z'; where.push([cx, cy]); }
+    if(n >= 3){
+      out += d + 'Z';
+      /* Somewhere to grab it - but not every islet. A country's claim on the
+         screen is spread between its islands, and the Grenadines run north from
+         Saint Vincent until the last of them is on top of Saint Lucia: both
+         ended up with nothing, each cancelled by the other. So only islands
+         that amount to something get a point, and a chain of specks no longer
+         reaches into the country next door. The specks are still drawn. */
+      /* Recorded where the island truly is, not where it was drawn. Growing a
+         country about its own middle carries its outlying islands outwards, and
+         Saint Vincent's northernmost was taken five pixels north onto Saint
+         Lucia - onto the very point Saint Lucia is grabbed by, so the two
+         cancelled each other and neither could be tapped at all. What is drawn
+         may shift a little to be legible; what you reach for must not move.
+
+         Every island keeps a point. Dropping the smaller ones was tried, on the
+         theory that the Grenadines were reaching into Saint Lucia; measured, it
+         changed Saint Lucia not at all - the collision was the moving, not the
+         counting - and it cost Kiribati's lesser atolls their reach. */
+      where.push([a.cx, a.cy]);
+    }
   }
   /* Where the islands ended up, and whether they are still being held up. A
      shape drawn at its true size is big enough to be hit on its own and wants
@@ -2292,6 +2312,7 @@ function applyView(){
   sizeLabels();
   placeZoom();
   syncZoomKeys();
+  paintReach();
   if(layerLabels.classList.contains('hide') === (k >= LABEL_AT)) drawLabels();
 }
 /* The globe turns rather than slides, so there is no sideways limit - but
@@ -2355,6 +2376,7 @@ function clampView(){
 function settleView(){
   clampView(); applyView();
   if(worldMap()) turn(); else placeFloaters();
+  paintReach();
 }
 /* The zoom keys go in the corner of the screen, which is the corner of the map
    too now that a board is held over the screen rather than free to be dragged
@@ -2801,6 +2823,48 @@ svg.addEventListener('click', ev=>{
   const t = entryForShape(shape); if(!t) return;
   select(t.code);
 });
+/* ============ showing the reach ============
+
+   Add ?reach to the address and the map is tinted by which place each point on
+   it would answer to. Not a drawing of what the rule ought to do - every sample
+   is put to the same function a tap goes through, so what is shown is what will
+   happen. A place with a usable target gets a patch you can see; a place with
+   nothing gets nothing, which is the point of looking.
+
+   It is a diagnostic and it is off unless asked for. */
+const SHOWREACH = /(^|[?&])reach($|[=&])/.test(location.search);
+let reachCv = null, reachRaf = 0;
+function paintReach(){
+  if(!SHOWREACH) return;
+  if(!reachCv){
+    reachCv = document.createElement('canvas');
+    reachCv.style.cssText = 'position:absolute;inset:0;z-index:6;pointer-events:none;opacity:.55';
+    wrap.appendChild(reachCv);
+  }
+  cancelAnimationFrame(reachRaf);
+  reachRaf = requestAnimationFrame(()=>{
+    const r = wrap.getBoundingClientRect();
+    const dpr = 1, STEP = 5;
+    reachCv.width = Math.ceil(r.width*dpr); reachCv.height = Math.ceil(r.height*dpr);
+    const c = reachCv.getContext('2d');
+    c.clearRect(0,0,reachCv.width,reachCv.height);
+    for(let y=0; y<r.height; y+=STEP){
+      for(let x=0; x<r.width; x+=STEP){
+        const sx = r.left+x, sy = r.top+y;
+        const el = document.elementFromPoint(sx, sy);
+        const under = el && el.closest ? el.closest('[data-code]') : null;
+        const hit = under && BY_CODE[under.dataset.code];
+        const near = reachFor(sx, sy, hit && hit.play ? NUDGE_PX : REACH_PX);
+        const win = (near && (!hit || screenSize(near) < screenSize(hit))) ? near : null;
+        if(!win) continue;
+        /* a colour of its own per place, so neighbouring cells can be told apart */
+        let h = 0; for(const ch of win.code) h = (h*31 + ch.charCodeAt(0)) & 1023;
+        c.fillStyle = `hsl(${h*0.35 % 360} 85% 55%)`;
+        c.fillRect(x, y, STEP, STEP);
+      }
+    }
+  });
+}
 /* ============ reaching for a small target ============
 
    A shape too small to aim at carries a reach: land within 22px of it and it is
