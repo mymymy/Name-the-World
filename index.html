@@ -880,7 +880,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 17 sep · v143</span>
+      <span id="build" class="caps">build 17 sep · v144</span>
     </div>
   </div>
 </div>
@@ -2833,7 +2833,7 @@ svg.addEventListener('click', ev=>{
 
    It is a diagnostic and it is off unless asked for. */
 const SHOWREACH = /(^|[?&])reach($|[=&])/.test(location.search);
-let reachCv = null, reachRaf = 0;
+let reachCv = null, reachTimer = 0;
 function paintReach(){
   if(!SHOWREACH) return;
   if(!reachCv){
@@ -2841,13 +2841,25 @@ function paintReach(){
     reachCv.style.cssText = 'position:absolute;inset:0;z-index:6;pointer-events:none;opacity:.55';
     wrap.appendChild(reachCv);
   }
-  cancelAnimationFrame(reachRaf);
-  reachRaf = requestAnimationFrame(()=>{
+  /* Cleared at once, drawn on a delay.
+
+     Every sample is a hit test and a walk of all the grab points, and there are
+     twelve thousand of them - a fifth of a second of work for one picture. Done
+     on every frame of a drag, as it was, twenty drag steps took eighteen
+     seconds. It is also a picture in screen coordinates, so the moment the map
+     moves it is not merely expensive but wrong.
+
+     So the canvas empties the instant anything moves, which costs nothing, and
+     fills in once the map has been still for a moment. Panning shows no tint;
+     stopping brings it back. */
+  const c = reachCv.getContext('2d');
+  c.clearRect(0, 0, reachCv.width, reachCv.height);
+  clearTimeout(reachTimer);
+  reachTimer = setTimeout(()=>{
     const r = wrap.getBoundingClientRect();
-    const dpr = 1, STEP = 5;
-    reachCv.width = Math.ceil(r.width*dpr); reachCv.height = Math.ceil(r.height*dpr);
-    const c = reachCv.getContext('2d');
-    c.clearRect(0,0,reachCv.width,reachCv.height);
+    const STEP = 5;
+    reachCv.width = Math.ceil(r.width); reachCv.height = Math.ceil(r.height);
+    const g = reachCv.getContext('2d');
     for(let y=0; y<r.height; y+=STEP){
       for(let x=0; x<r.width; x+=STEP){
         const sx = r.left+x, sy = r.top+y;
@@ -2863,11 +2875,11 @@ function paintReach(){
         if(!win) continue;
         /* a colour of its own per place, so neighbouring cells can be told apart */
         let h = 0; for(const ch of win.code) h = (h*31 + ch.charCodeAt(0)) & 1023;
-        c.fillStyle = `hsl(${h*0.35 % 360} 85% 55%)`;
-        c.fillRect(x, y, STEP, STEP);
+        g.fillStyle = `hsl(${h*0.35 % 360} 85% 55%)`;
+        g.fillRect(x, y, STEP, STEP);
       }
     }
-  });
+  }, 220);
 }
 /* ============ reaching for a small target ============
 
