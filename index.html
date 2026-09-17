@@ -391,6 +391,29 @@ path.c.sel{stroke:var(--live);stroke-width:2.6;stroke-opacity:1}
    it is drawn on, so half of it lies on the neighbour's side - and a neighbour
    drawn later paints over that half, leaving the border looking half as thick
    as the coast. Drawn last, it cannot be covered by anything. */
+/* The ground a small place answers to, drawn so it can be aimed at.
+
+   A shape thirteen pixels across is legible and still not a target; the halo is
+   the target, and showing it is the difference between knowing a place is there
+   and knowing where to put your finger. Each is as wide as it can be - 22px of
+   radius where there is room, and where there is not, half the way to whichever
+   neighbour is nearest, so the two touch and neither overlaps. Where they meet
+   is where the ground is divided.
+
+   Drawn over the map rather than under it, because it has to show over land as
+   well as sea: Vatican City's halo lies on Rome. Faint enough to read as a
+   place's shadow rather than as a mark of its own. */
+#reachring circle{
+  fill:var(--live); fill-opacity:.09;
+  stroke:var(--live); stroke-opacity:.3; stroke-width:1; vector-effect:non-scaling-stroke;
+}
+#reachring circle.right{fill:var(--ok); stroke:var(--ok)}
+#reachring circle.miss{fill:var(--no); stroke:var(--no)}
+#reachring circle.told{fill:var(--shown); stroke:var(--shown)}
+#reachring circle.sel{fill-opacity:.16; stroke-opacity:.75; stroke-width:1.5}
+@media (prefers-reduced-motion: no-preference){
+  #reachring circle{transition:fill-opacity .25s ease, stroke-opacity .25s ease}
+}
 #selring{fill:none;stroke:var(--live);stroke-width:2.6;stroke-opacity:1;
   stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none}
 circle.dot{fill:#B9B4A6;stroke:#6E7269;stroke-width:.5;cursor:pointer;vector-effect:non-scaling-stroke}
@@ -814,6 +837,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
             <path id="lbunder"></path>
             <path id="lbctx"></path>
           </g>
+          <g id="reachring" pointer-events="none"></g>
           <path id="selring"></path>
           <g id="labels" class="hide"></g>
         </g>
@@ -880,7 +904,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 17 sep · v141</span>
+      <span id="build" class="caps">build 17 sep · v142</span>
     </div>
   </div>
 </div>
@@ -2312,6 +2336,7 @@ function applyView(){
   sizeLabels();
   placeZoom();
   syncZoomKeys();
+  paintReachRings();
   paintReach();
   if(layerLabels.classList.contains('hide') === (k >= LABEL_AT)) drawLabels();
 }
@@ -2376,6 +2401,7 @@ function clampView(){
 function settleView(){
   clampView(); applyView();
   if(worldMap()) turn(); else placeFloaters();
+  paintReachRings(true);
   paintReach();
 }
 /* The zoom keys go in the corner of the screen, which is the corner of the map
@@ -2823,6 +2849,81 @@ svg.addEventListener('click', ev=>{
   const t = entryForShape(shape); if(!t) return;
   select(t.code);
 });
+/* Draw the ground each small place answers to.
+
+   Every point that has a reach gets a circle as wide as it is allowed to be:
+   22px where nothing is near, and half the way to the nearest other point where
+   something is - so neighbours touch rather than overlap, and the line where
+   they meet is the line where a tap changes hands. What is drawn is worked out
+   from the same numbers reachFor uses, so the halo is the click area rather
+   than a picture of it.
+
+   It fades out as the map is zoomed in: once a shape is drawn at its true size
+   it can be hit on its own and the reach is given up, so the halo goes with it. */
+/* Rebuilt on a leash. Every grab point is measured against every other, which
+   is a few tens of thousands of sums, and applyView runs on every frame of a
+   drag - so it is done at most once in a tenth of a second, and once more when
+   the map stops. Between those the halos ride along with the scene's transform
+   like everything else, which is what makes that affordable: they are in board
+   units, so panning and zooming move them for free and only their radii are
+   stale, by a few pixels, for a few frames. */
+let ringsAt = 0, ringsTimer = 0;
+function paintReachRings(now){
+  if(!SHOWREACH){ const l = $('#reachring'); if(l && l.firstChild) l.innerHTML = ''; return; }
+  if(!now){
+    const t = performance.now();
+    if(t - ringsAt < 110){
+      clearTimeout(ringsTimer);
+      ringsTimer = setTimeout(()=>paintReachRings(true), 120);
+      return;
+    }
+    ringsAt = t;
+  } else { ringsAt = performance.now(); clearTimeout(ringsTimer); }
+  const layer = $('#reachring');
+  if(!layer) return;
+  const m = scene.getScreenCTM();
+  const u = k * unitPx();
+  if(!m || !u){ layer.innerHTML = ''; return; }
+  /* every grab point in play, in screen pixels, so distances are in the units
+     the rule is written in */
+  const pts = [];
+  for(const e of basis()){
+    if(!e.play || screenSize(e) >= REACH_PX*2) continue;
+    const g = grabPoints(e); if(!g) continue;
+    for(const [bx, by] of g)
+      pts.push({e, bx, by, x:m.a*bx + m.c*by + m.e, y:m.b*bx + m.d*by + m.f});
+  }
+  const frag = document.createDocumentFragment();
+  for(let i=0;i<pts.length;i++){
+    const a = pts[i];
+    let near = Infinity;
+    for(let j=0;j<pts.length;j++) if(j!==i && pts[j].e !== a.e)
+      near = Math.min(near, Math.hypot(a.x-pts[j].x, a.y-pts[j].y));
+    /* half way to the neighbour, or the whole reach if there is no neighbour to
+       share with - and never smaller than the shape it is drawn around */
+    const r = Math.min(REACH_PX, near/2);
+    /* Drawn however small it comes out. Skipping the small ones took the halo
+       away from the Lesser Antilles, which is the one place on the map where
+       knowing how little room there is matters - a country with almost no
+       ground of its own should look like one.
+
+       The halo is not the whole of what can be tapped: the shape inside it is
+       hit directly, and the two together are the target. Saint Lucia is a
+       thirteen pixel island with three pixels of apron, not three pixels. */
+    if(r < 0.4) continue;
+    const c = document.createElementNS(NS, 'circle');
+    c.setAttribute('cx', a.bx.toFixed(1));
+    c.setAttribute('cy', a.by.toFixed(1));
+    c.setAttribute('r', (r/u).toFixed(2));
+    const ans = S.ans[a.e.code];
+    c.setAttribute('class',
+      (a.e.code === S.sel ? 'sel ' : '') +
+      (ans ? (ans.told ? 'told' : ans.ok ? 'right' : 'miss') : ''));
+    frag.appendChild(c);
+  }
+  layer.innerHTML = '';
+  layer.appendChild(frag);
+}
 /* ============ showing the reach ============
 
    Add ?reach to the address and the map is tinted by which place each point on
@@ -2855,7 +2956,11 @@ function paintReach(){
         const under = el && el.closest ? el.closest('[data-code]') : null;
         const hit = under && BY_CODE[under.dataset.code];
         const near = reachFor(sx, sy, hit && hit.play ? NUDGE_PX : REACH_PX);
-        const win = (near && (!hit || screenSize(near) < screenSize(hit))) ? near : null;
+        /* whoever the tap would actually name - the reach where it wins, and
+           otherwise the shape under the finger. Every country that can be
+           tapped has ground here, not only the ones small enough to need help */
+        const win = (near && (!hit || screenSize(near) < screenSize(hit))) ? near
+                  : (hit && hit.play ? hit : null);
         if(!win) continue;
         /* a colour of its own per place, so neighbouring cells can be told apart */
         let h = 0; for(const ch of win.code) h = (h*31 + ch.charCodeAt(0)) & 1023;
