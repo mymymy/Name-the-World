@@ -880,7 +880,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 17 sep · v138</span>
+      <span id="build" class="caps">build 17 sep · v139</span>
     </div>
   </div>
 </div>
@@ -1772,7 +1772,7 @@ function heldPath(e, minU){
   const gx = (lo+hi)/2, gy = (up+dn)/2;
   const G = span > 0 ? Math.max(1, Math.min(minU/span, 60)) : 1;
 
-  let out='';
+  let out='', where = [], lifted = false;
   for(let i=0;i<R.length;i++){
     const a = R[i];
     /* where this island sits once the country has been scaled as one */
@@ -1786,13 +1786,20 @@ function heldPath(e, minU){
     let m = G;
     if(size > 0 && size < minU && (gap === Infinity || gap > size*3))
       m = G * Math.min(minU/size, gap === Infinity ? Infinity : (gap*0.34)/size);
+    if(m > 1.02) lifted = true;
     let d='M', n=0;
     for(const [x,y] of a.P){
       const X = gx + (x-gx)*G, Y = gy + (y-gy)*G;      // the rigid part
       d += (n++ ? 'L' : '') + f1(cx + (X-cx)*(m/G)) + ',' + f1(cy + (Y-cy)*(m/G));
     }
-    if(n >= 3) out += d + 'Z';
+    if(n >= 3){ out += d + 'Z'; where.push([cx, cy]); }
   }
+  /* Where the islands ended up, and whether they are still being held up. A
+     shape drawn at its true size is big enough to be hit on its own and wants
+     no help; one being magnified is by definition too small, and gets a reach
+     around it. */
+  e.at = where;
+  e.lifted = lifted;
   return out;
 }
 function tinyRing(r, minU){
@@ -2761,11 +2768,45 @@ svg.addEventListener('click', ev=>{
   const under = ev.target.closest('[data-code]') ? ev.target
               : document.elementFromPoint(ev.clientX, ev.clientY);
   const el = under && under.closest ? under.closest('[data-code]') : null;
+  const hit = el && BY_CODE[el.dataset.code];
+  /* A shape being held above the floor is, by definition, too small to aim at -
+     thirteen pixels at best, and four of them across the Caribbean. So while it
+     is held it carries a reach of its own: land within 22px of an island and it
+     is yours, which is 44 across, the size a finger actually is.
+
+     Where two reaches would overlap there is no room to give both, so they are
+     settled by which is nearer - each keeps the ground closest to it and they
+     meet along the middle. Nothing is taken from a shape you could have hit
+     anyway: a direct hit on a held country wins outright, and the reach is gone
+     the moment the map is zoomed in far enough to draw the place truly. */
+  if(!(hit && hit.held)){
+    const near = reachFor(ev.clientX, ev.clientY);
+    if(near){ select(entryForShape(near).code); return; }
+  }
   if(!el){ closeAsk(true); hideTip(); S.sel = null; paintMap(); return; }
-  const shape = BY_CODE[el.dataset.code]; if(!shape) return;
+  const shape = hit; if(!shape) return;
   const t = entryForShape(shape); if(!t) return;
   select(t.code);
 });
+/* The nearest held island to a point on screen, if it is close enough to count.
+   Measured to where the island was actually drawn, not to where it truly is -
+   a magnified shape has moved, and the reach belongs to what you can see. */
+const REACH_PX = 22;
+function reachFor(cx, cy){
+  /* the scene's own matrix, which already carries the pan and the zoom - the
+     same sum done by hand put the Caribbean in Algeria */
+  const m = scene.getScreenCTM();
+  if(!m) return null;
+  let best = null, bd = REACH_PX;
+  for(const e of DATA){
+    if(!e.held || !e.lifted || !e.at || !e.play) continue;
+    for(const [bx, by] of e.at){
+      const d = Math.hypot(m.a*bx + m.c*by + m.e - cx, m.b*bx + m.d*by + m.f - cy);
+      if(d < bd){ bd = d; best = e; }
+    }
+  }
+  return best;
+}
 /* The keys stop at the limits rather than stretching past them - there is no
    gesture to give against, so there would be nothing to let go of. */
 function zoomStep(factor){
