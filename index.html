@@ -880,7 +880,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 17 sep · v144</span>
+      <span id="build" class="caps">build 18 sep · v145</span>
     </div>
   </div>
 </div>
@@ -2860,19 +2860,39 @@ function paintReach(){
     const STEP = 5;
     reachCv.width = Math.ceil(r.width); reachCv.height = Math.ceil(r.height);
     const g = reachCv.getContext('2d');
+    /* Only the small places are drawn. Tinting every country coloured in Brazil
+       and Venezuela, which are not in question and were burying the thing that
+       is - the few pixels the Lesser Antilles have between them.
+
+       It is also what makes this quick. The small ones sit in a handful of
+       places on the screen, so a sample more than a reach and a bit from any of
+       them cannot be theirs and needs no asking: the hit test, which is the
+       expensive part, is never reached for most of the map. */
+    const m = scene.getScreenCTM();
+    const spots = [];
+    if(m) for(const e of basis()){
+      if(!e.play || screenSize(e) >= REACH_PX*2) continue;
+      const pts = grabPoints(e); if(!pts) continue;
+      for(const [bx, by] of pts)
+        spots.push([m.a*bx + m.c*by + m.e, m.b*bx + m.d*by + m.f]);
+    }
+    /* a shape held above the floor can be a good deal wider than its grab
+       point, so the skirt allows for the shape as well as the reach */
+    const SKIRT = REACH_PX + MIN_SHAPE_PX;
     for(let y=0; y<r.height; y+=STEP){
       for(let x=0; x<r.width; x+=STEP){
         const sx = r.left+x, sy = r.top+y;
+        let near = false;
+        for(const [px, py] of spots)
+          if(Math.abs(px-sx) < SKIRT && Math.abs(py-sy) < SKIRT){ near = true; break; }
+        if(!near) continue;
         const el = document.elementFromPoint(sx, sy);
         const under = el && el.closest ? el.closest('[data-code]') : null;
         const hit = under && BY_CODE[under.dataset.code];
-        const near = reachFor(sx, sy, hit && hit.play ? NUDGE_PX : REACH_PX);
-        /* whoever the tap would actually name - the reach where it wins, and
-           otherwise the shape under the finger. Every country that can be
-           tapped has ground here, not only the ones small enough to need help */
-        const win = (near && (!hit || screenSize(near) < screenSize(hit))) ? near
+        const found = reachFor(sx, sy, hit && hit.play ? NUDGE_PX : REACH_PX);
+        const win = (found && (!hit || screenSize(found) < screenSize(hit))) ? found
                   : (hit && hit.play ? hit : null);
-        if(!win) continue;
+        if(!win || screenSize(win) >= REACH_PX*2) continue;
         /* a colour of its own per place, so neighbouring cells can be told apart */
         let h = 0; for(const ch of win.code) h = (h*31 + ch.charCodeAt(0)) & 1023;
         g.fillStyle = `hsl(${h*0.35 % 360} 85% 55%)`;
