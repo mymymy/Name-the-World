@@ -880,7 +880,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 18 sep · v145</span>
+      <span id="build" class="caps">build 18 sep · v146</span>
     </div>
   </div>
 </div>
@@ -1546,6 +1546,14 @@ function drawWorld(){
         p.removeAttribute('d'); h.removeAttribute('d');
         if(e.code === S.sel) setSelRing('');
       }
+      /* And what it could be grabbed by, which is the same ghost by another
+         route. This was left behind when the shape was cleared, so a country
+         turned away from kept the screen position it had when it was last
+         drawn: with the map over the Caribbean, Andorra, Monaco, San Marino,
+         Vatican City, Luxembourg, Liechtenstein and Malta all held ground in
+         the middle of the North Atlantic, and a tap out there answered to one
+         of them. Nothing drawn, nothing to reach for. */
+      e.at = null; e.lifted = false;
       continue;
     }
     const d = e.held ? heldPath(e, minU) : e.rings.map(r=>ringPath(r, 0)).join('');
