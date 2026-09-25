@@ -880,7 +880,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 25 sep · v147</span>
+      <span id="build" class="caps">build 25 sep · v148</span>
     </div>
   </div>
 </div>
@@ -2954,7 +2954,18 @@ const REACH_PX = 22;
    lies near the border may not, however near - the Bahamas are not in Haiti and
    Rhode Island is not in Connecticut. So the question asked is whether the
    small place actually stands on the ground you hit, which the shape itself can
-   answer. */
+   answer.
+
+   With one allowance, for the neighbours. Palestine is not inside Israel, it is
+   beside it, and at the opening view it is eleven pixels wide with Israel drawn
+   over the top: aim at it and the pixel you get is as likely to be Israel's as
+   its own. Containment alone hands every one of those taps to Israel, which is
+   the very thing the reach exists to stop. So a small place also keeps the
+   first few pixels of its neighbour's ground - measured from its own outline,
+   not from its middle, so it is the slip of a finger on a shared border and
+   nothing more. Four pixels reaches across the rounding and along a coast; it
+   does not reach the Bahamas into Haiti, which is eight away and over water. */
+const SLIP_PX = 4;
 /* Where a place can be grabbed, in board units. The globe records the middle of
    each island as it was drawn; a board is drawn once at a fixed size and keeps
    its own middle. */
@@ -2978,19 +2989,32 @@ function inShape(code, q){
   }
   return false;
 }
-/* Two ways a small place may take a tap that landed on a country.
+/* Three ways a small place may take a tap that landed on a country.
 
    It is under the finger. Its own shape covers the point, and the only reason
    the hit test did not say so is paint order - Israel is drawn over Palestine,
    Greater London over the City - so the tap was always on it and is simply
    being returned to it.
 
+   It is all but under the finger: the point misses its outline by a few pixels.
+   That is a tap aimed at an eleven-pixel country and landing on the line, and
+   it belongs to the small one. Asked by putting a ring of points four pixels
+   out around the tap and seeing whether any of them land on the shape, which
+   costs eight hit tests and only for a place already close enough to win.
+
    Or it stands on the country that was hit: the Vatican is inside Italy, so its
    reach may spill onto Italian ground around it. A place that merely lies near
-   a border may not, however near, which is the whole of the Bahamas-and-Haiti
-   difference - the Bahamas are not in Haiti. */
-function mayTake(e, host, q){
+   a border gets the slip and no more, which is the whole of the Bahamas-and-
+   Haiti difference - the Bahamas are not in Haiti, and not within four pixels
+   of it either. */
+function mayTake(e, host, q, cx, cy, inv){
   if(inShape(e.code, q)) return true;
+  for(let i = 0; i < 8; i++){
+    const a = i * Math.PI / 4;
+    const s = new DOMPoint(cx + SLIP_PX*Math.cos(a), cy + SLIP_PX*Math.sin(a))
+                .matrixTransform(inv);
+    if(inShape(e.code, s)) return true;
+  }
   const pts = grabPoints(e);
   if(!pts) return false;
   for(const [bx, by] of pts)
@@ -3004,21 +3028,25 @@ function reachFor(cx, cy, host){
   if(!m) return null;
   let best = null, bd = REACH_PX;
   /* the tap in board units, for asking a shape whether it covers it */
-  let q = null;
+  let q = null, inv = null;
   if(host && host.play){
-    const inv = m.inverse();
+    inv = m.inverse();
     q = new DOMPoint(cx, cy).matrixTransform(inv);
   }
   for(const e of basis()){
     if(!e.play) continue;
     if(screenSize(e) >= REACH_PX*2) continue;
-    if(q && host !== e && !mayTake(e, host, q)) continue;
     const pts = grabPoints(e);
     if(!pts) continue;
-    for(const [bx, by] of pts){
-      const d = Math.hypot(m.a*bx + m.c*by + m.e - cx, m.b*bx + m.d*by + m.f - cy);
-      if(d < bd){ bd = d; best = e; }
-    }
+    /* distance first, and the hit tests only for a place near enough to win -
+       the rest are settled by arithmetic and never touch the geometry */
+    let d = Infinity;
+    for(const [bx, by] of pts)
+      d = Math.min(d, Math.hypot(m.a*bx + m.c*by + m.e - cx,
+                                 m.b*bx + m.d*by + m.f - cy));
+    if(d >= bd) continue;
+    if(q && host !== e && !mayTake(e, host, q, cx, cy, inv)) continue;
+    bd = d; best = e;
   }
   return best;
 }
