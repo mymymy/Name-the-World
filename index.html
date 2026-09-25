@@ -880,7 +880,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 18 sep · v146</span>
+      <span id="build" class="caps">build 25 sep · v147</span>
     </div>
   </div>
 </div>
@@ -2802,8 +2802,17 @@ svg.addEventListener('click', ev=>{
      been. Land that is out of play has no pointer events, so it is passed
      through to whatever is beneath, and a click on the sea still finds nothing
      with a code on it and still means put this one down. */
-  const under = ev.target.closest('[data-code]') ? ev.target
-              : document.elementFromPoint(ev.clientX, ev.clientY);
+  /* Asked of the point, always - never of ev.target.
+
+     The map takes pointer capture on the way down so a drag that wanders off it
+     carries on being a drag, and the click that follows is dispatched to the
+     capturing element. Reading ev.target when it happens to carry a code looked
+     like a shortcut and was a different question: it gave the shape the event
+     was aimed at rather than the one at the pixel, and where a small country is
+     drawn inside a larger one the two disagree. Palestine answered as Israel
+     and the City of London as Greater London - each of them correctly under the
+     finger, each reported as the thing around it. */
+  const under = document.elementFromPoint(ev.clientX, ev.clientY);
   const el = under && under.closest ? under.closest('[data-code]') : null;
   const hit = el && BY_CODE[el.dataset.code];
   /* A shape being held above the floor is, by definition, too small to aim at -
@@ -2822,9 +2831,13 @@ svg.addEventListener('click', ev=>{
      would not need to be that precise to hit Greater London - so the reach is
      asked every time and taken whenever what it offers is smaller than what was
      under the finger. A big shape only keeps a tap that nothing small wanted. */
-  const near = reachFor(ev.clientX, ev.clientY, hit && hit.play ? NUDGE_PX : REACH_PX);
-  if(near && (!hit || screenSize(near) < screenSize(hit))){
-    select(entryForShape(near).code); return;
+  const near = reachFor(ev.clientX, ev.clientY, hit);
+  /* near === hit is the ordinary case of tapping a small place squarely: both
+     answers agree, and comparing their sizes asks whether a thing is smaller
+     than itself. Take it rather than falling through. */
+  if(near && (!hit || near === hit || screenSize(near) < screenSize(hit))){
+    const t = entryForShape(near);
+    if(t){ select(t.code); return; }
   }
   if(!el){ closeAsk(true); hideTip(); S.sel = null; paintMap(); return; }
   const shape = hit; if(!shape) return;
@@ -2897,7 +2910,7 @@ function paintReach(){
         const el = document.elementFromPoint(sx, sy);
         const under = el && el.closest ? el.closest('[data-code]') : null;
         const hit = under && BY_CODE[under.dataset.code];
-        const found = reachFor(sx, sy, hit && hit.play ? NUDGE_PX : REACH_PX);
+        const found = reachFor(sx, sy, hit);
         const win = (found && (!hit || screenSize(found) < screenSize(hit))) ? found
                   : (hit && hit.play ? hit : null);
         if(!win || screenSize(win) >= REACH_PX*2) continue;
@@ -2925,20 +2938,29 @@ function paintReach(){
    neighbours, so it is passed over; zoom in far enough and every shape passes
    out of this the same way. */
 const REACH_PX = 22;
-/* Over open ground the reach is the full 22. Over another shape it is not: a
-   point inside North Yorkshire belongs to North Yorkshire, and West Yorkshire
-   being small next door is no claim on it. What survives there is the case the
-   reach exists for - something small directly under the finger, the City of
-   London inside Greater London, the Vatican inside Rome - which is near enough
-   to be covered by a nudge rather than a reach. */
-const NUDGE_PX = 10;
+/* Land on open ground and the nearest small place within a finger's width is
+   yours. Land on another country and it is not that simple: the tap has hit
+   something, and the something has a claim of its own.
+
+   It used to be settled by shortening the reach to ten pixels there, which is a
+   guess dressed as a rule, and it was wrong by five taps in forty-five on Haiti
+   - the Bahamas' southern islets sit close enough to Haiti's north coast to
+   reach inside it. Shortening it further would have cost the Vatican, which is
+   genuinely inside Rome and has to be reachable there.
+
+   The difference is not distance, it is containment. A place that is inside the
+   country you tapped may take the tap: the Vatican inside Italy, San Marino
+   inside Italy, the City of London inside Greater London. A place that merely
+   lies near the border may not, however near - the Bahamas are not in Haiti and
+   Rhode Island is not in Connecticut. So the question asked is whether the
+   small place actually stands on the ground you hit, which the shape itself can
+   answer. */
 /* Where a place can be grabbed, in board units. The globe records the middle of
-   each island as it was drawn - magnified shapes have moved, and the reach
-   belongs to what is on the screen rather than to what is underneath it. A board
-   is drawn once at a fixed size and keeps its own middle. */
+   each island as it was drawn; a board is drawn once at a fixed size and keeps
+   its own middle. */
 function grabPoints(e){
   if(e.at && e.at.length) return e.at;
-  return e.c ? [e.c] : (e.cll && e.fr ? null : null);
+  return e.c ? [e.c] : null;
 }
 /* how wide it is on screen, so a shape big enough to hit can be left alone */
 function screenSize(e){
@@ -2948,15 +2970,49 @@ function screenSize(e){
   if(e.held) return e.lifted ? 0 : Infinity;   // held shapes are small by definition
   return Infinity;
 }
-function reachFor(cx, cy, limit){
+function inShape(code, q){
+  const els = nodes[code];
+  if(!els) return false;
+  for(const el of els){
+    try{ if(el.isPointInFill && el.isPointInFill(q)) return true; }catch(err){}
+  }
+  return false;
+}
+/* Two ways a small place may take a tap that landed on a country.
+
+   It is under the finger. Its own shape covers the point, and the only reason
+   the hit test did not say so is paint order - Israel is drawn over Palestine,
+   Greater London over the City - so the tap was always on it and is simply
+   being returned to it.
+
+   Or it stands on the country that was hit: the Vatican is inside Italy, so its
+   reach may spill onto Italian ground around it. A place that merely lies near
+   a border may not, however near, which is the whole of the Bahamas-and-Haiti
+   difference - the Bahamas are not in Haiti. */
+function mayTake(e, host, q){
+  if(inShape(e.code, q)) return true;
+  const pts = grabPoints(e);
+  if(!pts) return false;
+  for(const [bx, by] of pts)
+    if(inShape(host.code, new DOMPoint(bx, by))) return true;
+  return false;
+}
+function reachFor(cx, cy, host){
   /* the scene's own matrix, which already carries the pan and the zoom - the
      same sum done by hand put the Caribbean in Algeria */
   const m = scene.getScreenCTM();
   if(!m) return null;
-  let best = null, bd = limit || REACH_PX;
+  let best = null, bd = REACH_PX;
+  /* the tap in board units, for asking a shape whether it covers it */
+  let q = null;
+  if(host && host.play){
+    const inv = m.inverse();
+    q = new DOMPoint(cx, cy).matrixTransform(inv);
+  }
   for(const e of basis()){
     if(!e.play) continue;
     if(screenSize(e) >= REACH_PX*2) continue;
+    if(q && host !== e && !mayTake(e, host, q)) continue;
     const pts = grabPoints(e);
     if(!pts) continue;
     for(const [bx, by] of pts){
