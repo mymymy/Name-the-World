@@ -880,7 +880,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 27 sep · v150</span>
+      <span id="build" class="caps">build 27 sep · v151</span>
     </div>
   </div>
 </div>
@@ -2027,12 +2027,32 @@ function buildMap(){
   layerHalo.appendChild(halo);
   layerLand.appendChild(land);
 
+  /* The small shapes last here too, and only the small ones.
+
+     Nothing on these boards sits inside anything else - they tile, and the City
+     of London is a hole cut out of Greater London rather than a patch laid on
+     it. What buried the City was not a fill but a line: it is a pixel and a
+     half across, Greater London was drawn after it, and the hairline around
+     Greater London's own edge crossed the whole of it. A pixel there answered
+     Greater London. It matters more for the two strokes that are not hairlines
+     - the ring round the shape you have picked, and round one just named, thick
+     enough to bury a small neighbour outright.
+
+     Sorting the whole board by size fixed that and cost more than it was worth:
+     with every big county at the bottom, a tap a hair inside North Yorkshire
+     began answering East Riding, because its neighbour's outline now lay over
+     the edge. Ten of the shapes need this. The other thirty-eight keep the
+     order they had, and their borders meet as they always did. */
+  const SMALL_B = 12;                         // across, in board units
+  const small = e => Math.hypot(e.b[2]-e.b[0], e.b[3]-e.b[1]) < SMALL_B;
+  const bySize = list => list.filter(e=>!small(e)).concat(list.filter(small));
+
   const cty = document.createDocumentFragment();
   $('#ctysea').setAttribute('class', 'sea');
   $('#ctyctx').setAttribute('d', CTY_CTX);
   $('#ctyctx').setAttribute('class', 'ctx');
   $('#ctyctx').setAttribute('clip-path', 'url(#plateclip)');
-  CTY_ENTRY.forEach(e=>{
+  bySize(CTY_ENTRY).forEach(e=>{
     const p = document.createElementNS(NS,'path');
     p.setAttribute('d', e.d); p.setAttribute('class','c'); p.dataset.code = e.code;
     cty.appendChild(p); (nodes[e.code] = nodes[e.code]||[]).push(p);
@@ -2063,7 +2083,7 @@ function buildMap(){
   $('#usctx').setAttribute('d', US_CTX);
   $('#usctx').setAttribute('class', 'ctx');
   $('#usctx').setAttribute('clip-path', 'url(#plateclip)');
-  US_ENTRY.forEach(e=>{
+  bySize(US_ENTRY).forEach(e=>{
     const p = document.createElementNS(NS,'path');
     p.setAttribute('d', e.d); p.setAttribute('class','c'); p.dataset.code = e.code;
     us.appendChild(p); (nodes[e.code] = nodes[e.code]||[]).push(p);
@@ -2082,7 +2102,7 @@ function buildMap(){
   $('#lbctx').setAttribute('d', LB_CTX);
   $('#lbctx').setAttribute('class', 'ctx');
   $('#lbctx').setAttribute('clip-path', 'url(#plateclip)');
-  LB_ENTRY.forEach(e=>{
+  bySize(LB_ENTRY).forEach(e=>{
     const p = document.createElementNS(NS,'path');
     p.setAttribute('d', e.d); p.setAttribute('class','c'); p.dataset.code = e.code;
     lb.appendChild(p); (nodes[e.code] = nodes[e.code]||[]).push(p);
