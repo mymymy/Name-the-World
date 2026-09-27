@@ -880,7 +880,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 27 sep · v149</span>
+      <span id="build" class="caps">build 27 sep · v150</span>
     </div>
   </div>
 </div>
@@ -1984,12 +1984,27 @@ function buildMap(){
   layerGrat.appendChild(gr); gratPath = gr;
 
   const land = document.createDocumentFragment(), halo = document.createDocumentFragment();
-  DATA.filter(e=>e.g).forEach(e=>{
-    /* Which shapes are held up to the floor: the ones that used to be a dot.
-       Not every small ring on the map - Indonesia has hundreds of islets and
-       none of them is a question. These are the places the game asks about, and
-       a place you are asked to name has to be findable. */
-    e.held = !!(e.play && e.px < 30);
+  const shown = DATA.filter(e=>e.g);
+  /* Which shapes are held up to the floor: the ones that used to be a dot.
+     Not every small ring on the map - Indonesia has hundreds of islets and
+     none of them is a question. These are the places the game asks about, and
+     a place you are asked to name has to be findable. */
+  shown.forEach(e=>{ e.held = !!(e.play && e.px < 30); });
+  /* And they are drawn last, over the top of whatever surrounds them.
+
+     Painted in the order the data happens to be in, an enclave goes under its
+     host and is swallowed by it: the Vatican and San Marino under Italy, Monaco
+     under France, Liechtenstein under Austria, Singapore under Malaysia -
+     while Andorra, Lesotho and Palestine came out on top, by nothing but luck
+     of the list. Nobody could see it while every country was the colour of
+     paper. Name Italy and it turns green, and the Vatican turns green with it -
+     an answer, apparently, that was never given.
+
+     Small shapes last fixes it for all of them at once, and costs nothing: a
+     held shape is at most thirteen pixels, so what it covers of its host is
+     thirteen pixels the host could not have been tapped on anyway. */
+  const order = shown.filter(e=>!e.held).concat(shown.filter(e=>e.held));
+  order.forEach(e=>{
     e.rings = e.g.map(r=>decodeRing(r, e.gd));
     e.box = lonLatBox(e.rings);
     const p = document.createElementNS(NS,'path');
@@ -2898,27 +2913,40 @@ function paintReach(){
        places on the screen, so a sample more than a reach and a bit from any of
        them cannot be theirs and needs no asking: the hit test, which is the
        expensive part, is never reached for most of the map. */
+    /* A place with a reach anywhere is shown everywhere, all of it in its one
+       colour. Palestine is why: past about eight times the opening zoom the
+       West Bank is wider than a finger and rightly stops having a reach, while
+       Gaza, a sliver, keeps one. Tinting only what still has a reach drew half
+       a country and left the other half looking unclaimed. What is worth seeing
+       is where each place answers, and both halves of Palestine answer. */
     const m = scene.getScreenCTM();
-    const spots = [];
+    const spots = [], reaches = new Set();
     const uu2 = k * unitPx();
     if(m) for(const e of basis()){
       if(!e.play) continue;
       const pts = grabPoints(e); if(!pts) continue;
       const whole = screenSize(e);
-      for(const [bx, by, sz] of pts){
-        if((sz === undefined ? whole : sz * uu2) >= REACH_PX*2) continue;
-        spots.push([m.a*bx + m.c*by + m.e, m.b*bx + m.d*by + m.f]);
+      const w = pts.map(([bx, by, sz]) => sz === undefined ? whole : sz * uu2);
+      if(!w.some(x => x < REACH_PX*2)) continue;
+      reaches.add(e.code);
+      for(let i = 0; i < pts.length; i++){
+        const [bx, by] = pts[i];
+        /* How far from this point a sample could still be its own: the reach,
+           and the island's own width on top, since a grab point sits in the
+           middle of a shape rather than covering it. A constant stood here and
+           was too short for the West Bank at forty-five pixels; each island's
+           own measure is right for all of them, and keeps Kiribati's atolls as
+           cheap as they were. */
+        spots.push([m.a*bx + m.c*by + m.e, m.b*bx + m.d*by + m.f,
+                    REACH_PX + (isFinite(w[i]) ? w[i] : MIN_SHAPE_PX)]);
       }
     }
-    /* a shape held above the floor can be a good deal wider than its grab
-       point, so the skirt allows for the shape as well as the reach */
-    const SKIRT = REACH_PX + MIN_SHAPE_PX;
     for(let y=0; y<r.height; y+=STEP){
       for(let x=0; x<r.width; x+=STEP){
         const sx = r.left+x, sy = r.top+y;
         let near = false;
-        for(const [px, py] of spots)
-          if(Math.abs(px-sx) < SKIRT && Math.abs(py-sy) < SKIRT){ near = true; break; }
+        for(const [px, py, rad] of spots)
+          if(Math.abs(px-sx) < rad && Math.abs(py-sy) < rad){ near = true; break; }
         if(!near) continue;
         const el = document.elementFromPoint(sx, sy);
         const under = el && el.closest ? el.closest('[data-code]') : null;
@@ -2928,8 +2956,7 @@ function paintReach(){
         const found = reachFor(sx, sy, hit);
         const took = found && (!hit || found.e === hit || found.w < screenSize(hit));
         const win = took ? found.e : (hit && hit.play ? hit : null);
-        if(!win) continue;
-        if(!took && screenSize(win) >= REACH_PX*2) continue;
+        if(!win || !reaches.has(win.code)) continue;
         /* a colour of its own per place, so neighbouring cells can be told apart */
         let h = 0; for(const ch of win.code) h = (h*31 + ch.charCodeAt(0)) & 1023;
         g.fillStyle = `hsl(${h*0.35 % 360} 85% 55%)`;
