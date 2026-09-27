@@ -880,7 +880,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 25 sep · v148</span>
+      <span id="build" class="caps">build 27 sep · v149</span>
     </div>
   </div>
 </div>
@@ -1819,7 +1819,12 @@ function heldPath(e, minU){
          theory that the Grenadines were reaching into Saint Lucia; measured, it
          changed Saint Lucia not at all - the collision was the moving, not the
          counting - and it cost Kiribati's lesser atolls their reach. */
-      where.push([a.cx, a.cy]);
+      /* and how wide it truly is, which is not how wide the country is. Gaza is
+         three pixels across while the West Bank is eleven, and a country scored
+         as one thing gave Gaza the West Bank's answer: big enough to hit, so no
+         help - for a sliver pinned between Israel and the sea. Each island is
+         asked about itself. */
+      where.push([a.cx, a.cy, a.size]);
     }
   }
   /* Where the islands ended up, and whether they are still being held up. A
@@ -2832,11 +2837,15 @@ svg.addEventListener('click', ev=>{
      asked every time and taken whenever what it offers is smaller than what was
      under the finger. A big shape only keeps a tap that nothing small wanted. */
   const near = reachFor(ev.clientX, ev.clientY, hit);
-  /* near === hit is the ordinary case of tapping a small place squarely: both
+  /* near.e === hit is the ordinary case of tapping a small place squarely: both
      answers agree, and comparing their sizes asks whether a thing is smaller
-     than itself. Take it rather than falling through. */
-  if(near && (!hit || near === hit || screenSize(near) < screenSize(hit))){
-    const t = entryForShape(near);
+     than itself. Take it rather than falling through.
+
+     Otherwise it is the reaching island that is weighed, not the country it
+     belongs to. Gaza is a sliver of a country that is not small, and weighing
+     Palestine against Israel gave the tap to Israel every time. */
+  if(near && (!hit || near.e === hit || near.w < screenSize(hit))){
+    const t = entryForShape(near.e);
     if(t){ select(t.code); return; }
   }
   if(!el){ closeAsk(true); hideTip(); S.sel = null; paintMap(); return; }
@@ -2891,11 +2900,15 @@ function paintReach(){
        expensive part, is never reached for most of the map. */
     const m = scene.getScreenCTM();
     const spots = [];
+    const uu2 = k * unitPx();
     if(m) for(const e of basis()){
-      if(!e.play || screenSize(e) >= REACH_PX*2) continue;
+      if(!e.play) continue;
       const pts = grabPoints(e); if(!pts) continue;
-      for(const [bx, by] of pts)
+      const whole = screenSize(e);
+      for(const [bx, by, sz] of pts){
+        if((sz === undefined ? whole : sz * uu2) >= REACH_PX*2) continue;
         spots.push([m.a*bx + m.c*by + m.e, m.b*bx + m.d*by + m.f]);
+      }
     }
     /* a shape held above the floor can be a good deal wider than its grab
        point, so the skirt allows for the shape as well as the reach */
@@ -2910,10 +2923,13 @@ function paintReach(){
         const el = document.elementFromPoint(sx, sy);
         const under = el && el.closest ? el.closest('[data-code]') : null;
         const hit = under && BY_CODE[under.dataset.code];
+        /* the same question a tap asks, weighed the same way - an overlay that
+           answered by its own rule would be a drawing of what ought to happen */
         const found = reachFor(sx, sy, hit);
-        const win = (found && (!hit || screenSize(found) < screenSize(hit))) ? found
-                  : (hit && hit.play ? hit : null);
-        if(!win || screenSize(win) >= REACH_PX*2) continue;
+        const took = found && (!hit || found.e === hit || found.w < screenSize(hit));
+        const win = took ? found.e : (hit && hit.play ? hit : null);
+        if(!win) continue;
+        if(!took && screenSize(win) >= REACH_PX*2) continue;
         /* a colour of its own per place, so neighbouring cells can be told apart */
         let h = 0; for(const ch of win.code) h = (h*31 + ch.charCodeAt(0)) & 1023;
         g.fillStyle = `hsl(${h*0.35 % 360} 85% 55%)`;
@@ -2966,14 +2982,16 @@ const REACH_PX = 22;
    nothing more. Four pixels reaches across the rounding and along a coast; it
    does not reach the Bahamas into Haiti, which is eight away and over water. */
 const SLIP_PX = 4;
-/* Where a place can be grabbed, in board units. The globe records the middle of
-   each island as it was drawn; a board is drawn once at a fixed size and keeps
-   its own middle. */
+/* Where a place can be grabbed, in board units, and how wide the island at that
+   point is. The globe records the middle of each island as it was drawn along
+   with its true extent; a board is drawn once at a fixed size and keeps its own
+   middle, with no width, and is measured as a whole instead. */
 function grabPoints(e){
   if(e.at && e.at.length) return e.at;
   return e.c ? [e.c] : null;
 }
-/* how wide it is on screen, so a shape big enough to hit can be left alone */
+/* how wide the whole of it is on screen - the measure a board goes by, and the
+   one the click uses to weigh a reach against what was under the finger */
 function screenSize(e){
   const u = k * unitPx();
   if(!u) return Infinity;
@@ -3021,12 +3039,20 @@ function mayTake(e, host, q, cx, cy, inv){
     if(inShape(host.code, new DOMPoint(bx, by))) return true;
   return false;
 }
+/* Which place has a claim on this point, and how wide the part of it that
+   claimed it was - {e, w}, or nothing.
+
+   The width is the winning island's own, not the country's, and it is given
+   back because the caller needs it: a reach is only taken over what was under
+   the finger when it is the smaller of the two, and for Gaza the country is the
+   wrong thing to weigh. Israel would win every time. */
 function reachFor(cx, cy, host){
   /* the scene's own matrix, which already carries the pan and the zoom - the
      same sum done by hand put the Caribbean in Algeria */
   const m = scene.getScreenCTM();
   if(!m) return null;
-  let best = null, bd = REACH_PX;
+  const u = k * unitPx();
+  let best = null, bd = REACH_PX, bw = 0;
   /* the tap in board units, for asking a shape whether it covers it */
   let q = null, inv = null;
   if(host && host.play){
@@ -3035,20 +3061,28 @@ function reachFor(cx, cy, host){
   }
   for(const e of basis()){
     if(!e.play) continue;
-    if(screenSize(e) >= REACH_PX*2) continue;
     const pts = grabPoints(e);
     if(!pts) continue;
+    /* A board keeps no island widths, so it is weighed whole. */
+    const whole = screenSize(e);
     /* distance first, and the hit tests only for a place near enough to win -
        the rest are settled by arithmetic and never touch the geometry */
-    let d = Infinity;
-    for(const [bx, by] of pts)
-      d = Math.min(d, Math.hypot(m.a*bx + m.c*by + m.e - cx,
-                                 m.b*bx + m.d*by + m.f - cy));
+    let d = Infinity, w = 0;
+    for(const [bx, by, sz] of pts){
+      /* An island already wider than a finger needs no help and would only be
+         stealing from its neighbours. Asked of the island, so the West Bank can
+         pass out of this while Gaza, three pixels of it, does not. */
+      const iw = sz === undefined ? whole : sz * u;
+      if(iw >= REACH_PX*2) continue;
+      const id = Math.hypot(m.a*bx + m.c*by + m.e - cx,
+                            m.b*bx + m.d*by + m.f - cy);
+      if(id < d){ d = id; w = iw; }
+    }
     if(d >= bd) continue;
     if(q && host !== e && !mayTake(e, host, q, cx, cy, inv)) continue;
-    bd = d; best = e;
+    bd = d; bw = w; best = e;
   }
-  return best;
+  return best ? {e: best, w: bw} : null;
 }
 
 $('#zin').onclick = ()=> zoomStep(1.6);
