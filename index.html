@@ -880,7 +880,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 27 sep · v151</span>
+      <span id="build" class="caps">build 28 sep · v152</span>
     </div>
   </div>
 </div>
@@ -962,8 +962,25 @@ const HUE = {
   'North America':'#B7C9D4', 'South America':'#DBC49C',
   'Oceania':'#C6BCD1', 'Antarctica':'#E6EEF1'
 };
+/* Everything a name is matched by goes through here, on both sides: the names
+   in the data are put through it once when the game is built, and what you type
+   is put through it on every keystroke. Whatever it throws away cannot be
+   typed.
+
+   It used to throw away every letter that is not a to z, which quietly voided
+   twenty-five of the names the data offers. Russia answers to "Russian
+   Federation" and to "\u0420\u043e\u0441\u0441\u0438\u0439\u0441\u043a\u0430\u044f \u0424\u0435\u0434\u0435\u0440\u0430\u0446\u0438\u044f" - except that the second one
+   normalised to an empty string and could never be matched by anything. So did
+   \u0e23\u0e32\u0e0a\u0e2d\u0e32\u0e13\u0e32\u0e08\u0e31\u0e01\u0e23\u0e44\u0e17\u0e22, \u4e2d\u83ef\u6c11\u570b, \uc870\uc120\ubbfc\uc8fc\uc8fc\uc758\uc778\ubbfc\uacf5\ud654\uad6d and the rest of them. A
+   player with a Russian keyboard typing the name of their own country got
+   nothing, for a name the game had already promised to accept.
+
+   Letters and digits of any script are kept now, punctuation still goes. The
+   accent-stripping above stays, and applies to every alphabet that has accents
+   rather than only the Latin one - both sides of the comparison are treated the
+   same, so \u0420\u043e\u0441\u0441\u0438\u0301\u044f and \u0420\u043e\u0441\u0441\u0438\u044f are one word here, which is the point of it. */
 const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-  .replace(/&/g,' and ').replace(/[^a-z0-9 ]/g,' ').replace(/\bthe\b/g,' ')
+  .replace(/&/g,' and ').replace(/[^\p{L}\p{N} ]/gu,' ').replace(/\bthe\b/g,' ')
   .replace(/\s+/g,' ').trim();
 const collator = new Intl.Collator('en-GB');
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
