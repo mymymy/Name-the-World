@@ -880,7 +880,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 28 sep · v152</span>
+      <span id="build" class="caps">build 28 sep · v153</span>
     </div>
   </div>
 </div>
@@ -3464,7 +3464,7 @@ function openAsk(t){
   clearTimeout(goingTimer);
   ask.classList.remove('going');       // caught mid-fade, it comes straight back
   startTracking(t);
-  S.cursor = 0;
+  S.cursor = 0; S.chose = false;
   find.value = '';
   $('#asknote').textContent = '';
   ask.classList.add('on');
@@ -3585,10 +3585,12 @@ function fillSuggestions(){
   const hits = live.concat(done);
   const frag = document.createDocumentFragment();
   let i = 0;
-  hits.forEach(({e})=>{
+  hits.forEach(({e, s})=>{
     const used = spent.has(e.name);
     const b = document.createElement('button');
     b.type = 'button';
+    /* kept on the row so Enter can tell a clear winner from a tie */
+    b.dataset.s = s;
     const isCursor = !used && i++ === S.cursor;
     b.className = 'row' + (used ? ' used' : '') + (isCursor ? ' cursor' : '');
     b.innerHTML = `<span>${esc(e.name)}</span>` + (used ? '<span class="mark caps">used</span>' : '');
@@ -3597,18 +3599,34 @@ function fillSuggestions(){
   });
   sug.appendChild(frag);
 }
-find.addEventListener('input', ()=>{ S.cursor = 0; $('#asknote').textContent=''; renderSuggestions(); renderAskFoot(); placeFloaters(); });
+find.addEventListener('input', ()=>{ S.cursor = 0; S.chose = false; $('#asknote').textContent=''; renderSuggestions(); renderAskFoot(); placeFloaters(); });
 find.addEventListener('keydown', ev=>{
   const rows = [...sug.querySelectorAll('.row:not(.used)')];
   if(ev.key === 'Enter'){
     ev.preventDefault();
-    if(rows.length && (S.list || (S.sel && hinted.has(S.sel))))
+    if(rows.length && (S.list || (S.sel && hinted.has(S.sel)))){
+      /* Enter takes the name at the top of the list, which is the whole use of
+         the list - type 'ger', press Enter, name Germany.
+
+         Unless the top of the list is a draw. 'Korea' is North Korea and South
+         Korea equally, and pressing Enter quietly answered North, which is not
+         a thing the player said. 'United' is three countries at once. A word
+         that names two places names neither on its own, so the list stays up
+         and one of them has to be picked - by arrow key or by touch, either
+         way deliberately.
+
+         Only when nothing has been picked yet. Having moved the cursor is a
+         choice already made, and Enter then means the thing chosen. */
+      const tied = !S.chose && rows.length > 1 && rows[0].dataset.s === rows[1].dataset.s;
+      if(tied){ $('#asknote').textContent = 'Which one?'; return; }
       (rows[S.cursor] || rows[0]).click();
+    }
     else answer(find.value);
     return;
   }
   if(ev.key === 'ArrowDown' || ev.key === 'ArrowUp'){
     ev.preventDefault();
+    S.chose = true;
     S.cursor = Math.max(0, Math.min(rows.length-1, S.cursor + (ev.key === 'ArrowDown' ? 1 : -1)));
     renderSuggestions();
     /* inline as well as block: down the list the cursor moves vertically, across
