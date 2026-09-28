@@ -880,7 +880,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 28 sep · v153</span>
+      <span id="build" class="caps">build 28 sep · v154</span>
     </div>
   </div>
 </div>
@@ -1543,6 +1543,10 @@ const worldPaths = [], worldDots = [];
 let lam0 = 0;                      // the meridian the map is turned to
 /* how small a shape may get before it is held up, in screen pixels */
 const MIN_SHAPE_PX = 13;
+/* A capital is a dot, and the dot is this across in board units. It is the one
+   thing on the map whose size is fixed rather than drawn from geography, so it
+   is written down once and read by both the drawing and the reaching. */
+const DOT_R = 4;
 function drawWorld(){
   /* the same floor in board units, which is what the geometry is measured in */
   const uu = k * unitPx();
@@ -1581,6 +1585,12 @@ function drawWorld(){
     const [e,c] = worldDots[i];
     const q = project(e.cll[0], e.cll[1]);
     c.setAttribute('cx', q[0].toFixed(1)); c.setAttribute('cy', q[1].toFixed(1));
+    /* Somewhere to grab it, written down where it is drawn and at the same
+       moment - a dot is six pixels across and was the smallest thing in the
+       game with no reach at all, while every country had one. Recorded here
+       rather than worked out later because the dot moves with the meridian:
+       a point kept from the last turn is a city where the city is not. */
+    e.at = [[q[0], q[1], DOT_R*2]];
   }
   const edge = spherePath();
   $('#sphere').setAttribute('d', edge); $('#rim').setAttribute('d', edge);
@@ -2037,7 +2047,7 @@ function buildMap(){
      is what a filled circle has meant on every map ever printed. */
   CAP_ENTRY.forEach(e=>{
     const c = document.createElementNS(NS,'circle');
-    c.setAttribute('r',4); c.setAttribute('class','dot'); c.dataset.code = e.code;
+    c.setAttribute('r',DOT_R); c.setAttribute('class','dot'); c.dataset.code = e.code;
     land.appendChild(c); (nodes[e.code] = nodes[e.code]||[]).push(c);
     worldDots.push([e, c]);
   });
@@ -3059,6 +3069,8 @@ function grabPoints(e){
 function screenSize(e){
   const u = k * unitPx();
   if(!u) return Infinity;
+  /* a dot is the size it is drawn, whatever the city under it is worth */
+  if(e.isCap) return DOT_R*2 * u;
   if(e.b) return Math.max(e.b[2]-e.b[0], e.b[3]-e.b[1]) * u;
   if(e.held) return e.lifted ? 0 : Infinity;   // held shapes are small by definition
   return Infinity;
