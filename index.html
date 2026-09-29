@@ -338,6 +338,9 @@ path.c.out{fill:var(--land-out);stroke:#B4B8AF;pointer-events:none}
 /* in the capitals game the countries are the backdrop you read the map from,
    not shapes that are out of play - so they keep their normal colour */
 path.c.ctx{fill:var(--land);stroke:var(--coast);stroke-width:.6;stroke-opacity:.55;pointer-events:none}
+/* A country in the capitals game is the backdrop, and it is also the way you
+   reach the city in it - so it takes taps while looking exactly as it did. */
+path.c.ctx.pick{pointer-events:auto;cursor:pointer}
 path.c.ctx.host{stroke-width:2.2;stroke-opacity:1;stroke:var(--ok)}
 .gone{display:none}
 /* the counties board replaces the world one outright - its own projection,
@@ -880,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 28 sep · v154</span>
+      <span id="build" class="caps">build 29 sep · v155</span>
     </div>
   </div>
 </div>
@@ -1438,6 +1441,14 @@ function rollRound(){
 }
 function entryForShape(e){
   if(S.mode==='continents') return e.continent ? BY_CODE['CONT-'+e.continent] : null;
+  /* and in the capitals game a country stands for the city in it. Every one of
+     the 198 capitals belongs to a country that is drawn, and no country has two
+     of them, so this is a name for a shape rather than a guess at one. Western
+     Sahara and Antarctica have no capital in the game and answer for nobody. */
+  if(S.mode==='capitals' && !e.isCap){
+    const c = BY_CODE['CAP-'+e.code];
+    return c && targets().includes(c) ? c : null;
+  }
   return targets().includes(e) ? e : null;
 }
 function unnamed(){ return targets().filter(e=>!S.ans[e.code]); }
@@ -2202,6 +2213,12 @@ function paintMap(){
        yet - a gap, once the states around it are coloured in. It is land that
        is not in play, and takes that colour like anywhere else out of play. */
     let cls = t ? ' play' : (caps ? ' ctx' : ' out');
+    /* Hit anywhere on France to be asked about Paris. A capital is a seven
+       pixel dot; the country around it is the size of a country, and it is the
+       thing a player is already looking at when they go for its capital.
+       The dot keeps its own reach, so where a city sits near a border - or is
+       a country of its own, like Singapore - the nearer dot still wins. */
+    if(caps && !t && BY_CODE['CAP-'+e.code]) cls += ' pick';
     /* Every answer is marked the moment it is given, so a shape is right, wrong
        or given away - there is no longer a fourth state of named-but-unmarked. */
     if(a) cls += a.told ? ' told' : (a.ok ? ' right' : ' miss');
@@ -3103,7 +3120,14 @@ function inShape(code, q){
    of it either. */
 function mayTake(e, host, q, cx, cy, inv){
   if(inShape(e.code, q)) return true;
-  for(let i = 0; i < 8; i++){
+  /* The slip is for a shape that shares a border - Palestine beside Israel,
+     where aiming at eleven pixels lands on the line. A capital is not a shape
+     on the map, it is a mark placed on one, and it belongs to exactly one
+     country. Given the slip as well, every capital reached four pixels into
+     its neighbours: a tap plainly inside Slovakia answered Budapest, because
+     Hungary's dot was four pixels over the border. So a dot gets the ground it
+     stands on and the ground it is drawn on, and no more. */
+  if(!e.isCap) for(let i = 0; i < 8; i++){
     const a = i * Math.PI / 4;
     const s = new DOMPoint(cx + SLIP_PX*Math.cos(a), cy + SLIP_PX*Math.sin(a))
                 .matrixTransform(inv);
