@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 sep · v155</span>
+      <span id="build" class="caps">build 29 sep · v156</span>
     </div>
   </div>
 </div>
@@ -1554,9 +1554,10 @@ const worldPaths = [], worldDots = [];
 let lam0 = 0;                      // the meridian the map is turned to
 /* how small a shape may get before it is held up, in screen pixels */
 const MIN_SHAPE_PX = 13;
-/* A capital is a dot, and the dot is this across in board units. It is the one
-   thing on the map whose size is fixed rather than drawn from geography, so it
-   is written down once and read by both the drawing and the reaching. */
+/* The radius a dot is born with, before sizeDots gives it the one it keeps.
+   What it is actually drawn at is DOT_PX, in screen pixels, held there at every
+   zoom - so anything that reasons about a dot's size must read that and not
+   this, which is only the value in the markup until the first draw. */
 const DOT_R = 4;
 function drawWorld(){
   /* the same floor in board units, which is what the geometry is measured in */
@@ -1597,11 +1598,16 @@ function drawWorld(){
     const q = project(e.cll[0], e.cll[1]);
     c.setAttribute('cx', q[0].toFixed(1)); c.setAttribute('cy', q[1].toFixed(1));
     /* Somewhere to grab it, written down where it is drawn and at the same
-       moment - a dot is six pixels across and was the smallest thing in the
+       moment - a dot is seven pixels across and was the smallest thing in the
        game with no reach at all, while every country had one. Recorded here
        rather than worked out later because the dot moves with the meridian:
-       a point kept from the last turn is a city where the city is not. */
-    e.at = [[q[0], q[1], DOT_R*2]];
+       a point kept from the last turn is a city where the city is not.
+       Its width is held in board units, because that is what the reach
+       measures in - but the dot is a fixed size on screen, so the number
+       changes with the zoom while the dot does not. Written as DOT_R*2 it grew
+       with the map and passed for finger-sized at about seven times in, and
+       every capital quietly lost its reach from there on. */
+    e.at = [[q[0], q[1], uu ? DOT_PX*2/uu : 0]];
   }
   const edge = spherePath();
   $('#sphere').setAttribute('d', edge); $('#rim').setAttribute('d', edge);
@@ -3086,8 +3092,8 @@ function grabPoints(e){
 function screenSize(e){
   const u = k * unitPx();
   if(!u) return Infinity;
-  /* a dot is the size it is drawn, whatever the city under it is worth */
-  if(e.isCap) return DOT_R*2 * u;
+  /* a dot is the size it is drawn, which is the same at every zoom */
+  if(e.isCap) return DOT_PX*2;
   if(e.b) return Math.max(e.b[2]-e.b[0], e.b[3]-e.b[1]) * u;
   if(e.held) return e.lifted ? 0 : Infinity;   // held shapes are small by definition
   return Infinity;
