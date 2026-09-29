@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 sep · v156</span>
+      <span id="build" class="caps">build 29 sep · v157</span>
     </div>
   </div>
 </div>
@@ -1596,7 +1596,12 @@ function drawWorld(){
   for(let i=0;i<worldDots.length;i++){
     const [e,c] = worldDots[i];
     const q = project(e.cll[0], e.cll[1]);
-    c.setAttribute('cx', q[0].toFixed(1)); c.setAttribute('cy', q[1].toFixed(1));
+    /* Three places, not one. These are board units, and a board unit is a
+       pixel and a bit at the opening view but twenty-five pixels at thirty
+       times in - so a tenth of a unit, which reads as precision, is two and a
+       half pixels of it there. The dot was being snapped that far from the
+       point it marks, and the parting below is measured in tenths of that. */
+    c.setAttribute('cx', q[0].toFixed(3)); c.setAttribute('cy', q[1].toFixed(3));
     /* Somewhere to grab it, written down where it is drawn and at the same
        moment - a dot is seven pixels across and was the smallest thing in the
        game with no reach at all, while every country had one. Recorded here
@@ -1609,6 +1614,8 @@ function drawWorld(){
        every capital quietly lost its reach from there on. */
     e.at = [[q[0], q[1], uu ? DOT_PX*2/uu : 0]];
   }
+  /* and once they are all placed, part the ones that landed on each other */
+  spreadDots(uu);
   const edge = spherePath();
   $('#sphere').setAttribute('d', edge); $('#rim').setAttribute('d', edge);
   /* The clip only has to say where the halo stops, and a step or two of slack
@@ -2266,6 +2273,117 @@ function sizeDots(){
     const w = Math.sqrt(e.px) * u;           // roughly how wide the country is on screen
     c.style.opacity = Math.min(1, Math.max(0, (DOT_PX*7 - w)/(DOT_PX*4)));
   });
+}
+
+/* Two dots on the same few pixels read as one dot. Half of each has to show,
+   which for two equal circles means their centres at least 0.81 of a radius
+   apart: closer than that and the lens they share is more than half a circle.
+   The Vatican and Rome are a sixth of a pixel apart at the opening view and
+   would still be touching at forty times in, so no amount of zoom parts them -
+   only moving one of them does.
+
+   A dot may be moved to get there, and only so far as keeps it standing on its
+   own country. That is what makes this safe at every zoom rather than past some
+   threshold: tight where the ground is tight, generous where it is not. It also
+   keeps the mark honest twice over. A capital drawn onto the country next door
+   is a lie about where it is - and a licence, because a dot standing in a
+   country may take taps meant for that country.
+
+   The islands keep their true middles while their drawing shifts; a dot does
+   the opposite, and what it is reached for follows what is drawn. The move here
+   is small and deliberate and its whole purpose is to tell two dots apart, so a
+   reach left behind at the old spot would hand the tap to the other one. */
+const DOT_GAP = 0.81;                        // of a radius, centre to centre
+function spreadDots(u){
+  if(!u || !worldDots.length) return;
+  /* The dots are only shown in the game that is about them; everywhere else
+     they carry the class that puts them away. Parting things nobody can see
+     costs a millisecond of every frame of every drag in the countries game,
+     which is the one most played. */
+  if(S.mode !== 'capitals') return;
+  const gap = DOT_GAP * DOT_PX / u;          // the same distance, in board units
+  /* Read from what was just worked out, not back off the elements. Two hundred
+     dots is four hundred attribute reads a frame, each one a string to parse,
+     and the numbers are already to hand. */
+  const P = [];
+  for(const [e, c] of worldDots){
+    const a = e.at && e.at[0]; if(!a) continue;
+    P.push({e, c, x: a[0], y: a[1], ox: a[0], oy: a[1]});
+  }
+  /* Only near neighbours are worth comparing, so they go into cells a gap
+     across and each one looks at the nine around it. Two hundred dots compared
+     every which way is forty thousand sums a frame for the sake of a handful
+     that touch; and the handful is found once, not on every pass. */
+  const cells = new Map();
+  for(let i=0;i<P.length;i++){
+    const key = Math.floor(P[i].x/gap) + ',' + Math.floor(P[i].y/gap);
+    const list = cells.get(key); if(list) list.push(i); else cells.set(key, [i]);
+  }
+  const pairs = [];
+  for(let i=0;i<P.length;i++){
+    const ci = Math.floor(P[i].x/gap), cj = Math.floor(P[i].y/gap);
+    for(let a=-1;a<=1;a++) for(let b=-1;b<=1;b++){
+      const list = cells.get((ci+a) + ',' + (cj+b));
+      if(!list) continue;
+      for(const j of list){
+        if(j <= i) continue;
+        const dx = P[j].x-P[i].x, dy = P[j].y-P[i].y;
+        if(dx*dx + dy*dy < gap*gap) pairs.push([i, j]);
+      }
+    }
+  }
+  if(!pairs.length) return;
+  const onOwn = (p, x, y) => {
+    const code = p.e.iso || p.e.code;
+    try{ return inShape(code, new DOMPoint(x, y)); }catch(err){ return false; }
+  };
+  /* back towards where it really is, until it is on its own ground again. If
+     it was never on it - the country is off the edge and not drawn, or the
+     outline is coarser than the city is precise - it does not move at all. */
+  const hold = p => {
+    if(onOwn(p, p.x, p.y)) return;
+    const mx = p.x - p.ox, my = p.y - p.oy;
+    let lo = 0, hi = 1;
+    for(let s=0;s<6;s++){
+      const t = (lo+hi)/2;
+      if(onOwn(p, p.ox + mx*t, p.oy + my*t)) lo = t; else hi = t;
+    }
+    p.x = p.ox + mx*lo; p.y = p.oy + my*lo;
+  };
+  const touched = new Set(), now = new Set();
+  /* Each pass gives each of a pair half of what they still lack, so a pair with
+     one partner pinned against its border closes the gap by half a pass - four
+     passes left them six per cent short of showing half, which is visible. Ten
+     takes that to a tenth of a per cent.
+
+     Only the dots that moved in this pass are put back on their ground. Asking
+     a shape whether it covers a point is the dear part of all this, and asking
+     it again about a dot that has not moved is the same answer for the same
+     money. */
+  for(let pass=0; pass<10; pass++){
+    now.clear();
+    for(const [i, j] of pairs){
+      const dx = P[j].x - P[i].x, dy = P[j].y - P[i].y;
+      const d = Math.hypot(dx, dy);
+      if(d >= gap) continue;
+      /* Exactly on top of one another has no direction to part along, so they
+         take a fixed one - the same pair parts the same way on every frame,
+         rather than flickering off in whatever direction rounding suggests. */
+      const ux = d < 1e-9 ? 1 : dx/d, uy = d < 1e-9 ? 0 : dy/d;
+      const push = (gap - d)/2;
+      P[i].x -= ux*push; P[i].y -= uy*push;
+      P[j].x += ux*push; P[j].y += uy*push;
+      now.add(i); now.add(j);
+    }
+    if(!now.size) break;
+    for(const i of now){ touched.add(i); hold(P[i]); }
+  }
+  for(const i of touched){
+    const p = P[i];
+    if(p.x === p.ox && p.y === p.oy) continue;
+    p.c.setAttribute('cx', p.x.toFixed(3)); p.c.setAttribute('cy', p.y.toFixed(3));
+    p.e.at[0][0] = p.x; p.e.at[0][1] = p.y;
+  }
 }
 
 /* On a screen taller than it is wide, the globe at its natural size is a narrow
