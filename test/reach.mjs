@@ -138,13 +138,35 @@ console.log('a tap on the island itself');
   ok(`names it, all ${onScreen.length} of them`, {wrong, dead}, {wrong:[], dead:[]});
 }
 
-console.log('\na tap 16px off the mark - a miss, by the old rules');
+console.log('\na tap just inside what a place may claim - a miss, by the old rules');
 {
+  /* Sixteen pixels, flat, was right when every small shape was drawn at the
+     same size and claimed the same forty-four pixels around it. A place now
+     claims three times what it is drawn, so what counts as a near miss is its
+     own business - a mark a pixel and a half across does not get to answer for
+     ground sixteen pixels away, and should not. Each is tapped just inside
+     what it may have. */
+  /* Of the piece being tapped, not the biggest the country has. São Tomé and
+     Cape Verde are several islands of different sizes, and the spot found is
+     not always on the largest - measuring one and tapping another is how this
+     came to fail three taps in twenty, at random. */
+  const claimAt = (name, s) => p.evaluate(([n, x, y])=>{
+    const e = DATA.find(z=>z.name===n);
+    const m = scene.getScreenCTM(), u = k*unitPx();
+    let best = Infinity, w = 0;
+    for(const a of (e.at || [])){
+      const d = Math.hypot(m.a*a[0]+m.c*a[1]+m.e - x, m.b*a[0]+m.d*a[1]+m.f - y);
+      if(d < best){ best = d; w = a[2]*u; }
+    }
+    return Math.max(3, reachOf(w) - 2);
+  }, [name, s[0], s[1]]);
   let n = 0, found = 0; const lost = [];
   for(const name of onScreen){
-    for(const [dx,dy] of [[16,0],[-16,0],[0,16],[0,-16]]){
+    for(const [ux,uy] of [[1,0],[-1,0],[0,1],[0,-1]]){
       await reset();
       const s = await spotOf(name); if(!s) continue;
+      const off = await claimAt(name, s);
+      const dx = ux*off, dy = uy*off;
       /* the offset point has to be on the map too - sixteen pixels below a spot
          near the bottom edge is the Next button, and a tap there proves nothing */
       const inside = await p.evaluate(([x,y])=>{ const r = wrap.getBoundingClientRect();

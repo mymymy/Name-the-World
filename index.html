@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 1 oct · v160</span>
+      <span id="build" class="caps">build 1 oct · v161</span>
     </div>
   </div>
 </div>
@@ -3249,6 +3249,25 @@ function paintReach(){
    neighbours, so it is passed over; zoom in far enough and every shape passes
    out of this the same way. */
 const REACH_PX = 22;
+/* How much of that a place actually gets: three times what it is drawn, up to
+   the full reach and never below a third of it.
+
+   A flat forty-four pixels was right when every small shape was drawn at the
+   same thirteen, and wrong once they are drawn at the size they have earned.
+   San Marino two zoom steps out is a mark a pixel and a half across, and it was
+   taking a forty-four pixel bite out of an Italy only a hundred pixels tall -
+   a claim out of all proportion to anything you could see, on ground that
+   plainly belonged to its neighbour.
+
+   Three times, so that a shape at the floor of seven pixels has the whole of
+   it: a finger's width, which is what the reach is for. Below that the claim
+   shrinks with the mark, and the help arrives as the thing becomes something
+   you could be aiming at. The lower bound is for the boards, where nothing is
+   magnified and a shape is simply as small as it is - the City of London is a
+   pixel and a half on the counties and will never be more at that zoom, and
+   taking its reach away for being small is precisely backwards. */
+const GRAB = 3, GRAB_MIN = 8;
+const reachOf = w => Math.max(GRAB_MIN, Math.min(REACH_PX, w * GRAB));
 /* Land on open ground and the nearest small place within a finger's width is
    yours. Land on another country and it is not that simple: the tap has hit
    something, and the something has a claim of its own.
@@ -3381,6 +3400,7 @@ function reachFor(cx, cy, host){
       if(sz !== undefined && iw < MIN_HIT_PX) continue;   // too small to be seen at all
       const id = Math.hypot(m.a*bx + m.c*by + m.e - cx,
                             m.b*bx + m.d*by + m.f - cy);
+      if(id > reachOf(iw)) continue;             // beyond what a mark this size may claim
       if(id < d){ d = id; w = iw; }
     }
     if(d >= bd) continue;
