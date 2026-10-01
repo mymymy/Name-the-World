@@ -151,3 +151,18 @@ cd server && npx wrangler d1 execute name-the-world-board --remote --file=schema
 ## Hosting
 
 Any static host will serve it. For GitHub Pages: **Settings → Pages → Deploy from a branch → `main` / root**.
+
+## Known, not yet fixed
+
+**Two city labels on one spot overlap.** In the capitals game a place is
+labelled once it has been named, and the label is anchored where the city truly
+is. Vatican City and Rome are 0.37px apart there, so the two names are drawn
+over each other and read as `VatRomeCity`.
+
+The dots themselves no longer collide — they are parted far enough apart that
+half of each shows, and held on their own country while doing it (`spreadDots`).
+The labels were not moved with them, and they are the thing you actually read.
+Whatever is done about it wants to handle more than this one pair: Kinshasa and
+Brazzaville, Jerusalem and Ramallah, and the Lesser Antilles all crowd at some
+zoom, and a label is far wider than the dot it belongs to, so parting labels is
+a harder packing problem than parting dots was.
