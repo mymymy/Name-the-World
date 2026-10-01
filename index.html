@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 1 oct · v159</span>
+      <span id="build" class="caps">build 1 oct · v160</span>
     </div>
   </div>
 </div>
@@ -1552,8 +1552,15 @@ let k=1, tx=0, ty=0;
 const nodes = {};
 const worldPaths = [], worldDots = [];
 let lam0 = 0;                      // the meridian the map is turned to
-/* how small a shape may get before it is held up, in screen pixels */
-const MIN_SHAPE_PX = 13;
+/* How small a shape may get before it is held up, in screen pixels.
+
+   Seven, not thirteen. Thirteen was chosen when the drawn shape had to be the
+   thing you tapped, and it is not any more: a held shape carries a reach of
+   forty-four pixels around it whatever its size, so the drawing only has to be
+   seen, and seven pixels is plainly seen. Thirteen made San Marino and Vatican
+   City loom - readable long before you had zoomed anywhere near them, and half
+   again too big when you got there. */
+const MIN_SHAPE_PX = 7;
 /* And how much ground it may be given to get there.
 
    The floor on its own was overzealous. It asked what size a shape must be to
@@ -1572,12 +1579,13 @@ const MIN_SHAPE_PX = 13;
    What is capped instead is the ground added, which is a distance on the map
    rather than a factor - so it is the same distance at every zoom, and it is
    the screen that changes. A shape is drawn at its true size plus this, or at
-   the floor, whichever is smaller. Near the widest view the sum is about a
-   pixel, so everything small is a speck; by the time the game has zoomed to
-   ask about one, the same distance is ten pixels and the floor has taken over.
+   the floor, whichever is smaller. Near the widest view the sum is a
+   third of a pixel, so everything small is a speck; by the time the game has
+   zoomed to ask about one it is four pixels, and the floor takes over later
+   still.
    The one rule covers both ends, and covers Vatican City as readily as San
    Marino, because it does not care how small the thing it is adding to is. */
-const GROW_U = 1.3;
+const GROW_U = 0.5;
 /* And below this, drawn, a shape is not there to be aimed at. Nothing may be
    reached for that cannot be seen: with the stretch capped, Vatican City is a
    sixth of a pixel at the opening view, and a forty-four pixel target sitting
