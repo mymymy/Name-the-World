@@ -20,8 +20,21 @@ await p.click('.game[data-mode="world"]'); await p.waitForTimeout(250);
 const g0 = await p.$('.menupanel:not([hidden]) button.go'); if(g0) await g0.click();
 await p.waitForTimeout(1200);
 
-const reset = async ()=>{ await p.evaluate(()=>{ S.sel = null; closeAsk(); fitCurrent(); });
-  await p.waitForTimeout(1000); };
+/* Wait for the map to stop, not for a length of time. Naming a place flies it,
+   and the flight outlives the click that started it - and the globe turns on an
+   animation of its own, so lam0 has to be watched as well as the zoom and the
+   pan. A fixed sleep here is what made Kiribati answer São Tomé: the view was
+   still moving when the spot was measured. */
+const reset = async ()=>{
+  await p.evaluate(()=>{ S.sel = null; closeAsk(true); hideTip(); fitCurrent(); });
+  let last = null, same = 0;
+  await p.waitForTimeout(150);
+  for(let i = 0; i < 60 && same < 3; i++){
+    const now = await p.evaluate(()=>[k, tx, ty, lam0].join(','));
+    same = now === last ? same + 1 : 0; last = now;
+    await p.waitForTimeout(70);
+  }
+};
 /* Found by where the country is actually painted, not by anything the page
    keeps about it - so the same test can be put to a build that has none of
    this, and give an answer rather than nothing to compare. */
@@ -42,27 +55,61 @@ const spotOf = name => p.evaluate(n=>{
      bounding-box centre is no good either - Palestine is the West Bank and Gaza,
      and the middle of the two is Israel. */
   const m = scene.getScreenCTM(), inv = m.inverse();
+  /* On the shape, and near a piece of it.
+
+     isPointInFill knows nothing of the clip that hides the far side of the
+     globe, so a path that wraps the antimeridian answers yes for points inside
+     a region that is never painted. Kiribati did exactly that: a point in the
+     Atlantic came back as Kiribati with the nearest Kiribati atoll six hundred
+     and sixty-three pixels away, and the tap - rightly - found nothing there. */
   const on = (x,y) => {
     const q = new DOMPoint(x,y).matrixTransform(inv);
+    let onFill = false;
     for(const el of (nodes[e.code]||[]))
-      { try{ if(el.isPointInFill && el.isPointInFill(q)) return true; }catch(err){} }
+      { try{ if(el.isPointInFill && el.isPointInFill(q)){ onFill = true; break; } }catch(err){} }
+    if(!onFill) return false;
+    if(!e.at || !e.at.length) return true;
+    for(const a of e.at)
+      if(Math.hypot(m.a*a[0]+m.c*a[1]+m.e - x, m.b*a[0]+m.d*a[1]+m.f - y) < 40) return true;
     return false;
   };
+  /* The biggest piece first. Kiribati is thirty-five atolls over a third of the
+     planet; four of the twelve it draws are under a pixel across, and a piece
+     too small to be drawn is not a target by the rules this is checking - so
+     tapping one and calling the answer wrong tests nothing. Aim at the largest,
+     then fall back to a sweep of the box. */
   const cand = [];
+  if(e.at && e.at.length){
+    const big = e.at.slice().sort((p,q2)=>q2[2]-p[2])[0];
+    cand.push([m.a*big[0] + m.c*big[1] + m.e, m.b*big[0] + m.d*big[1] + m.f, -1]);
+  }
   for(let i=1;i<=9;i++) for(let j=1;j<=9;j++){
     const x = b.x + b.width*i/10, y = b.y + b.height*j/10;
     cand.push([x, y, Math.hypot(i-5, j-5)]);
   }
   cand.sort((p,q2)=>p[2]-q2[2]);
   for(const [x,y] of cand) if(ok(x,y) && on(x,y)) return [x,y];
-  const cx = b.x + b.width/2, cy = b.y + b.height/2;
-  return ok(cx,cy) ? [cx,cy] : null;
+  /* and no falling back to the middle of the box. That was here, unchecked by
+     on(), and it is the very thing the comment above warns about: Kiribati's
+     box is a third of the planet and its middle is open water. A country with
+     no point of its own on screen is one this test has nothing to say about. */
+  return null;
 }, name);
 const picked = ()=>p.evaluate(()=>S.sel && BY_CODE[S.sel] && entryForShape(BY_CODE[S.sel]).name);
 
 await reset();
-/* the same set on either build: the countries small enough to have been dots */
-const held = await p.evaluate(()=>DATA.filter(e=>e.play && e.px < 30).map(e=>e.name));
+/* The countries small enough to have been dots - less the ones too small to be
+   drawn at all here. The stretch that lifts a shape to the floor is capped, so
+   a country that would need more than that is left as the speck it is, and a
+   speck is not a target: nothing is reachable that cannot be seen. Only Vatican
+   City is in that position, and only until you zoom in; it is checked on its
+   own below. */
+const held = await p.evaluate(()=>{
+  const u = k*unitPx();
+  return DATA.filter(e=>e.play && e.px < 30)
+    .filter(e=>!e.at || Math.max(...e.at.map(a=>a[2]*u)) >= MIN_HIT_PX)
+    .map(e=>e.name);
+});
 const onScreen = [];
 for(const n of held) if(await spotOf(n)) onScreen.push(n);
 console.log(`held countries on screen at the opening view: ${onScreen.length}\n`);
@@ -76,6 +123,7 @@ console.log('a tap on the island itself');
     await p.mouse.click(s[0], s[1]); await p.waitForTimeout(150);
     const got = await picked();
     if(got !== n){
+
       (got ? wrong : dead).push(got ? `${n}->${got}` : n);
       if(0) console.log('     ' + n + ' tapped at (' + s[0].toFixed(0) + ',' + s[1].toFixed(0) + ') -> ' +
         await p.evaluate(([x,y,code])=>{
@@ -117,6 +165,57 @@ console.log('\na tap 16px off the mark - a miss, by the old rules');
   ok(`still finds a country (${found} of ${n})`,
      lost.filter(x=>!x.startsWith('Kiribati')), []);
   if(lost.length) console.log('     not reached: ' + lost.join(', '));
+}
+
+console.log('\na country too small to draw is not a target, until it is');
+{
+  /* Settle first: a flight from the taps above outlives them, and it lands on
+     its own zoom a moment after this sets one. Then the widest view, not
+     whatever fitCurrent gives - the point is a zoom too wide to draw it. */
+  await reset();
+  await p.evaluate(()=>{ const e = DATA.find(x=>x.name==='Vatican City' && x.g);
+    S.sel = null; closeAsk(true); lam0 = e.cll[0]; k = worldFill();
+    const mm = svg.getScreenCTM(), r = wrap.getBoundingClientRect();
+    ty = ((r.top+r.height/2)-mm.f)/mm.d - wy(e.cll[1])*k;
+    clampView(); applyView(); turn(); });
+  await p.waitForTimeout(400);
+  const far = await p.evaluate(()=>{
+    const e = DATA.find(x=>x.name==='Vatican City' && x.g);
+    const u = k*unitPx();
+    const drawn = Math.max(...e.at.map(a=>a[2]*u));
+    const m = scene.getScreenCTM(), q = project(e.cll[0], e.cll[1]);
+    const sx = m.a*q[0]+m.c*q[1]+m.e, sy = m.b*q[0]+m.d*q[1]+m.f;
+    const el = document.elementFromPoint(sx+6, sy);
+    const c = el && el.closest ? el.closest('[data-code]') : null;
+    const hit = c && BY_CODE[c.dataset.code];
+    const near = reachFor(sx+6, sy, hit);
+    const took = near && (!hit || near.e === hit || near.w < screenSize(hit));
+    const win = took ? near.e : (hit ? entryForShape(hit) : null);
+    return {drawn: +drawn.toFixed(2), says: win ? win.name : 'nothing'};
+  });
+  ok(`drawn ${far.drawn}px at the opening view, a tap beside it is Italy's`,
+     far.says, 'Italy');
+  /* and in close, where it is a shape you can see */
+  const near = await p.evaluate(()=>{
+    const e = DATA.find(x=>x.name==='Vatican City' && x.g);
+    lam0 = e.cll[0]; k = worldFill()*25;
+    const mm = svg.getScreenCTM(), r = wrap.getBoundingClientRect();
+    ty = ((r.top+r.height/2)-mm.f)/mm.d - wy(e.cll[1])*k;
+    clampView(); applyView(); turn();
+    const u = k*unitPx();
+    const drawn = Math.max(...e.at.map(a=>a[2]*u));
+    const m = scene.getScreenCTM(), q = project(e.cll[0], e.cll[1]);
+    const sx = m.a*q[0]+m.c*q[1]+m.e, sy = m.b*q[0]+m.d*q[1]+m.f;
+    const el = document.elementFromPoint(sx+6, sy);
+    const c = el && el.closest ? el.closest('[data-code]') : null;
+    const hit = c && BY_CODE[c.dataset.code];
+    const r2 = reachFor(sx+6, sy, hit);
+    const took = r2 && (!hit || r2.e === hit || r2.w < screenSize(hit));
+    const win = took ? r2.e : (hit ? entryForShape(hit) : null);
+    return {drawn: +drawn.toFixed(2), says: win ? win.name : 'nothing'};
+  });
+  ok(`zoomed in it is ${near.drawn}px, and the same tap is its own`,
+     near.says, 'Vatican City');
 }
 
 console.log('\nand the reach is given up once the shape can be hit on its own');

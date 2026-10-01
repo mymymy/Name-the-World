@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 29 sep · v157</span>
+      <span id="build" class="caps">build 1 oct · v158</span>
     </div>
   </div>
 </div>
@@ -1554,6 +1554,42 @@ const worldPaths = [], worldDots = [];
 let lam0 = 0;                      // the meridian the map is turned to
 /* how small a shape may get before it is held up, in screen pixels */
 const MIN_SHAPE_PX = 13;
+/* And how far a shape may be stretched to get there.
+
+   The floor on its own was overzealous. It asked what size a shape must be to
+   be read, and never asked what it cost to get there: Vatican City is a tenth
+   of a kilometre across and was drawn at the opening view as though it were
+   three hundred and forty-four, which is a stretch of two thousand three
+   hundred times. Seven points of a border carried that far stop being a border.
+   It came out as a plain rectangle on the coast of Italy, half of it over the
+   sea, and read as a fault in the drawing rather than a country.
+
+   So the stretch is capped, and a shape too small to reach the floor within it
+   is simply drawn small. The map says less at the widest view and stops saying
+   anything untrue; zoom in and the true size climbs, the cap stops binding, the
+   floor takes over, and the country is there to be seen and tapped. Everything
+   that was already within the cap is drawn exactly as it was.
+
+   Sixty, because the stretch countries need divides cleanly and the Vatican is
+   alone on the far side of it: Monaco wants 49, Nauru 44, San Marino 30, and
+   nothing else more than 13. A cap anywhere from sixty to two thousand holds
+   back that one country and no other, so it is set at the near edge of that
+   range rather than at a number nothing stands at. */
+const MAX_BLOW = 60;
+/* And below this, drawn, a shape is not there to be aimed at. Nothing may be
+   reached for that cannot be seen: with the stretch capped, Vatican City is a
+   sixth of a pixel at the opening view, and a forty-four pixel target sitting
+   invisibly on top of Rome is the ghost problem wearing a different hat - it
+   would take taps meant for Italy and answer with a country that is not drawn.
+   Zoom in, the speck becomes a shape, and it gets its reach with its outline.
+
+   Low, because a speck is not nothing. Cape Verde, Palau and the Maldives are
+   drawn as islands of about two pixels - the group scaling brings the country
+   up to the floor and the islands within it keep their spacing, so no single
+   one of them is ever large. They are perfectly visible as a cluster and are
+   exactly the countries this whole business was for. Three pixels took their
+   reach away; the Vatican, capped, is a third of one. */
+const MIN_HIT_PX = 1.2;
 /* The radius a dot is born with, before sizeDots gives it the one it keeps.
    What it is actually drawn at is DOT_PX, in screen pixels, held there at every
    zoom - so anything that reasons about a dot's size must read that and not
@@ -1829,7 +1865,7 @@ function heldPath(e, minU){
     if(x<lo)lo=x; if(x>hi)hi=x; if(y<up)up=y; if(y>dn)dn=y; }
   const span = Math.max(hi-lo, dn-up);
   const gx = (lo+hi)/2, gy = (up+dn)/2;
-  const G = span > 0 ? Math.max(1, Math.min(minU/span, 60)) : 1;
+  const G = span > 0 ? Math.max(1, Math.min(minU/span, MAX_BLOW)) : 1;
 
   let out='', where = [], lifted = false;
   for(let i=0;i<R.length;i++){
@@ -1845,6 +1881,7 @@ function heldPath(e, minU){
     let m = G;
     if(size > 0 && size < minU && (gap === Infinity || gap > size*3))
       m = G * Math.min(minU/size, gap === Infinity ? Infinity : (gap*0.34)/size);
+    if(m > MAX_BLOW) m = MAX_BLOW;              // the cap again, after the island's own growth
     if(m > 1.02) lifted = true;
     let d='M', n=0;
     for(const [x,y] of a.P){
@@ -1875,7 +1912,11 @@ function heldPath(e, minU){
          as one thing gave Gaza the West Bank's answer: big enough to hit, so no
          help - for a sliver pinned between Israel and the sea. Each island is
          asked about itself. */
-      where.push([a.cx, a.cy, a.size]);
+      /* As drawn, not as it truly is. The reach is a promise about a thing on
+         the screen, so it has to be measured on the screen: a shape held up to
+         the floor is thirteen pixels whatever its coastline says, and one held
+         back by the cap is the speck it really is. */
+      where.push([a.cx, a.cy, a.size * m]);
     }
   }
   /* Where the islands ended up, and whether they are still being held up. A
@@ -2340,15 +2381,24 @@ function spreadDots(u){
   /* back towards where it really is, until it is on its own ground again. If
      it was never on it - the country is off the edge and not drawn, or the
      outline is coarser than the city is precise - it does not move at all. */
+  /* asked of the position as it will be written, rounded - see the write-back */
+  const fits = (p, x, y) => onOwn(p, +x.toFixed(3), +y.toFixed(3));
   const hold = p => {
-    if(onOwn(p, p.x, p.y)) return;
+    if(fits(p, p.x, p.y)) return;
     const mx = p.x - p.ox, my = p.y - p.oy;
     let lo = 0, hi = 1;
     for(let s=0;s<6;s++){
       const t = (lo+hi)/2;
-      if(onOwn(p, p.ox + mx*t, p.oy + my*t)) lo = t; else hi = t;
+      if(fits(p, p.ox + mx*t, p.oy + my*t)) lo = t; else hi = t;
     }
     p.x = p.ox + mx*lo; p.y = p.oy + my*lo;
+    /* And checked, not trusted. The search assumes that if a point along the
+       way is on the country then everything nearer the start is too, which a
+       shape a pixel across does not honour: its path is rounded to a tenth of a
+       board unit, which at that size is most of it, so containment comes and
+       goes along the line. When the answer does not hold, the dot stays where
+       the city is. */
+    if(lo > 0 && !fits(p, p.x, p.y)){ p.x = p.ox; p.y = p.oy; }
   };
   const touched = new Set(), now = new Set();
   /* Each pass gives each of a pair half of what they still lack, so a pair with
@@ -2380,8 +2430,23 @@ function spreadDots(u){
   }
   for(const i of touched){
     const p = P[i];
+    /* The last word, asked of the position actually about to be written.
+       Holding each dot as it was pushed, pass by pass, is not the same promise:
+       a dot can be cleared early and pushed again late, and the shapes these
+       are tested against are a pixel across with their paths rounded to a
+       tenth of a board unit, so a point that was inside can stop being inside
+       for a hundredth of a pixel of movement. What matters is where it ends up,
+       so that is what is asked, once, here. */
+    /* Rounded first, then asked. What is written is what the hit test must be
+       given: a thousandth of a board unit is nothing at the opening view and a
+       hundredth of a pixel four times in, which is the whole of the margin by
+       which a dot sits inside a country a pixel across. Tested unrounded and
+       written rounded, the answer was about a point the map never held. */
+    const rx = +p.x.toFixed(3), ry = +p.y.toFixed(3);
+    if(!onOwn(p, rx, ry)){ p.x = p.ox; p.y = p.oy; }   // the safety net
+    else { p.x = rx; p.y = ry; }
     if(p.x === p.ox && p.y === p.oy) continue;
-    p.c.setAttribute('cx', p.x.toFixed(3)); p.c.setAttribute('cy', p.y.toFixed(3));
+    p.c.setAttribute('cx', p.x); p.c.setAttribute('cy', p.y);
     p.e.at[0][0] = p.x; p.e.at[0][1] = p.y;
   }
 }
@@ -3297,7 +3362,8 @@ function reachFor(cx, cy, host){
          stealing from its neighbours. Asked of the island, so the West Bank can
          pass out of this while Gaza, three pixels of it, does not. */
       const iw = sz === undefined ? whole : sz * u;
-      if(iw >= REACH_PX*2) continue;
+      if(iw >= REACH_PX*2) continue;             // big enough to hit on its own
+      if(sz !== undefined && iw < MIN_HIT_PX) continue;   // too small to be seen at all
       const id = Math.hypot(m.a*bx + m.c*by + m.e - cx,
                             m.b*bx + m.d*by + m.f - cy);
       if(id < d){ d = id; w = iw; }

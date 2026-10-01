@@ -87,7 +87,8 @@ for(const r of survey)
   console.log(String(r.mult).padStart(4)+'x' + String(r.tooClose).padStart(14) +
     '   ' + (r.pair ? (r.pair.join(' / ') + ' @' + r.worst + 'px').padEnd(36) : '-'.padEnd(36)) +
     String(r.unfair).padStart(8) + String(r.strays).padStart(18) +
-    (r.unfairNames.length ? '   ' + r.unfairNames.join(', ') : ''));
+    (r.unfairNames.length ? '   could part: ' + r.unfairNames.join(', ') : '') +
+    (r.strayNames.length ? '   strayed: ' + r.strayNames.join(', ') : ''));
 console.log('');
 ok('every pair still touching had nowhere left to go',
    survey.filter(r=>r.unfair>0).map(r=>r.mult+'x: '+r.unfairNames.join(', ')), []);
