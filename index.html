@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 1 oct · v158</span>
+      <span id="build" class="caps">build 1 oct · v159</span>
     </div>
   </div>
 </div>
@@ -1554,28 +1554,30 @@ const worldPaths = [], worldDots = [];
 let lam0 = 0;                      // the meridian the map is turned to
 /* how small a shape may get before it is held up, in screen pixels */
 const MIN_SHAPE_PX = 13;
-/* And how far a shape may be stretched to get there.
+/* And how much ground it may be given to get there.
 
    The floor on its own was overzealous. It asked what size a shape must be to
-   be read, and never asked what it cost to get there: Vatican City is a tenth
-   of a kilometre across and was drawn at the opening view as though it were
-   three hundred and forty-four, which is a stretch of two thousand three
-   hundred times. Seven points of a border carried that far stop being a border.
-   It came out as a plain rectangle on the coast of Italy, half of it over the
-   sea, and read as a fault in the drawing rather than a country.
+   be read and never what it cost: at the widest view San Marino came out
+   thirteen pixels beside an Italy of fifty - a quarter of its length, when it
+   is truly a hundred and fifteenth of it - and Vatican City, a tenth of a
+   kilometre across, was drawn as though it were three hundred and forty-four,
+   a plain rectangle half over the sea.
 
-   So the stretch is capped, and a shape too small to reach the floor within it
-   is simply drawn small. The map says less at the widest view and stops saying
-   anything untrue; zoom in and the true size climbs, the cap stops binding, the
-   floor takes over, and the country is there to be seen and tapped. Everything
-   that was already within the cap is drawn exactly as it was.
+   Capping the stretch as a multiple was tried and is wrong, because a multiple
+   of almost nothing is almost nothing: at three times, San Marino became the
+   speck it should be and Vatican City became invisible at every zoom the game
+   can reach, including the one it flies to when it asks you to name it. You
+   were shown blank land and asked for a country.
 
-   Sixty, because the stretch countries need divides cleanly and the Vatican is
-   alone on the far side of it: Monaco wants 49, Nauru 44, San Marino 30, and
-   nothing else more than 13. A cap anywhere from sixty to two thousand holds
-   back that one country and no other, so it is set at the near edge of that
-   range rather than at a number nothing stands at. */
-const MAX_BLOW = 60;
+   What is capped instead is the ground added, which is a distance on the map
+   rather than a factor - so it is the same distance at every zoom, and it is
+   the screen that changes. A shape is drawn at its true size plus this, or at
+   the floor, whichever is smaller. Near the widest view the sum is about a
+   pixel, so everything small is a speck; by the time the game has zoomed to
+   ask about one, the same distance is ten pixels and the floor has taken over.
+   The one rule covers both ends, and covers Vatican City as readily as San
+   Marino, because it does not care how small the thing it is adding to is. */
+const GROW_U = 1.3;
 /* And below this, drawn, a shape is not there to be aimed at. Nothing may be
    reached for that cannot be seen: with the stretch capped, Vatican City is a
    sixth of a pixel at the opening view, and a forty-four pixel target sitting
@@ -1865,7 +1867,10 @@ function heldPath(e, minU){
     if(x<lo)lo=x; if(x>hi)hi=x; if(y<up)up=y; if(y>dn)dn=y; }
   const span = Math.max(hi-lo, dn-up);
   const gx = (lo+hi)/2, gy = (up+dn)/2;
-  const G = span > 0 ? Math.max(1, Math.min(minU/span, MAX_BLOW)) : 1;
+  /* the most a shape of this size may be scaled: up to the floor, and never
+     adding more than GROW_U of ground to it */
+  const grow = t => t > 0 ? Math.max(1, Math.min(minU, t + GROW_U)/t) : 1;
+  const G = span > 0 ? grow(span) : 1;
 
   let out='', where = [], lifted = false;
   for(let i=0;i<R.length;i++){
@@ -1881,7 +1886,9 @@ function heldPath(e, minU){
     let m = G;
     if(size > 0 && size < minU && (gap === Infinity || gap > size*3))
       m = G * Math.min(minU/size, gap === Infinity ? Infinity : (gap*0.34)/size);
-    if(m > MAX_BLOW) m = MAX_BLOW;              // the cap again, after the island's own growth
+    /* and the island's own growth is held to the same allowance of ground,
+       measured against the size it really is rather than the scaled one */
+    m = Math.max(1, Math.min(m, grow(a.size)));
     if(m > 1.02) lifted = true;
     let d='M', n=0;
     for(const [x,y] of a.P){
