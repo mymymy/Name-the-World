@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 2 oct · v163</span>
+      <span id="build" class="caps">build 2 oct · v164</span>
     </div>
   </div>
 </div>
@@ -3397,6 +3397,65 @@ function inShape(code, q){
   }
   return false;
 }
+/* Which country a small place sits inside, if it sits inside one at all.
+
+   This is the question the third rule below is really asking - is this an
+   enclave? - and it was being asked by proxy: is the middle of the place inside
+   the other country's outline? That is true of Vatican City and of Monaco and
+   false of San Marino, because Italy's simplified coastline cuts a notch where
+   San Marino is and not where the Vatican is. Two enclaves treated differently
+   by an accident of how the coast was drawn rather than by anything real.
+
+   So it is asked directly: step a little way out from the place all the way
+   round, and see whose ground you land on. Every probe that finds a country
+   finding the same one means the place is enclosed by it. Probes that find
+   nothing are sea and do not count, which lets Monaco - walled in by France on
+   every side but the water - answer the same as San Marino, while the Bahamas,
+   with nothing but sea around them, answer nobody.
+
+   Worked out once per place. It is a fact about the map, not about the zoom. */
+const ENCLOSED = new Map();
+function inRings(rings, lon, lat){
+  let inside = false;
+  for(const r of rings)
+    for(let i=0, j=r.length-1; i<r.length; j=i++){
+      const xi=r[i][0], yi=r[i][1], xj=r[j][0], yj=r[j][1];
+      if(((yi>lat)!==(yj>lat)) && (lon < (xj-xi)*(lat-yi)/(yj-yi)+xi)) inside = !inside;
+    }
+  return inside;
+}
+function enclosedBy(e){
+  if(ENCLOSED.has(e.code)) return ENCLOSED.get(e.code);
+  let found = null;
+  if(e.rings && e.rings.length){
+    const OUT = 0.02;                       // degrees out, about two kilometres
+    const probes = [];
+    for(const r of e.rings){
+      let lo=180, hi=-180, la=90, lb=-90;
+      for(const [x,y] of r){ if(x<lo)lo=x; if(x>hi)hi=x; if(y<la)la=y; if(y>lb)lb=y; }
+      const cx=(lo+hi)/2, cy=(la+lb)/2;
+      const step = Math.max(1, Math.floor(r.length/8));
+      for(let i=0;i<r.length;i+=step){
+        const dx = r[i][0]-cx, dy = r[i][1]-cy, d = Math.hypot(dx,dy) || 1;
+        probes.push([r[i][0] + dx/d*OUT, r[i][1] + dy/d*OUT]);
+      }
+    }
+    const tally = new Map();
+    let onLand = 0;
+    for(const [lon, lat] of probes)
+      for(const o of DATA){
+        if(o === e || !o.rings || !o.box) continue;
+        if(lon < o.box[0]-.01 || lon > o.box[1]+.01 ||
+           lat < o.box[2]-.01 || lat > o.box[3]+.01) continue;
+        if(!inRings(o.rings, lon, lat)) continue;
+        tally.set(o.code, (tally.get(o.code)||0) + 1); onLand++;
+        break;
+      }
+    if(onLand >= 3 && tally.size === 1) found = [...tally.keys()][0];
+  }
+  ENCLOSED.set(e.code, found);
+  return found;
+}
 /* Three ways a small place may take a tap that landed on a country.
 
    It is under the finger. Its own shape covers the point, and the only reason
@@ -3430,15 +3489,18 @@ function mayTake(e, host, q, cx, cy, inv){
                 .matrixTransform(inv);
     if(inShape(e.code, s)) return true;
   }
-  /* Asked of the middle of each piece, not of the outline points. An outline
-     runs along a border, and a point on a border is inside whichever shape the
-     rounding favours - so asking it whether this place stands on that country
-     gets an answer about the line rather than about the place. */
-  const pts = (e.home && e.home.length) ? e.home : grabPoints(e);
-  if(!pts) return false;
-  for(const [bx, by] of pts)
-    if(inShape(host.code, new DOMPoint(bx, by))) return true;
-  return false;
+  /* And this is that question - is it an enclave of the country you hit? - with
+     one more asked alongside it: is it still being held up?
+
+     Enclosure alone is not a reason to borrow. The Gambia is enclosed by
+     Senegal and is also twelve pixels of country you can tap directly; granted
+     the run of Senegal's ground it took five times as much of it. Vatican City
+     is enclosed by Italy and has nothing of its own to tap at all. What tells
+     them apart is already recorded: a shape still being magnified is one too
+     small to be drawn truly, and that is exactly the shape with nowhere else
+     for its skirt to go. Once a place is drawn at its own size it has its own
+     ground, and its neighbour's is only the four-pixel slip. */
+  return e.lifted && enclosedBy(e) === host.code;
 }
 /* Which place has a claim on this point, and how wide the part of it that
    claimed it was - {e, w}, or nothing.
