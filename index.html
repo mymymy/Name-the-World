@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 2 oct · v164</span>
+      <span id="build" class="caps">build 2 oct · v165</span>
     </div>
   </div>
 </div>
@@ -1555,9 +1555,9 @@ let lam0 = 0;                      // the meridian the map is turned to
 /* How small a shape may get before it is held up, in screen pixels.
 
    Seven, not thirteen. Thirteen was chosen when the drawn shape had to be the
-   thing you tapped, and it is not any more: a held shape carries a reach of
-   forty-four pixels around it whatever its size, so the drawing only has to be
-   seen, and seven pixels is plainly seen. Thirteen made San Marino and Vatican
+   thing you tapped, and it is not any more: a held shape carries a skirt of
+   ground around it (see TARGET_PX), so the drawing only has to be seen, and
+   seven pixels is plainly seen. Thirteen made San Marino and Vatican
    City loom - readable long before you had zoomed anywhere near them, and half
    again too big when you got there. */
 const MIN_SHAPE_PX = 7;
@@ -1600,6 +1600,25 @@ const GROW_U = 0.5;
    exactly the countries this whole business was for. Three pixels took their
    reach away; the Vatican, capped, is a third of one. */
 const MIN_HIT_PX = 1.2;
+/* What every small country is owed: a target a finger across, at some zoom the
+   game can reach. Not at every zoom - at the opening view on a phone the
+   Gambia is a sliver and that is what it should look like; zoom in and it is
+   there to be hit. So the promise is made at full zoom and kept by adding
+   ground: each island gets a skirt of map, not of screen, wide enough that it
+   and the skirt together are this many pixels across when the map is as close
+   as it goes. Cyprus makes it unaided and gets nothing; the Vatican, a tenth
+   of a kilometre, gets nearly all of it. Being ground, the skirt shrinks as you
+   pull back, so it takes nothing worth having from anyone at the widest view.
+
+   Aimed at forty-eight so that forty-four is met: the skirt is measured from
+   points along the outline, and between them it dips; and a drawn shape is not
+   always in the middle of the ground it was measured on. Aimed at forty-four
+   exactly, Vatican City came out at three quarters of a finger. */
+const TARGET_PX = 48;
+/* and never less than this, for whatever the skirt: a click is reported in
+   whole pixels, and a tap aimed at the edge of a sliver lands a pixel over it
+   as often as not. Palestine lost taps to Israel that way. */
+const EDGE_PX = 2;
 /* The radius a dot is born with, before sizeDots gives it the one it keeps.
    What it is actually drawn at is DOT_PX, in screen pixels, held there at every
    zoom - so anything that reasons about a dot's size must read that and not
@@ -1632,7 +1651,7 @@ function drawWorld(){
          Vatican City, Luxembourg, Liechtenstein and Malta all held ground in
          the middle of the North Atlantic, and a tap out there answered to one
          of them. Nothing drawn, nothing to reach for. */
-      e.at = null; e.home = null; e.lifted = false;
+      e.at = null; e.lifted = false;
       continue;
     }
     const d = e.held ? heldPath(e, minU) : e.rings.map(r=>ringPath(r, 0)).join('');
@@ -1880,8 +1899,13 @@ function heldPath(e, minU){
      adding more than GROW_U of ground to it */
   const grow = t => t > 0 ? Math.max(1, Math.min(minU, t + GROW_U)/t) : 1;
   const G = span > 0 ? grow(span) : 1;
+  /* and the same sums at full zoom, which is where the skirt is decided */
+  const uMax = ZOOM_MAX * unitPx();
+  const targetU = TARGET_PX / uMax, minMax = MIN_SHAPE_PX / uMax;
+  const across = e.across ||
+    (e.across = e.rings.map(r => acrossOf(r, e.cll ? e.cll[0] : lam0)));
 
-  let out='', where = [], homes = [], lifted = false;
+  let out='', where = [], lifted = false;
   const uu = minU ? MIN_SHAPE_PX/minU : 1;        // one board unit, in screen px
   for(let i=0;i<R.length;i++){
     const a = R[i];
@@ -1942,11 +1966,19 @@ function heldPath(e, minU){
          Taken at the size the shape is drawn but about the point it truly
          occupies: what is drawn may shift to be legible, and what you reach for
          must not move. */
-      const longPx = a.size * m * uu, thinPx = a.thin * m * uu;
+      /* How much ground this island is owed: enough that at full zoom it and
+         its skirt are a finger across. A distance on the map, so it shrinks
+         with the map - at the opening view a speck has a speck's claim, and
+         by the time you have zoomed in to look for it, it has the finger. */
+      const [tS, tT] = across[i];
+      const gMax = tS > 0 ? Math.max(1, Math.min(minMax, tS + GROW_U)/tS) : 1;
+      const skirt = Math.max(0, (targetU - tT * gMax) / 2);
+      const longPx = a.size * m * uu;
       /* Only a ring that will actually carry a claim is worth sampling. One
-         already wider than a finger gets none, one too small to see gets none,
-         and between them is a handful of shapes per frame. */
-      const needs = longPx >= MIN_HIT_PX && longPx < REACH_PX*2;
+         that makes the width on its own at full zoom gets none, one too small
+         to see gets none, and between them is a handful of shapes per frame. */
+      const needs = skirt > 0 && longPx >= MIN_HIT_PX;
+      const claimPx = Math.max(EDGE_PX, skirt * uu);
       /* Points around the outline rather than one in the middle, so the claims
          they carry add up to a skirt that follows the coast.
 
@@ -1955,25 +1987,24 @@ function heldPath(e, minU){
          held shape on every frame, which came to six milliseconds on a budget
          of sixteen; these outlines are already simplified to roughly even
          steps, and the spacing only has to be comfortably under the skirt. The
-         ring's own perimeter sets how many are wanted.
+         ring's own perimeter sets how many are wanted: under half the skirt
+         apart, so the scallops between them are half a pixel deep at full zoom
+         rather than the one and a bit that left Monaco short of its width.
 
          Taken at the size the shape is drawn but about the point it truly
          occupies: what is drawn may shift to be legible, and what you reach for
          must not move. */
       const round = 2 * (a.size + a.thin) * m * uu;        // near enough its perimeter
-      const want = needs ? Math.max(1, Math.min(24,
-                     Math.ceil(round / Math.max(reachOf(thinPx) * 0.66, 1)))) : 1;
+      const want = needs ? Math.max(1, Math.min(48,
+                     Math.ceil(round / Math.max(claimPx * 0.45, 1)))) : 1;
       const last = a.P.length - 1;
-      if(want <= 1 || last < 2) where.push([a.cx, a.cy, a.size * m, a.thin * m]);
+      const sk = needs ? skirt : 0;
+      if(want <= 1 || last < 2) where.push([a.cx, a.cy, a.size * m, a.thin * m, sk]);
       else for(let q = 0; q < want; q++){
         const v = a.P[Math.round(q * last / want)];
         where.push([a.cx + (v[0]-a.cx)*m, a.cy + (v[1]-a.cy)*m,
-                    a.size * m, a.thin * m]);
+                    a.size * m, a.thin * m, sk]);
       }
-      /* and one point for the middle of it, which is what answers "does this
-         place stand on that country" - an outline runs along a border and a
-         point on it belongs to neither side */
-      homes.push([a.cx, a.cy]);
     }
   }
   /* Where the islands ended up, and whether they are still being held up. A
@@ -1981,9 +2012,34 @@ function heldPath(e, minU){
      no help; one being magnified is by definition too small, and gets a reach
      around it. */
   e.at = where;
-  e.home = homes;
   e.lifted = lifted;
   return out;
+}
+/* How long a ring is, and how wide - in board units, as it is drawn when the
+   game flies to it, which is with the meridian through its own country.
+
+   Wide not by its box. The Gambia's box is thirty-six pixels tall at full zoom
+   and the country inside it is a river eight pixels across, so the box said it
+   needed four pixels of help and it needed eighteen. What is taken instead is
+   the width of the rectangle with the same area and the same perimeter: exact
+   for a strip and for a square, three quarters of the way across a disc, and
+   on the narrow side for a ragged coast - which errs towards help. Then the
+   smaller of that and the box, so it can never be wider than it is. Worked out
+   once per ring; it is a fact about the map, not the zoom. */
+function acrossOf(r, lam){
+  let lo=Infinity, hi=-Infinity, up=Infinity, dn=-Infinity, A=0, L=0;
+  let px = 0, py = 0;
+  for(let j=0;j<=r.length;j++){
+    const [lon, lat] = r[j % r.length];
+    const x = wx(wrapLon(lon - lam), lat), y = wy(lat);
+    if(j){ A += px*y - x*py; L += Math.hypot(x-px, y-py); }
+    px = x; py = y;
+    if(x<lo)lo=x; if(x>hi)hi=x; if(y<up)up=y; if(y>dn)dn=y;
+  }
+  A = Math.abs(A)/2;
+  const box = Math.min(hi-lo, dn-up);
+  const flat = Math.max(0, (L - Math.sqrt(Math.max(0, L*L - 16*A))) / 4);
+  return [Math.max(hi-lo, dn-up), Math.min(box, flat || box)];
 }
 function tinyRing(r, minU){
   const P = [];
@@ -3245,21 +3301,16 @@ function paintReach(){
       if(!e.play) continue;
       const pts = grabPoints(e); if(!pts) continue;
       const whole = screenSize(e);
-      const w = pts.map(([bx, by, sz]) => sz === undefined ? whole : sz * uu2);
-      if(!w.some(x => x < REACH_PX*2)) continue;
+      const claims = pts.map(pt => claimAt(pt, uu2, whole));
+      if(!claims.some(c => c > 0)) continue;
       reaches.add(e.code);
       for(let i = 0; i < pts.length; i++){
-        const [bx, by, , tn] = pts[i];
+        const [bx, by, sz] = pts[i];
         /* How far from this point a sample could still be its own: what this
-           island may claim, and its own width on top, since a grab point sits
-           in the middle of a shape rather than covering it. A constant stood
-           here and was too short for the West Bank at forty-five pixels; and
-           then the full reach stood here, which is now more than most of them
-           may have - and every pixel of slack is samples spent on ground that
-           was never in question. */
-        const wide = isFinite(w[i]) ? w[i] : MIN_SHAPE_PX;
-        spots.push([m.a*bx + m.c*by + m.e, m.b*bx + m.d*by + m.f,
-                    claimOf(wide, tn === undefined ? undefined : tn * uu2) + wide]);
+           island may claim, and its own width on top, since a point may sit on
+           one side of a shape and the shape run on past it. */
+        const wide = sz === undefined ? (isFinite(whole) ? whole : MIN_SHAPE_PX) : sz * uu2;
+        spots.push([m.a*bx + m.c*by + m.e, m.b*bx + m.d*by + m.f, claims[i] + wide]);
       }
     }
     for(let y=0; y<r.height; y+=STEP){
@@ -3335,40 +3386,28 @@ const REACH_PX = 22;
    the shape of the claim and not its generosity. */
 const SKIRT = 2.5, SKIRT_MIN = 7, SKIRT_MAX = 18;
 const reachOf = w => Math.max(SKIRT_MIN, Math.min(SKIRT_MAX, w * SKIRT));
-/* Measured across a shape, not along it. The Gambia is twelve pixels long and
+/* Measured across a shape, not along it. The Gambia was twelve pixels long and
    three and a half wide, and going by its length it claimed the full
    twenty-two - a circle six times its own width, thrown over Senegal on both
    sides of it. What makes a shape hard to hit is how thin it is, and that is
-   also how far its claim ought to reach. Its length still decides whether it
-   needs help at all and whether it is drawn large enough to be aimed at. */
+   also how far its claim ought to reach.
+
+   This is what the boards and the capitals' dots go by now, which are drawn at
+   one size and keep it. The countries on the globe are owed ground instead. */
 const claimOf = (long, thin) => reachOf(thin === undefined ? long : thin);
 /* Land on open ground and the nearest small place within a finger's width is
-   yours. Land on another country and it is not that simple: the tap has hit
-   something, and the something has a claim of its own.
+   yours. Land on another county or state and it is not that simple: the tap
+   has hit something, and the something has a claim of its own.
 
-   It used to be settled by shortening the reach to ten pixels there, which is a
-   guess dressed as a rule, and it was wrong by five taps in forty-five on Haiti
-   - the Bahamas' southern islets sit close enough to Haiti's north coast to
-   reach inside it. Shortening it further would have cost the Vatican, which is
-   genuinely inside Rome and has to be reachable there.
+   On the boards the difference is containment. A place that is under the tap
+   may take it - the City of London inside Greater London, painted beneath its
+   stroke - and a place that merely lies near the border may not, however near:
+   Rhode Island is not in Connecticut. With one allowance, the first few pixels
+   of its neighbour's ground, measured from its own outline: the slip of a
+   finger on a shared border and nothing more.
 
-   The difference is not distance, it is containment. A place that is inside the
-   country you tapped may take the tap: the Vatican inside Italy, San Marino
-   inside Italy, the City of London inside Greater London. A place that merely
-   lies near the border may not, however near - the Bahamas are not in Haiti and
-   Rhode Island is not in Connecticut. So the question asked is whether the
-   small place actually stands on the ground you hit, which the shape itself can
-   answer.
-
-   With one allowance, for the neighbours. Palestine is not inside Israel, it is
-   beside it, and at the opening view it is eleven pixels wide with Israel drawn
-   over the top: aim at it and the pixel you get is as likely to be Israel's as
-   its own. Containment alone hands every one of those taps to Israel, which is
-   the very thing the reach exists to stop. So a small place also keeps the
-   first few pixels of its neighbour's ground - measured from its own outline,
-   not from its middle, so it is the slip of a finger on a shared border and
-   nothing more. Four pixels reaches across the rounding and along a coast; it
-   does not reach the Bahamas into Haiti, which is eight away and over water. */
+   The globe's small countries settle this by distance instead, with a skirt of
+   ground; see TARGET_PX. */
 const SLIP_PX = 4;
 /* Where a place can be grabbed, in board units, and how wide the island at that
    point is. The globe records the middle of each island as it was drawn along
@@ -3397,88 +3436,26 @@ function inShape(code, q){
   }
   return false;
 }
-/* Which country a small place sits inside, if it sits inside one at all.
-
-   This is the question the third rule below is really asking - is this an
-   enclave? - and it was being asked by proxy: is the middle of the place inside
-   the other country's outline? That is true of Vatican City and of Monaco and
-   false of San Marino, because Italy's simplified coastline cuts a notch where
-   San Marino is and not where the Vatican is. Two enclaves treated differently
-   by an accident of how the coast was drawn rather than by anything real.
-
-   So it is asked directly: step a little way out from the place all the way
-   round, and see whose ground you land on. Every probe that finds a country
-   finding the same one means the place is enclosed by it. Probes that find
-   nothing are sea and do not count, which lets Monaco - walled in by France on
-   every side but the water - answer the same as San Marino, while the Bahamas,
-   with nothing but sea around them, answer nobody.
-
-   Worked out once per place. It is a fact about the map, not about the zoom. */
-const ENCLOSED = new Map();
-function inRings(rings, lon, lat){
-  let inside = false;
-  for(const r of rings)
-    for(let i=0, j=r.length-1; i<r.length; j=i++){
-      const xi=r[i][0], yi=r[i][1], xj=r[j][0], yj=r[j][1];
-      if(((yi>lat)!==(yj>lat)) && (lon < (xj-xi)*(lat-yi)/(yj-yi)+xi)) inside = !inside;
-    }
-  return inside;
-}
-function enclosedBy(e){
-  if(ENCLOSED.has(e.code)) return ENCLOSED.get(e.code);
-  let found = null;
-  if(e.rings && e.rings.length){
-    const OUT = 0.02;                       // degrees out, about two kilometres
-    const probes = [];
-    for(const r of e.rings){
-      let lo=180, hi=-180, la=90, lb=-90;
-      for(const [x,y] of r){ if(x<lo)lo=x; if(x>hi)hi=x; if(y<la)la=y; if(y>lb)lb=y; }
-      const cx=(lo+hi)/2, cy=(la+lb)/2;
-      const step = Math.max(1, Math.floor(r.length/8));
-      for(let i=0;i<r.length;i+=step){
-        const dx = r[i][0]-cx, dy = r[i][1]-cy, d = Math.hypot(dx,dy) || 1;
-        probes.push([r[i][0] + dx/d*OUT, r[i][1] + dy/d*OUT]);
-      }
-    }
-    const tally = new Map();
-    let onLand = 0;
-    for(const [lon, lat] of probes)
-      for(const o of DATA){
-        if(o === e || !o.rings || !o.box) continue;
-        if(lon < o.box[0]-.01 || lon > o.box[1]+.01 ||
-           lat < o.box[2]-.01 || lat > o.box[3]+.01) continue;
-        if(!inRings(o.rings, lon, lat)) continue;
-        tally.set(o.code, (tally.get(o.code)||0) + 1); onLand++;
-        break;
-      }
-    if(onLand >= 3 && tally.size === 1) found = [...tally.keys()][0];
-  }
-  ENCLOSED.set(e.code, found);
-  return found;
-}
-/* Three ways a small place may take a tap that landed on a country.
+/* Two ways a board's small place may take a tap that landed on a neighbour.
 
    It is under the finger. Its own shape covers the point, and the only reason
-   the hit test did not say so is paint order - Israel is drawn over Palestine,
-   Greater London over the City - so the tap was always on it and is simply
-   being returned to it.
+   the hit test did not say so is paint order - Greater London is drawn over
+   the City - so the tap was always on it and is simply being returned to it.
 
    It is all but under the finger: the point misses its outline by a few pixels.
-   That is a tap aimed at an eleven-pixel country and landing on the line, and
-   it belongs to the small one. Asked by putting a ring of points four pixels
-   out around the tap and seeing whether any of them land on the shape, which
-   costs eight hit tests and only for a place already close enough to win.
+   That is a tap aimed at a sliver and landing on the line, and it belongs to
+   the small one. Asked by putting a ring of points four pixels out around the
+   tap and seeing whether any of them land on the shape, which costs eight hit
+   tests and only for a place already close enough to win.
 
-   Or it stands on the country that was hit: the Vatican is inside Italy, so its
-   reach may spill onto Italian ground around it. A place that merely lies near
-   a border gets the slip and no more, which is the whole of the Bahamas-and-
-   Haiti difference - the Bahamas are not in Haiti, and not within four pixels
-   of it either. */
+   The countries on the globe are not asked this. Their skirt is ground, sized
+   so that it does not reach anywhere it should not at the zoom it is used, and
+   the containment rules that once stood here - is it inside the country you
+   hit, is it an enclave of it - were all ways of guessing at that. */
 function mayTake(e, host, q, cx, cy, inv){
   if(inShape(e.code, q)) return true;
-  /* The slip is for a shape that shares a border - Palestine beside Israel,
-     where aiming at eleven pixels lands on the line. A capital is not a shape
-     on the map, it is a mark placed on one, and it belongs to exactly one
+  /* The slip is for a shape that shares a border. A capital is not a shape on
+     the map, it is a mark placed on one, and it belongs to exactly one
      country. Given the slip as well, every capital reached four pixels into
      its neighbours: a tap plainly inside Slovakia answered Budapest, because
      Hungary's dot was four pixels over the border. So a dot gets the ground it
@@ -3489,18 +3466,18 @@ function mayTake(e, host, q, cx, cy, inv){
                 .matrixTransform(inv);
     if(inShape(e.code, s)) return true;
   }
-  /* And this is that question - is it an enclave of the country you hit? - with
-     one more asked alongside it: is it still being held up?
-
-     Enclosure alone is not a reason to borrow. The Gambia is enclosed by
-     Senegal and is also twelve pixels of country you can tap directly; granted
-     the run of Senegal's ground it took five times as much of it. Vatican City
-     is enclosed by Italy and has nothing of its own to tap at all. What tells
-     them apart is already recorded: a shape still being magnified is one too
-     small to be drawn truly, and that is exactly the shape with nowhere else
-     for its skirt to go. Once a place is drawn at its own size it has its own
-     ground, and its neighbour's is only the four-pixel slip. */
-  return e.lifted && enclosedBy(e) === host.code;
+  return false;
+}
+/* How far from one of its points a place may claim, in screen pixels: a
+   globe country by the ground it is owed, a dot or a board by what it is drawn.
+   Nothing, for something already wider than a finger or too small to see. */
+function claimAt(pt, u, whole){
+  const [, , sz, tn, sk] = pt;
+  const iw = sz === undefined ? whole : sz * u;
+  if(sz !== undefined && iw < MIN_HIT_PX) return 0;
+  if(sk !== undefined) return sk > 0 ? Math.max(EDGE_PX, sk * u) : 0;
+  if(iw >= REACH_PX*2) return 0;
+  return claimOf(iw, tn === undefined ? undefined : tn * u);
 }
 /* Which place has a claim on this point, and how wide the part of it that
    claimed it was - {e, w}, or nothing.
@@ -3515,7 +3492,12 @@ function reachFor(cx, cy, host){
   const m = scene.getScreenCTM();
   if(!m) return null;
   const u = k * unitPx();
-  let best = null, bd = REACH_PX, bw = 0;
+  /* A small country's own drawing is its own. Skirts reach over the ground
+     around a place, never over another small place's land: Saint Lucia's skirt
+     does not get to answer for a tap on Saint Vincent. */
+  if(host && host.play && host.held && host.at && basis().includes(host))
+    return {e: host, w: Math.max(0, ...host.at.map(a => a[2] * u))};
+  let best = null, bd = Infinity, bw = 0;
   /* the tap in board units, for asking a shape whether it covers it */
   let q = null, inv = null;
   if(host && host.play){
@@ -3531,20 +3513,19 @@ function reachFor(cx, cy, host){
     /* distance first, and the hit tests only for a place near enough to win -
        the rest are settled by arithmetic and never touch the geometry */
     let d = Infinity, w = 0;
-    for(const [bx, by, sz, tn] of pts){
-      /* An island already wider than a finger needs no help and would only be
-         stealing from its neighbours. Asked of the island, so the West Bank can
-         pass out of this while Gaza, three pixels of it, does not. */
-      const iw = sz === undefined ? whole : sz * u;
-      if(iw >= REACH_PX*2) continue;             // big enough to hit on its own
-      if(sz !== undefined && iw < MIN_HIT_PX) continue;   // too small to be seen at all
+    for(const pt of pts){
+      /* Asked of the island, not the country, so a big piece can pass out of
+         this while a small one keeps its claim. */
+      const c = claimAt(pt, u, whole);
+      if(!c) continue;
+      const [bx, by, sz] = pt;
       const id = Math.hypot(m.a*bx + m.c*by + m.e - cx,
                             m.b*bx + m.d*by + m.f - cy);
-      if(id > claimOf(iw, tn === undefined ? undefined : tn * u)) continue;
-      if(id < d){ d = id; w = iw; }
+      if(id > c) continue;
+      if(id < d){ d = id; w = sz === undefined ? whole : sz * u; }
     }
     if(d >= bd) continue;
-    if(q && host !== e && !mayTake(e, host, q, cx, cy, inv)) continue;
+    if(q && host !== e && !e.held && !mayTake(e, host, q, cx, cy, inv)) continue;
     bd = d; bw = w; best = e;
   }
   return best ? {e: best, w: bw} : null;

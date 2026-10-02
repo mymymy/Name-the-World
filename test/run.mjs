@@ -25,6 +25,7 @@ const ALL = [
   ['enclaves',   'an enclave is not swallowed by its host'],
   ['ghosts',     'nothing is reachable where nothing is drawn'],
   ['reach',      'the small countries can be hit'],
+  ['fullzoom',   'and are a finger across, zoomed in'],
   ['bigkeep',    'and the big ones keep their own taps'],
   ['caribbean',  'the Bahamas do not take taps inside Haiti'],
   ['gazareach',  'Gaza has a reach of its own, at every zoom'],

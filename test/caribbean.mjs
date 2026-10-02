@@ -4,8 +4,9 @@
    hit Bahamas instead." It was true - five of forty-five points inside Haiti
    answered to the Bahamas, because the reach was settled by a flat ten pixels
    and the Bahamas' southern islets sit closer than that to Haiti's north
-   coast. The fix was to stop measuring distance alone and ask whether the
-   small place stands on the ground that was hit.
+   coast. It was fixed by asking whether the small place stood on the ground
+   that was hit; it is kept fixed now by the skirt being ground rather than
+   pixels, so at this zoom the Bahamas claim a few pixels and no more.
 
    This is the framing of that report: the Caribbean at the zoom the screenshot
    was taken at, every point on the five countries in question, put to the same

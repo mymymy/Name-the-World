@@ -1,6 +1,6 @@
 # Tests
 
-Fifteen programs that open the page in a real browser, tap it, type at it, and
+Sixteen programs that open the page in a real browser, tap it, type at it, and
 check what it does. No framework: each one is a plain Node script that prints
 what it found and exits non-zero if it found something wrong.
 
@@ -36,10 +36,11 @@ forgotten is a test nobody dares delete and nobody trusts either.
 | `cardhead` | the result card reads as it should | the score and the clock, and which of them leads |
 | `enclaves` | an enclave is not swallowed by its host | the Vatican, San Marino, Monaco, Liechtenstein and Singapore were painted under their neighbours, so naming Italy turned the Vatican green |
 | `ghosts` | nothing is reachable where nothing is drawn | up to 35 countries could be tapped while off the edge of the globe - Andorra and Monaco answering from the North Atlantic |
-| `reach` | the small countries can be hit | the tiny ones used to be dots nobody understood; they are drawn true now and carry a 44px reach |
+| `reach` | the small countries can be hit | the tiny ones used to be dots nobody understood; they are drawn true now and carry a skirt of ground around them |
+| `fullzoom` | and each is a finger across at full zoom, and costs nobody anything at the opening view | the rule, as asked for: a 44px target at *some* zoom, not every one. The Gambia's reach once covered a fist of Senegal at the opening view, and the Vatican was a speck at every zoom |
 | `bigkeep` | and the big ones keep their own taps | the counterweight to `reach`: every reach is a licence to steal, and this is the check that it isn't used |
 | `caribbean` | the Bahamas do not take taps inside Haiti | reported from a phone. Five of forty-five points inside Haiti answered to the Bahamas |
-| `gazareach` | Gaza has a reach of its own, at every zoom | Palestine was scored as one country, so once the West Bank was big enough to hit, Gaza - a three-pixel sliver - lost its reach with it |
+| `gazareach` | Gaza has a reach of its own, at every zoom up to full | Palestine was scored as one country, so once the West Bank was big enough to hit, Gaza - a three-pixel sliver - lost its reach with it |
 | `boardreach` | the same, on counties, states and boroughs | Rhode Island is 7px, Bristol 8, the City of London 1, and they tile rather than sit in a sea |
 | `capreach` | a capital is a 7px dot and has a touch area | it had none. 0 of 398 near-miss taps found anything |
 | `capcountry` | and its country answers for it | hit anywhere on France to be asked about Paris |
