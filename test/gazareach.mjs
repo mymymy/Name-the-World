@@ -28,7 +28,11 @@ const look = mult => p.evaluate(m=>{
   /* Gaza is the second ring; where it sits now, and how wide it really is */
   const c = scene.getScreenCTM(), u = k*unitPx();
   const [bx, by, sz] = e.at[1];
-  return {x: c.a*bx + c.c*by + c.e, y: c.b*bx + c.d*by + c.f, w: sz*u};
+  return {x: c.a*bx + c.c*by + c.e, y: c.b*bx + c.d*by + c.f, w: sz*u,
+          /* how far out it may still answer for - its own business now, not a
+             flat forty-four pixels, and measured across the sliver rather than
+             along it */
+          claim: claimOf(sz*u, e.at[1][3] === undefined ? undefined : e.at[1][3]*u)};
 }, mult);
 const picked = ()=>p.evaluate(()=>S.sel && BY_CODE[S.sel] && BY_CODE[S.sel].name);
 
@@ -49,12 +53,13 @@ const onGround = (x,y) => p.evaluate(([cx,cy])=>{
 
 for(const mult of [1, 2, 4, 6]){
   /* west of it, towards the sea - the side with nothing on it */
-  for(const dx of [0, -8, -14]){
+  for(const frac of [0, 0.5, 0.85]){
     const gz = await settle(mult);
+    const dx = -Math.round(gz.claim * frac);
     const x = gz.x + dx, y = gz.y;
     const ground = await onGround(x, y);
     const what = `${mult}x zoom, Gaza is ${gz.w.toFixed(1)}px, ` +
-                 (dx ? `${-dx}px west` : 'on it');
+                 (dx ? `${-dx}px west of ${gz.claim.toFixed(0)}px` : 'on it');
     /* Open water is nobody's and a reach may have all of it. Another country's
        ground is already someone's, and a tap that far inside Egypt is Egypt's -
        the same rule that keeps the Bahamas out of Haiti. At the world view a

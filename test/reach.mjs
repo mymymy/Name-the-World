@@ -153,12 +153,13 @@ console.log('\na tap just inside what a place may claim - a miss, by the old rul
   const claimAt = (name, s) => p.evaluate(([n, x, y])=>{
     const e = DATA.find(z=>z.name===n);
     const m = scene.getScreenCTM(), u = k*unitPx();
-    let best = Infinity, w = 0;
+    let best = Infinity, w = 0, t;
     for(const a of (e.at || [])){
       const d = Math.hypot(m.a*a[0]+m.c*a[1]+m.e - x, m.b*a[0]+m.d*a[1]+m.f - y);
-      if(d < best){ best = d; w = a[2]*u; }
+      if(d < best){ best = d; w = a[2]*u; t = a[3] === undefined ? undefined : a[3]*u; }
     }
-    return Math.max(3, reachOf(w) - 2);
+    /* what it may claim is measured across the shape, not along it */
+    return Math.max(3, claimOf(w, t) - 2);
   }, [name, s[0], s[1]]);
   let n = 0, found = 0; const lost = [];
   for(const name of onScreen){

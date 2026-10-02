@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 1 oct · v161</span>
+      <span id="build" class="caps">build 2 oct · v162</span>
     </div>
   </div>
 </div>
@@ -1867,7 +1867,8 @@ function heldPath(e, minU){
       P.push([x,y]);
       if(x<lo)lo=x; if(x>hi)hi=x; if(y<up)up=y; if(y>dn)dn=y;
     }
-    return {P, cx:(lo+hi)/2, cy:(up+dn)/2, size:Math.max(hi-lo, dn-up)};
+    return {P, cx:(lo+hi)/2, cy:(up+dn)/2,
+            size:Math.max(hi-lo, dn-up), thin:Math.min(hi-lo, dn-up)};
   });
   /* the country's own extent, and the rigid scaling that brings it to the floor */
   let lo=Infinity, hi=-Infinity, up=Infinity, dn=-Infinity;
@@ -1931,7 +1932,7 @@ function heldPath(e, minU){
          the screen, so it has to be measured on the screen: a shape held up to
          the floor is thirteen pixels whatever its coastline says, and one held
          back by the cap is the speck it really is. */
-      where.push([a.cx, a.cy, a.size * m]);
+      where.push([a.cx, a.cy, a.size * m, a.thin * m]);
     }
   }
   /* Where the islands ended up, and whether they are still being held up. A
@@ -3170,7 +3171,15 @@ function paintReach(){
   clearTimeout(reachTimer);
   reachTimer = setTimeout(()=>{
     const r = wrap.getBoundingClientRect();
-    const STEP = 5;
+    /* Three pixels, not five. The zone is not a circle and has no radius to
+       draw: it is every point the whole decision answers this place for, which
+       turns on the shape's own geometry, on what it is allowed to take from
+       its neighbour and on the neighbours competing for the same ground. So it
+       is sampled, and the sampling is what you see the edges of. Five was
+       chosen when the skirt was wide and every sample dear; with the skirt cut
+       to what a place may actually claim, three costs about what five used to
+       and the patches stop looking like brickwork. */
+    const STEP = 3;
     reachCv.width = Math.ceil(r.width); reachCv.height = Math.ceil(r.height);
     const g = reachCv.getContext('2d');
     /* Only the small places are drawn. Tinting every country coloured in Brazil
@@ -3198,15 +3207,17 @@ function paintReach(){
       if(!w.some(x => x < REACH_PX*2)) continue;
       reaches.add(e.code);
       for(let i = 0; i < pts.length; i++){
-        const [bx, by] = pts[i];
-        /* How far from this point a sample could still be its own: the reach,
-           and the island's own width on top, since a grab point sits in the
-           middle of a shape rather than covering it. A constant stood here and
-           was too short for the West Bank at forty-five pixels; each island's
-           own measure is right for all of them, and keeps Kiribati's atolls as
-           cheap as they were. */
+        const [bx, by, , tn] = pts[i];
+        /* How far from this point a sample could still be its own: what this
+           island may claim, and its own width on top, since a grab point sits
+           in the middle of a shape rather than covering it. A constant stood
+           here and was too short for the West Bank at forty-five pixels; and
+           then the full reach stood here, which is now more than most of them
+           may have - and every pixel of slack is samples spent on ground that
+           was never in question. */
+        const wide = isFinite(w[i]) ? w[i] : MIN_SHAPE_PX;
         spots.push([m.a*bx + m.c*by + m.e, m.b*bx + m.d*by + m.f,
-                    REACH_PX + (isFinite(w[i]) ? w[i] : MIN_SHAPE_PX)]);
+                    claimOf(wide, tn === undefined ? undefined : tn * uu2) + wide]);
       }
     }
     for(let y=0; y<r.height; y+=STEP){
@@ -3268,6 +3279,13 @@ const REACH_PX = 22;
    taking its reach away for being small is precisely backwards. */
 const GRAB = 3, GRAB_MIN = 8;
 const reachOf = w => Math.max(GRAB_MIN, Math.min(REACH_PX, w * GRAB));
+/* Measured across a shape, not along it. The Gambia is twelve pixels long and
+   three and a half wide, and going by its length it claimed the full
+   twenty-two - a circle six times its own width, thrown over Senegal on both
+   sides of it. What makes a shape hard to hit is how thin it is, and that is
+   also how far its claim ought to reach. Its length still decides whether it
+   needs help at all and whether it is drawn large enough to be aimed at. */
+const claimOf = (long, thin) => reachOf(thin === undefined ? long : thin);
 /* Land on open ground and the nearest small place within a finger's width is
    yours. Land on another country and it is not that simple: the tap has hit
    something, and the something has a claim of its own.
@@ -3391,7 +3409,7 @@ function reachFor(cx, cy, host){
     /* distance first, and the hit tests only for a place near enough to win -
        the rest are settled by arithmetic and never touch the geometry */
     let d = Infinity, w = 0;
-    for(const [bx, by, sz] of pts){
+    for(const [bx, by, sz, tn] of pts){
       /* An island already wider than a finger needs no help and would only be
          stealing from its neighbours. Asked of the island, so the West Bank can
          pass out of this while Gaza, three pixels of it, does not. */
@@ -3400,7 +3418,7 @@ function reachFor(cx, cy, host){
       if(sz !== undefined && iw < MIN_HIT_PX) continue;   // too small to be seen at all
       const id = Math.hypot(m.a*bx + m.c*by + m.e - cx,
                             m.b*bx + m.d*by + m.f - cy);
-      if(id > reachOf(iw)) continue;             // beyond what a mark this size may claim
+      if(id > claimOf(iw, tn === undefined ? undefined : tn * u)) continue;
       if(id < d){ d = id; w = iw; }
     }
     if(d >= bd) continue;
