@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 2 oct · v162</span>
+      <span id="build" class="caps">build 2 oct · v163</span>
     </div>
   </div>
 </div>
@@ -1632,7 +1632,7 @@ function drawWorld(){
          Vatican City, Luxembourg, Liechtenstein and Malta all held ground in
          the middle of the North Atlantic, and a tap out there answered to one
          of them. Nothing drawn, nothing to reach for. */
-      e.at = null; e.lifted = false;
+      e.at = null; e.home = null; e.lifted = false;
       continue;
     }
     const d = e.held ? heldPath(e, minU) : e.rings.map(r=>ringPath(r, 0)).join('');
@@ -1881,7 +1881,8 @@ function heldPath(e, minU){
   const grow = t => t > 0 ? Math.max(1, Math.min(minU, t + GROW_U)/t) : 1;
   const G = span > 0 ? grow(span) : 1;
 
-  let out='', where = [], lifted = false;
+  let out='', where = [], homes = [], lifted = false;
+  const uu = minU ? MIN_SHAPE_PX/minU : 1;        // one board unit, in screen px
   for(let i=0;i<R.length;i++){
     const a = R[i];
     /* where this island sits once the country has been scaled as one */
@@ -1932,7 +1933,47 @@ function heldPath(e, minU){
          the screen, so it has to be measured on the screen: a shape held up to
          the floor is thirteen pixels whatever its coastline says, and one held
          back by the cap is the speck it really is. */
-      where.push([a.cx, a.cy, a.size * m, a.thin * m]);
+      /* Points around the outline rather than one in the middle, so the claims
+         they carry add up to a skirt that follows the coast. Spaced at about
+         two thirds of the skirt, which keeps the scallops between them smaller
+         than the line is thick, and capped so a ragged coastline cannot cost
+         more than a smooth one.
+
+         Taken at the size the shape is drawn but about the point it truly
+         occupies: what is drawn may shift to be legible, and what you reach for
+         must not move. */
+      const longPx = a.size * m * uu, thinPx = a.thin * m * uu;
+      /* Only a ring that will actually carry a claim is worth sampling. One
+         already wider than a finger gets none, one too small to see gets none,
+         and between them is a handful of shapes per frame. */
+      const needs = longPx >= MIN_HIT_PX && longPx < REACH_PX*2;
+      /* Points around the outline rather than one in the middle, so the claims
+         they carry add up to a skirt that follows the coast.
+
+         Taken every so many vertices rather than every so many pixels. Walking
+         the outline by arc length means a square root per segment for every
+         held shape on every frame, which came to six milliseconds on a budget
+         of sixteen; these outlines are already simplified to roughly even
+         steps, and the spacing only has to be comfortably under the skirt. The
+         ring's own perimeter sets how many are wanted.
+
+         Taken at the size the shape is drawn but about the point it truly
+         occupies: what is drawn may shift to be legible, and what you reach for
+         must not move. */
+      const round = 2 * (a.size + a.thin) * m * uu;        // near enough its perimeter
+      const want = needs ? Math.max(1, Math.min(24,
+                     Math.ceil(round / Math.max(reachOf(thinPx) * 0.66, 1)))) : 1;
+      const last = a.P.length - 1;
+      if(want <= 1 || last < 2) where.push([a.cx, a.cy, a.size * m, a.thin * m]);
+      else for(let q = 0; q < want; q++){
+        const v = a.P[Math.round(q * last / want)];
+        where.push([a.cx + (v[0]-a.cx)*m, a.cy + (v[1]-a.cy)*m,
+                    a.size * m, a.thin * m]);
+      }
+      /* and one point for the middle of it, which is what answers "does this
+         place stand on that country" - an outline runs along a border and a
+         point on it belongs to neither side */
+      homes.push([a.cx, a.cy]);
     }
   }
   /* Where the islands ended up, and whether they are still being held up. A
@@ -1940,6 +1981,7 @@ function heldPath(e, minU){
      no help; one being magnified is by definition too small, and gets a reach
      around it. */
   e.at = where;
+  e.home = homes;
   e.lifted = lifted;
   return out;
 }
@@ -3277,8 +3319,22 @@ const REACH_PX = 22;
    magnified and a shape is simply as small as it is - the City of London is a
    pixel and a half on the counties and will never be more at that zoom, and
    taking its reach away for being small is precisely backwards. */
-const GRAB = 3, GRAB_MIN = 8;
-const reachOf = w => Math.max(GRAB_MIN, Math.min(REACH_PX, w * GRAB));
+/* A skirt around the outline, not a radius from the middle.
+
+   A radius was the wrong primitive and a bounding-box centre is not a point on
+   the shape. Eight of Kiribati's twelve atolls had their point in the lagoon;
+   and the Gambia, measured from the middle of a curved sliver, got a claim that
+   bulged nine pixels into Senegal at its waist and fell twenty-seven pixels
+   short of its own ends four zoom steps in. The country was outside its own
+   reach.
+
+   So the claim is the shape swept outwards by this much. The numbers are set to
+   leave the sideways margin where the radius had put it - a radius of three
+   times the width, measured from the centre of a shape W wide, is a margin of
+   3W minus W/2, which is two and a half W from the edge - so what changes is
+   the shape of the claim and not its generosity. */
+const SKIRT = 2.5, SKIRT_MIN = 7, SKIRT_MAX = 18;
+const reachOf = w => Math.max(SKIRT_MIN, Math.min(SKIRT_MAX, w * SKIRT));
 /* Measured across a shape, not along it. The Gambia is twelve pixels long and
    three and a half wide, and going by its length it claimed the full
    twenty-two - a circle six times its own width, thrown over Senegal on both
@@ -3374,7 +3430,11 @@ function mayTake(e, host, q, cx, cy, inv){
                 .matrixTransform(inv);
     if(inShape(e.code, s)) return true;
   }
-  const pts = grabPoints(e);
+  /* Asked of the middle of each piece, not of the outline points. An outline
+     runs along a border, and a point on a border is inside whichever shape the
+     rounding favours - so asking it whether this place stands on that country
+     gets an answer about the line rather than about the place. */
+  const pts = (e.home && e.home.length) ? e.home : grabPoints(e);
   if(!pts) return false;
   for(const [bx, by] of pts)
     if(inShape(host.code, new DOMPoint(bx, by))) return true;
