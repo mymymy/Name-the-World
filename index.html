@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 2 oct · v165</span>
+      <span id="build" class="caps">build 2 oct · v166</span>
     </div>
   </div>
 </div>
@@ -1606,9 +1606,11 @@ const MIN_HIT_PX = 1.2;
    there to be hit. So the promise is made at full zoom and kept by adding
    ground: each island gets a skirt of map, not of screen, wide enough that it
    and the skirt together are this many pixels across when the map is as close
-   as it goes. Cyprus makes it unaided and gets nothing; the Vatican, a tenth
-   of a kilometre, gets nearly all of it. Being ground, the skirt shrinks as you
-   pull back, so it takes nothing worth having from anyone at the widest view.
+   as it goes. The Vatican, a tenth of a kilometre, gets nearly all of it;
+   Cyprus, which reads narrower than it is because its coast is ragged and its
+   panhandle long, gets sixteen pixels it does not strictly need, over sea.
+   Being ground, the skirt shrinks as you pull back, so it takes nothing worth
+   having from anyone at the widest view.
 
    Aimed at forty-eight so that forty-four is met: the skirt is measured from
    points along the outline, and between them it dips; and a drawn shape is not
@@ -1999,11 +2001,11 @@ function heldPath(e, minU){
                      Math.ceil(round / Math.max(claimPx * 0.45, 1)))) : 1;
       const last = a.P.length - 1;
       const sk = needs ? skirt : 0;
-      if(want <= 1 || last < 2) where.push([a.cx, a.cy, a.size * m, a.thin * m, sk]);
+      if(want <= 1 || last < 2) where.push([a.cx, a.cy, a.size * m, a.thin * m, sk, tT]);
       else for(let q = 0; q < want; q++){
         const v = a.P[Math.round(q * last / want)];
         where.push([a.cx + (v[0]-a.cx)*m, a.cy + (v[1]-a.cy)*m,
-                    a.size * m, a.thin * m, sk]);
+                    a.size * m, a.thin * m, sk, tT]);
       }
     }
   }
@@ -3468,14 +3470,36 @@ function mayTake(e, host, q, cx, cy, inv){
   }
   return false;
 }
+/* How wide a country is, by the same measure as a small one's pieces: its
+   widest piece, in board units, worked out once. */
+function wideOf(e){
+  if(e.wideU === undefined)
+    e.wideU = e.rings && e.rings.length
+      ? Math.max(...e.rings.map(r => acrossOf(r, e.cll ? e.cll[0] : 0)[1])) : Infinity;
+  return e.wideU;
+}
 /* How far from one of its points a place may claim, in screen pixels: a
    globe country by the ground it is owed, a dot or a board by what it is drawn.
-   Nothing, for something already wider than a finger or too small to see. */
-function claimAt(pt, u, whole){
-  const [, , sz, tn, sk] = pt;
+   Nothing, for something already wider than a finger or too small to see.
+
+   And a skirt goes onto another country's land only where that country can
+   spare it. Israel is seventeen pixels wide at full zoom, exactly as wide as
+   the West Bank, and narrower than that through the middle: given its full
+   fifteen pixels, the West Bank's skirt took every tap from Tel Aviv to the
+   edge of Gaza's, and Israel could not be named there at all. So the skirt
+   crosses onto a neighbour only if the neighbour is more than twice as wide
+   as the piece reaching for it - Senegal for the Gambia, Italy for the
+   Vatican, Jordan for the West Bank - and otherwise stops at the edge
+   allowance. Over the sea it is not limited. */
+function claimAt(pt, u, whole, on){
+  const [, , sz, tn, sk, wd] = pt;
   const iw = sz === undefined ? whole : sz * u;
   if(sz !== undefined && iw < MIN_HIT_PX) return 0;
-  if(sk !== undefined) return sk > 0 ? Math.max(EDGE_PX, sk * u) : 0;
+  if(sk !== undefined){
+    if(!(sk > 0)) return 0;
+    if(on && wd !== undefined && wideOf(on) <= 2 * wd) return EDGE_PX;
+    return Math.max(EDGE_PX, sk * u);
+  }
   if(iw >= REACH_PX*2) return 0;
   return claimOf(iw, tn === undefined ? undefined : tn * u);
 }
@@ -3515,8 +3539,9 @@ function reachFor(cx, cy, host){
     let d = Infinity, w = 0;
     for(const pt of pts){
       /* Asked of the island, not the country, so a big piece can pass out of
-         this while a small one keeps its claim. */
-      const c = claimAt(pt, u, whole);
+         this while a small one keeps its claim - and of the ground the tap
+         landed on, which may not be able to spare it. */
+      const c = claimAt(pt, u, whole, host && host !== e && !host.held && host.rings ? host : null);
       if(!c) continue;
       const [bx, by, sz] = pt;
       const id = Math.hypot(m.a*bx + m.c*by + m.e - cx,

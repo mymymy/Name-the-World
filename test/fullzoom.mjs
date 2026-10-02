@@ -6,10 +6,11 @@
    phone. Countries that are too small to click even at max zoom need
    compensating for."
 
-   So two checks. At full zoom, centred on each held country, there has to be a
+   So three checks. At full zoom, centred on each held country, there has to be a
    point with forty-four pixels all round it - a disc, sampled - that answers to that
    country, or, where two small places are close enough to want the same ground,
-   to the nearer of them. And at the opening view, nothing small takes more than a few pixels
+   to the nearer of them. A neighbour that is itself thin keeps most of its
+   own ground. And at the opening view, nothing small takes more than a few pixels
    of anyone else's ground: the Gambia's reach once covered a fist's width of
    Senegal there, and the compensation is not owed at that zoom. */
 import { chromium, PAGE, PHONE } from './lib.mjs';
@@ -98,6 +99,38 @@ for(const name of held){
   if(res.best <= 1) short.push(`${name} ${(res.best*100).toFixed(0)}%${res.cands ? '' : ' (nothing on screen)'}`);
 }
 ok(`every one has ${RADIUS*2}px all round, at full zoom`, short, []);
+
+/* And the ground it is given comes from somewhere. Israel is seventeen pixels
+   wide at full zoom, as wide as the West Bank; given the West Bank's whole
+   skirt, every tap from Tel Aviv south answered Palestine. Most of Israel in
+   view must still answer to Israel. (Gaza's skirt does take the strip between
+   it and the West Bank, which is a choice, not an accident.) */
+await p.evaluate(()=>{ S.sel = null; closeAsk(true); hideTip();
+  lam0 = 35.0; k = ZOOM_MAX;
+  const mm = svg.getScreenCTM(), r = wrap.getBoundingClientRect();
+  ty = ((r.top+r.height/2)-mm.f)/mm.d - wy(31.9)*k;
+  clampView(); applyView(); turn(); });
+await p.waitForTimeout(60);
+const israel = await p.evaluate(()=>{
+  const isr = DATA.find(x=>x.name==='Israel');
+  const r = wrap.getBoundingClientRect(), inv = scene.getScreenCTM().inverse();
+  let ground = 0, kept = 0;
+  for(let y = r.y + 60; y < r.y + r.height - 120; y += 2)
+    for(let x = r.x + 10; x < r.x + r.width - 10; x += 2){
+      if(!inShape(isr.code, new DOMPoint(x, y).matrixTransform(inv))) continue;
+      const el = document.elementFromPoint(x, y);
+      const c = el && el.closest ? el.closest('[data-code]') : null;
+      const hit = c && BY_CODE[c.dataset.code];
+      if(hit !== isr) continue;                 // drawn over by a small one
+      ground++;
+      const near = reachFor(x, y, hit);
+      const took = near && (!hit || near.e === hit || near.w < screenSize(hit));
+      if(!took || near.e === isr) kept++;
+    }
+  return {ground, kept};
+});
+ok(`at full zoom, Israel keeps most of its own ground (${israel.kept}/${israel.ground})`,
+   israel.ground > 100 && israel.kept / israel.ground >= 0.6, true);
 
 /* and at the opening view, the compensation costs nobody anything */
 await p.evaluate(()=>{ S.sel = null; closeAsk(true); fitCurrent(); });
