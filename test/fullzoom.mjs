@@ -6,7 +6,7 @@
    phone. Countries that are too small to click even at max zoom need
    compensating for."
 
-   So seven checks. At full zoom, centred on each held country, there has to be a
+   So eight checks. At full zoom, centred on each held country, there has to be a
    point with forty-four pixels all round it - a disc, sampled - that answers to that
    country, or, where two small places are close enough to want the same ground,
    to the nearer of them. A neighbour that is itself small - Israel, Qatar -
@@ -37,7 +37,7 @@ const RADIUS = 22;          // forty-four across, a finger
    Israel, itself seventeen pixels wide; Liechtenstein is walled in by narrow
    strips of Switzerland and Austria. Measured, not hoped: these are what they
    have, so that any change that shrinks them further shows. */
-const RADIUS_FOR = {'Palestine': 19, 'Luxembourg': 20, 'Liechtenstein': 10};
+const RADIUS_FOR = {'Palestine': 21, 'Liechtenstein': 10};
 
 const held = await p.evaluate(()=>DATA.filter(e=>e.play && e.held && e.g).map(e=>e.name));
 console.log(`${held.length} held countries, each at full zoom (k=${await p.evaluate(()=>ZOOM_MAX)})\n`);
@@ -209,6 +209,31 @@ const casamance = await p.evaluate(()=>{ const e = BY_CODE.GMB, sen = BY_CODE.SE
   return {cols, worst: Math.round(worst*100)}; });
 ok(`at full zoom, the Casamance keeps its middle (worst column ${casamance.worst}% taken, ${casamance.cols} columns)`,
    casamance.cols >= 5 && casamance.worst <= 40, true);
+
+/* And a border the small place sits on is not the far side of a strip.
+   Andorra is on the line between France and Spain; a line from it through a
+   tap just inside Spain runs nearly along that border and comes out in France,
+   so Spain looked like a thin strip there and Andorra's skirt had wedges cut
+   out of it on both sides - 138 pixels of them. */
+const andorra = await p.evaluate(()=>{ const e = BY_CODE.AND;
+  S.sel = null; closeAsk(true); hideTip(); lam0 = e.cll[0]; k = ZOOM_MAX;
+  const mm = svg.getScreenCTM(), rr = wrap.getBoundingClientRect();
+  ty = ((rr.top+rr.height/2)-mm.f)/mm.d - wy(e.cll[1])*k; clampView(); applyView(); turn();
+  const m = scene.getScreenCTM(), u = k*unitPx(), q = project(e.cll[0], e.cll[1]);
+  const cx = m.a*q[0]+m.c*q[1]+m.e, cy = m.b*q[0]+m.d*q[1]+m.f;
+  let refused = 0;
+  for(let y = cy-30; y <= cy+30; y++) for(let x = cx-30; x <= cx+30; x++){
+    const el = document.elementFromPoint(x, y);
+    const c = el && el.closest ? el.closest('[data-code]') : null;
+    const hit = c && BY_CODE[c.dataset.code];
+    if(!hit || hit === e) continue;
+    const inside = e.at.some(a => Math.hypot(m.a*a[0]+m.c*a[1]+m.e - x, m.b*a[0]+m.d*a[1]+m.f - y) <= claimAt(a, u, screenSize(e), hit));
+    if(!inside) continue;
+    const near = reachFor(x, y, hit);
+    if(!near || near.e !== e) refused++;
+  }
+  return refused; });
+ok(`at full zoom, Andorra's skirt has no wedges cut out of it (${andorra} refused)`, andorra <= 5, true);
 
 /* And the far-flung pieces of big countries: a player who has not yet named
    France will try Guadeloupe. Each must answer on its own land, and on at

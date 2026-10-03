@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 3 oct · v170</span>
+      <span id="build" class="caps">build 4 oct · v171</span>
     </div>
   </div>
 </div>
@@ -3628,10 +3628,45 @@ function claimAt(pt, u, whole, on){
    most the first quarter of it. A third was tried and, measured along slanting
    lines, still took up to 46% of the Casamance.
 
-   The cost is the landlocked: Liechtenstein, walled in by narrow strips of
-   Switzerland and Austria, has a target of twenty pixels at full zoom rather
-   than forty-four, Luxembourg forty, Palestine thirty-eight. */
+   A strip runs to a border the small place does not itself sit on - see
+   below for Andorra, where it does. The cost is Liechtenstein, walled in by
+   real strips of Switzerland and Austria (Vorarlberg runs out into Germany):
+   twenty pixels at full zoom rather than forty-four. Palestine has forty-two. */
 const SQUEEZE = 4;
+/* The countries a small place touches, found once by stepping a little way out
+   from every point of its outline and asking whose land that is. */
+const NEIGHBOURS = new Map();
+function inRings(rings, lon, lat){
+  let inside = false;
+  for(const r of rings)
+    for(let i=0, j=r.length-1; i<r.length; j=i++){
+      const xi=r[i][0], yi=r[i][1], xj=r[j][0], yj=r[j][1];
+      if(((yi>lat)!==(yj>lat)) && (lon < (xj-xi)*(lat-yi)/(yj-yi)+xi)) inside = !inside;
+    }
+  return inside;
+}
+function neighboursOf(e){
+  if(NEIGHBOURS.has(e.code)) return NEIGHBOURS.get(e.code);
+  const found = new Set();
+  for(const r of (e.rings || [])){
+    let lo=180, hi=-180, la=90, lb=-90;
+    for(const [x,y] of r){ if(x<lo)lo=x; if(x>hi)hi=x; if(y<la)la=y; if(y>lb)lb=y; }
+    const cx = (lo+hi)/2, cy = (la+lb)/2;
+    for(const [x, y] of r){
+      const dx = x - cx, dy = y - cy, d = Math.hypot(dx, dy) || 1;
+      for(const out of [0.02, 0.06]){                 // two and six kilometres out
+        const lon = x + dx/d*out, lat = y + dy/d*out;
+        for(const o of DATA){
+          if(o === e || !o.rings || !o.box || found.has(o.code)) continue;
+          if(lon < o.box[0]-.01 || lon > o.box[1]+.01 || lat < o.box[2]-.01 || lat > o.box[3]+.01) continue;
+          if(inRings(o.rings, lon, lat)){ found.add(o.code); break; }
+        }
+      }
+    }
+  }
+  NEIGHBOURS.set(e.code, found);
+  return found;
+}
 function squeezes(host, own, px, py, cx, cy, inv){
   const dx = cx - px, dy = cy - py, L = Math.hypot(dx, dy);
   if(L < 1) return false;
@@ -3644,6 +3679,14 @@ function squeezes(host, own, px, py, cx, cy, inv){
   const el = document.elementFromPoint(cx + ux*(fwd+2), cy + uy*(fwd+2));
   const c = el && el.closest ? el.closest('[data-code]') : null;
   if(!c || c.dataset.code === host.code) return false;   // the sea, or the edge
+  /* A border the small place itself sits on is not the far side of a strip.
+     Andorra is on the line between France and Spain, and a tap just south of
+     it, in Spain, is reached by a line that runs nearly along that border and
+     comes out in France a few pixels on: along that line Spain looked thirty
+     pixels thick, and Andorra's skirt had wedges cut out of it on both sides.
+     Neither France nor Spain is a strip. Senegal between the Gambia and
+     Guinea-Bissau is: the Gambia does not touch Guinea-Bissau. */
+  if(c.dataset.code !== own.code && neighboursOf(own).has(c.dataset.code)) return false;
   return back > Math.max(EDGE_PX, (back + fwd + 1) / SQUEEZE);
 }
 /* Which place has a claim on this point, and how wide the part of it that
