@@ -6,7 +6,7 @@
    phone. Countries that are too small to click even at max zoom need
    compensating for."
 
-   So four checks. At full zoom, centred on each held country, there has to be a
+   So five checks. At full zoom, centred on each held country, there has to be a
    point with forty-four pixels all round it - a disc, sampled - that answers to that
    country, or, where two small places are close enough to want the same ground,
    to the nearer of them. A neighbour that is itself small - Israel, Qatar -
@@ -76,8 +76,12 @@ for(const name of held){
     let best = 0, bestAt = null;
     for(const [x0, y0] of cand){
       /* a little search about the middle of the piece: a sliver's middle is not
-         always on its axis */
-      for(const [ox, oy] of [[0,0],[4,0],[-4,0],[0,4],[0,-4]]){
+         always on its axis, and a target pressed against a neighbour that can
+         spare little sits a little way out to sea */
+      const offs = [];
+      for(let ox = -12; ox <= 12; ox += 2) for(let oy = -12; oy <= 12; oy += 2) offs.push([ox, oy]);
+      offs.sort((a, b) => Math.hypot(...a) - Math.hypot(...b));
+      for(const [ox, oy] of offs){
         const x = x0+ox, y = y0+oy;
         let good = 0, total = 0, shared = 0;
         for(const rr of [0, R/2, R]) for(let i = 0; i < (rr ? 24 : 1); i++){
@@ -144,6 +148,35 @@ ok(`at full zoom, Israel keeps most of its own ground (${israel.kept}/${israel.g
 const qatar = await keeps('Qatar', 50.56, 26.03);
 ok(`at full zoom, Qatar keeps most of its own ground (${qatar.kept}/${qatar.ground})`,
    qatar.ground > 100 && qatar.kept / qatar.ground >= 0.85, true);
+
+/* And a country's pieces may not pincer a neighbour. Limbang, the part of
+   Malaysia between Brunei's two pieces, is eight pixels wide at full zoom, and
+   both of Brunei's skirts reached into it until none of it answered Malaysia. */
+const limbang = await p.evaluate(()=>{ const e = BY_CODE.BRN, h = BY_CODE.MYS;
+  S.sel = null; closeAsk(true); hideTip(); lam0 = e.cll[0]; k = ZOOM_MAX;
+  const mm = svg.getScreenCTM(), r = wrap.getBoundingClientRect();
+  ty = ((r.top+r.height/2)-mm.f)/mm.d - wy(e.cll[1])*k; clampView(); applyView(); turn();
+  const m = scene.getScreenCTM();
+  const boxes = e.rings.map(ring=>{ let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+    for(const [lon,lat] of ring){ const q = project(lon,lat);
+      const x = m.a*q[0]+m.c*q[1]+m.e, y = m.b*q[0]+m.d*q[1]+m.f;
+      x0=Math.min(x0,x); x1=Math.max(x1,x); y0=Math.min(y0,y); y1=Math.max(y1,y); }
+    return [x0,x1,y0,y1]; }).sort((a,b)=>a[0]-b[0]);
+  const W = boxes[0], E = boxes[boxes.length-1];
+  let ground = 0, kept = 0;
+  for(let y = Math.floor(Math.max(W[2],E[2])); y < Math.min(W[3],E[3]); y++)
+    for(let x = Math.floor(W[1]-6); x < E[0]+6; x++){
+      const el = document.elementFromPoint(x, y);
+      const c = el && el.closest ? el.closest('[data-code]') : null;
+      const hit = c && BY_CODE[c.dataset.code];
+      if(hit !== h) continue; ground++;
+      const near = reachFor(x, y, hit);
+      const took = near && (near.e === hit || near.w < screenSize(hit));
+      if(!took || near.e === h) kept++;
+    }
+  return {ground, kept}; });
+ok(`at full zoom, Limbang keeps its middle (${limbang.kept}/${limbang.ground})`,
+   limbang.ground > 50 && limbang.kept / limbang.ground >= 0.25, true);
 
 /* and at the opening view, the compensation costs nobody anything */
 await p.evaluate(()=>{ S.sel = null; closeAsk(true); fitCurrent(); });

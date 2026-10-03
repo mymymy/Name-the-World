@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 3 oct · v167</span>
+      <span id="build" class="caps">build 3 oct · v168</span>
     </div>
   </div>
 </div>
@@ -3519,7 +3519,8 @@ function spareOf(e){
    size: eleven pixels for Qatar, sixty for Italy, a hundred and forty-five for
    Saudi Arabia. Qatar loses 167. The cost is Palestine's: Gaza may take only
    sixteen pixels of Israel where it wanted twenty-two, and Palestine's widest
-   target at full zoom is forty pixels rather than forty-four. */
+   target at full zoom is forty-two pixels rather than forty-four, a little
+   way out to sea from Gaza. */
 function claimAt(pt, u, whole, on){
   const [, , sz, tn, sk, wd] = pt;
   const iw = sz === undefined ? whole : sz * u;
@@ -3534,6 +3535,36 @@ function claimAt(pt, u, whole, on){
   }
   if(iw >= REACH_PX*2) return 0;
   return claimOf(iw, tn === undefined ? undefined : tn * u);
+}
+/* Whether a skirt reaching from (px,py) to the tap at (cx,cy) would close the
+   gap between two pieces of the same small country.
+
+   The rules above look at the neighbour as a whole, and Malaysia as a whole
+   has plenty to spare. But Limbang, the part of it between Brunei's two
+   pieces, is eight pixels wide at full zoom, and Brunei's skirts reached in
+   from both sides and took all of it. The strip of Israel between Gaza and the
+   West Bank is the same shape. A country's pieces may not pincer a neighbour:
+   along the line from the small place through the tap, if the host comes out
+   on another piece of the same small country, the skirt takes at most the
+   first third of it, and the middle third stays the host's.
+
+   Asked only of that: tried for any land on the far side, it took a third of
+   Liechtenstein's target away, because near a three-way border almost every
+   line through Switzerland comes out in Austria soon enough. */
+const SQUEEZE = 3;
+function squeezes(host, own, px, py, cx, cy, inv){
+  const dx = cx - px, dy = cy - py, L = Math.hypot(dx, dy);
+  if(L < 1) return false;
+  const ux = dx / L, uy = dy / L;
+  const on = (x, y) => inShape(host.code, new DOMPoint(x, y).matrixTransform(inv));
+  let back = 0; while(back < L && on(cx - ux*(back+1), cy - uy*(back+1))) back++;
+  const MAX = 160;
+  let fwd = 0; while(fwd < MAX && on(cx + ux*(fwd+1), cy + uy*(fwd+1))) fwd++;
+  if(fwd >= MAX) return false;                 // a long way through: plenty
+  const el = document.elementFromPoint(cx + ux*(fwd+2), cy + uy*(fwd+2));
+  const c = el && el.closest ? el.closest('[data-code]') : null;
+  if(!c || c.dataset.code !== own.code) return false;    // not a pincer
+  return back > Math.max(EDGE_PX, (back + fwd + 1) / SQUEEZE);
 }
 /* Which place has a claim on this point, and how wide the part of it that
    claimed it was - {e, w}, or nothing.
@@ -3568,7 +3599,7 @@ function reachFor(cx, cy, host){
     const whole = screenSize(e);
     /* distance first, and the hit tests only for a place near enough to win -
        the rest are settled by arithmetic and never touch the geometry */
-    let d = Infinity, w = 0;
+    let d = Infinity, w = 0, nx = 0, ny = 0;
     for(const pt of pts){
       /* Asked of the island, not the country, so a big piece can pass out of
          this while a small one keeps its claim - and of the ground the tap
@@ -3576,13 +3607,15 @@ function reachFor(cx, cy, host){
       const c = claimAt(pt, u, whole, host && host !== e && !host.held && host.rings ? host : null);
       if(!c) continue;
       const [bx, by, sz] = pt;
-      const id = Math.hypot(m.a*bx + m.c*by + m.e - cx,
-                            m.b*bx + m.d*by + m.f - cy);
+      const px = m.a*bx + m.c*by + m.e, py = m.b*bx + m.d*by + m.f;
+      const id = Math.hypot(px - cx, py - cy);
       if(id > c) continue;
-      if(id < d){ d = id; w = sz === undefined ? whole : sz * u; }
+      if(id < d){ d = id; w = sz === undefined ? whole : sz * u; nx = px; ny = py; }
     }
     if(d >= bd) continue;
     if(q && host !== e && !e.held && !mayTake(e, host, q, cx, cy, inv)) continue;
+    if(e.held && host && host !== e && !host.held && host.rings && d > EDGE_PX &&
+       squeezes(host, e, nx, ny, cx, cy, inv || (inv = m.inverse()))) continue;
     bd = d; bw = w; best = e;
   }
   return best ? {e: best, w: bw} : null;
