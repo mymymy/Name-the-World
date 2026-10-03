@@ -6,7 +6,7 @@
    phone. Countries that are too small to click even at max zoom need
    compensating for."
 
-   So six checks. At full zoom, centred on each held country, there has to be a
+   So seven checks. At full zoom, centred on each held country, there has to be a
    point with forty-four pixels all round it - a disc, sampled - that answers to that
    country, or, where two small places are close enough to want the same ground,
    to the nearer of them. A neighbour that is itself small - Israel, Qatar -
@@ -30,11 +30,14 @@ const g0 = await p.$('.menupanel:not([hidden]) button.go'); if(g0) await g0.clic
 await p.waitForTimeout(1500);
 
 const RADIUS = 22;          // forty-four across, a finger
-/* Except Palestine, which gets forty. Its target has to come out of Israel or
-   the sea, and Israel - itself seventeen pixels wide at full zoom - can spare
-   only so much; see SPARE. A choice, made knowingly: 44 for Palestine costs
-   Israel its ground between Gaza and the West Bank. */
-const RADIUS_FOR = {'Palestine': 20};
+/* Except where the neighbours cannot spare it. A small country's target comes
+   out of the sea or out of its neighbours, and a neighbour gives at most a
+   quarter of a strip that runs to another border - the middle of a strip is
+   where people tap for it (see SQUEEZE). Palestine's target has to come out of
+   Israel, itself seventeen pixels wide; Liechtenstein is walled in by narrow
+   strips of Switzerland and Austria. Measured, not hoped: these are what they
+   have, so that any change that shrinks them further shows. */
+const RADIUS_FOR = {'Palestine': 19, 'Luxembourg': 20, 'Liechtenstein': 10};
 
 const held = await p.evaluate(()=>DATA.filter(e=>e.play && e.held && e.g).map(e=>e.name));
 console.log(`${held.length} held countries, each at full zoom (k=${await p.evaluate(()=>ZOOM_MAX)})\n`);
@@ -111,7 +114,7 @@ for(const name of held){
   }, [name, RADIUS_FOR[name] || RADIUS]);
   if(res.best <= 1) short.push(`${name} ${(res.best*100).toFixed(0)}%${res.cands ? '' : ' (nothing on screen)'}`);
 }
-ok(`every one has ${RADIUS*2}px all round, at full zoom`, short, []);
+ok(`every one has ${RADIUS*2}px all round at full zoom, bar ${Object.keys(RADIUS_FOR).join(', ')}`, short, []);
 
 /* And the ground it is given comes from somewhere. Israel is seventeen pixels
    wide at full zoom, as wide as the West Bank; given the West Bank's whole
@@ -181,6 +184,31 @@ const limbang = await p.evaluate(()=>{ const e = BY_CODE.BRN, h = BY_CODE.MYS;
   return {ground, kept}; });
 ok(`at full zoom, Limbang keeps its middle (${limbang.kept}/${limbang.ground})`,
    limbang.ground > 50 && limbang.kept / limbang.ground >= 0.25, true);
+
+/* And a strip of a neighbour between two borders keeps its middle, which is
+   where people tap for it. The Casamance, Senegal between the Gambia and
+   Guinea-Bissau, is thirty to forty pixels across at full zoom, and the
+   Gambia's skirt took half of it. Walked south across it in columns. */
+const casamance = await p.evaluate(()=>{ const e = BY_CODE.GMB, sen = BY_CODE.SEN;
+  S.sel = null; closeAsk(true); hideTip(); lam0 = e.cll[0]; k = ZOOM_MAX;
+  const mm = svg.getScreenCTM(), rr = wrap.getBoundingClientRect();
+  ty = ((rr.top+rr.height/2)-mm.f)/mm.d - wy(e.cll[1])*k; clampView(); applyView(); turn();
+  const m = scene.getScreenCTM(), q = project(e.cll[0], e.cll[1]);
+  const cx = m.a*q[0]+m.c*q[1]+m.e, cy = m.b*q[0]+m.d*q[1]+m.f;
+  const at = (x, y) => { const el = document.elementFromPoint(x, y);
+    const c = el && el.closest ? el.closest('[data-code]') : null; return c && BY_CODE[c.dataset.code]; };
+  let worst = 0, cols = 0;
+  for(let dx = -40; dx <= 40; dx += 5){
+    const x = cx + dx; let y = cy - 40;
+    while(y < cy + 60 && at(x, y) !== e) y++;
+    while(y < cy + 80 && at(x, y) === e) y++;
+    const y0 = y; let taken = 0;
+    while(y < cy + 200 && at(x, y) === sen){ const near = reachFor(x, y, sen); if(near && near.e === e) taken++; y++; }
+    if(y - y0 >= 15 && at(x, y + 1)){ cols++; worst = Math.max(worst, taken / (y - y0)); }
+  }
+  return {cols, worst: Math.round(worst*100)}; });
+ok(`at full zoom, the Casamance keeps its middle (worst column ${casamance.worst}% taken, ${casamance.cols} columns)`,
+   casamance.cols >= 5 && casamance.worst <= 40, true);
 
 /* And the far-flung pieces of big countries: a player who has not yet named
    France will try Guadeloupe. Each must answer on its own land, and on at

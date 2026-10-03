@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 3 oct · v169</span>
+      <span id="build" class="caps">build 3 oct · v170</span>
     </div>
   </div>
 </div>
@@ -3609,22 +3609,29 @@ function claimAt(pt, u, whole, on){
   if(iw >= REACH_PX*2) return 0;
   return claimOf(iw, tn === undefined ? undefined : tn * u);
 }
-/* Whether a skirt reaching from (px,py) to the tap at (cx,cy) would close the
-   gap between two pieces of the same small country.
+/* Whether a skirt reaching from (px,py) to the tap at (cx,cy) would take the
+   middle of a strip of the host that runs to another border.
 
-   The rules above look at the neighbour as a whole, and Malaysia as a whole
-   has plenty to spare. But Limbang, the part of it between Brunei's two
-   pieces, is eight pixels wide at full zoom, and Brunei's skirts reached in
-   from both sides and took all of it. The strip of Israel between Gaza and the
-   West Bank is the same shape. A country's pieces may not pincer a neighbour:
-   along the line from the small place through the tap, if the host comes out
-   on another piece of the same small country, the skirt takes at most the
-   first third of it, and the middle third stays the host's.
+   The rules above look at the neighbour as a whole, and Senegal and Malaysia
+   as wholes have plenty to spare. But the stretch of Senegal between the
+   Gambia and Guinea-Bissau is thirty to forty pixels across at full zoom, and
+   the Gambia's skirt took half of it - and the middle of a strip between two
+   borders is exactly where someone looking for that country taps. Limbang,
+   the part of Malaysia between Brunei's two pieces, is eight pixels wide and
+   lost all of it.
 
-   Asked only of that: tried for any land on the far side, it took a third of
-   Liechtenstein's target away, because near a three-way border almost every
-   line through Switzerland comes out in Austria soon enough. */
-const SQUEEZE = 3;
+   So the question is asked along the line from the small place through the
+   tap: how thick is the host there, and what is on the far side? If the line
+   comes out on the sea, nothing is being cut off - Italy west of the Vatican
+   runs to the coast, and the Vatican may have it. If it comes out on land,
+   anyone's, the host is a strip between two borders, and the skirt takes at
+   most the first quarter of it. A third was tried and, measured along slanting
+   lines, still took up to 46% of the Casamance.
+
+   The cost is the landlocked: Liechtenstein, walled in by narrow strips of
+   Switzerland and Austria, has a target of twenty pixels at full zoom rather
+   than forty-four, Luxembourg forty, Palestine thirty-eight. */
+const SQUEEZE = 4;
 function squeezes(host, own, px, py, cx, cy, inv){
   const dx = cx - px, dy = cy - py, L = Math.hypot(dx, dy);
   if(L < 1) return false;
@@ -3636,7 +3643,7 @@ function squeezes(host, own, px, py, cx, cy, inv){
   if(fwd >= MAX) return false;                 // a long way through: plenty
   const el = document.elementFromPoint(cx + ux*(fwd+2), cy + uy*(fwd+2));
   const c = el && el.closest ? el.closest('[data-code]') : null;
-  if(!c || c.dataset.code !== own.code) return false;    // not a pincer
+  if(!c || c.dataset.code === host.code) return false;   // the sea, or the edge
   return back > Math.max(EDGE_PX, (back + fwd + 1) / SQUEEZE);
 }
 /* Which place has a claim on this point, and how wide the part of it that
