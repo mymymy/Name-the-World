@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 2 oct · v166</span>
+      <span id="build" class="caps">build 3 oct · v167</span>
     </div>
   </div>
 </div>
@@ -3478,6 +3478,25 @@ function wideOf(e){
       ? Math.max(...e.rings.map(r => acrossOf(r, e.cll ? e.cll[0] : 0)[1])) : Infinity;
   return e.wideU;
 }
+/* How much ground a country can spare to a small neighbour's skirt: a share
+   of its own size, taken as the side of a square of the same area. */
+const SPARE = 4;
+function spareOf(e){
+  if(e.spareU === undefined){
+    let A = 0;
+    for(const r of (e.rings || [])){
+      const lam = e.cll ? e.cll[0] : 0; let a = 0;
+      for(let i=0, j=r.length-1; i<r.length; j=i++){
+        const xi = wx(wrapLon(r[i][0]-lam), r[i][1]), yi = wy(r[i][1]);
+        const xj = wx(wrapLon(r[j][0]-lam), r[j][1]), yj = wy(r[j][1]);
+        a += xj*yi - xi*yj;
+      }
+      A += Math.abs(a)/2;
+    }
+    e.spareU = A ? Math.sqrt(A) / SPARE : Infinity;
+  }
+  return e.spareU;
+}
 /* How far from one of its points a place may claim, in screen pixels: a
    globe country by the ground it is owed, a dot or a board by what it is drawn.
    Nothing, for something already wider than a finger or too small to see.
@@ -3490,14 +3509,27 @@ function wideOf(e){
    crosses onto a neighbour only if the neighbour is more than twice as wide
    as the piece reaching for it - Senegal for the Gambia, Italy for the
    Vatican, Jordan for the West Bank - and otherwise stops at the edge
-   allowance. Over the sea it is not limited. */
+   allowance. Over the sea it is not limited.
+
+   And even then only as much as the neighbour can spare. Twice as wide is a
+   test of the piece, not of the neighbour: Bahrain's islands are four pixels
+   across and Qatar thirty-two, so Bahrain passed it and took twenty-two pixels
+   off Qatar's west coast - 760 of the 2,010 pixels of Qatar in view at full
+   zoom. A country now gives at most a quarter of the side of a square its own
+   size: eleven pixels for Qatar, sixty for Italy, a hundred and forty-five for
+   Saudi Arabia. Qatar loses 167. The cost is Palestine's: Gaza may take only
+   sixteen pixels of Israel where it wanted twenty-two, and Palestine's widest
+   target at full zoom is forty pixels rather than forty-four. */
 function claimAt(pt, u, whole, on){
   const [, , sz, tn, sk, wd] = pt;
   const iw = sz === undefined ? whole : sz * u;
   if(sz !== undefined && iw < MIN_HIT_PX) return 0;
   if(sk !== undefined){
     if(!(sk > 0)) return 0;
-    if(on && wd !== undefined && wideOf(on) <= 2 * wd) return EDGE_PX;
+    if(on && wd !== undefined){
+      if(wideOf(on) <= 2 * wd) return EDGE_PX;
+      return Math.max(EDGE_PX, Math.min(sk, spareOf(on)) * u);
+    }
     return Math.max(EDGE_PX, sk * u);
   }
   if(iw >= REACH_PX*2) return 0;
