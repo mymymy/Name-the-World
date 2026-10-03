@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 3 oct · v168</span>
+      <span id="build" class="caps">build 3 oct · v169</span>
     </div>
   </div>
 </div>
@@ -1657,6 +1657,7 @@ function drawWorld(){
       continue;
     }
     const d = e.held ? heldPath(e, minU) : e.rings.map(r=>ringPath(r, 0)).join('');
+    if(!e.held) e.at = outerPoints(e, uu);
     p.setAttribute('d', d); h.setAttribute('d', d);
     if(e.code === S.sel) setSelRing(d);      // it moves with the map like the rest
   }
@@ -2042,6 +2043,78 @@ function acrossOf(r, lam){
   const box = Math.min(hi-lo, dn-up);
   const flat = Math.max(0, (L - Math.sqrt(Math.max(0, L*L - 16*A))) / 4);
   return [Math.max(hi-lo, dn-up), Math.min(box, flat || box)];
+}
+/* The far-flung small pieces of a country that is not small.
+
+   France is easy to find in Europe, so France as a whole gets no skirt. But
+   Guadeloupe and Martinique are France too, sixteen and twenty-six pixels
+   across at full zoom in a sea of small countries that do have skirts, and a
+   player who has not yet named France will try them. So will anyone after
+   Hawaii, the Canaries, the Azores, Aruba or Réunion. And Tuvalu is nine atolls
+   with no piece big enough to tap at all.
+
+   So a small piece gets the same skirt a small country would, sized the same
+   way, when it is far from anything of its own country you could tap instead:
+   more than 400km from the nearest big piece, or in a country with none. Big
+   is by the box here, not the width, because the width reads a ragged
+   coastline as narrow - by width Greece has no big piece and every one of its
+   islands would qualify. Worked out once per country, the first time it is
+   drawn.
+
+   Unlike a small country's, this skirt goes over the sea and the country's own
+   ground only: a board's rules, not the globe's, decide whether it may take a
+   tap on a neighbour, so Guadeloupe does not get to take Dominica's coast. */
+const OUTER_KM = 400;
+function outerRings(e){
+  if(e.outer !== undefined) return e.outer;
+  e.outer = [];
+  if(!e.play || e.held || !e.rings || e.rings.length < 2) return e.outer;
+  const uMax = ZOOM_MAX * unitPx(), targetU = TARGET_PX / uMax;
+  const mids = e.rings.map(r => { let lo=1e9, hi=-1e9, la=1e9, lb=-1e9;
+    for(const [x,y] of r){ if(x<lo)lo=x; if(x>hi)hi=x; if(y<la)la=y; if(y>lb)lb=y; }
+    return [(lo+hi)/2, (la+lb)/2]; });
+  const box = e.rings.map((r,i) => { let lo=1e9, hi=-1e9, up=1e9, dn=-1e9;
+    for(const [lon,lat] of r){ const x = wx(wrapLon(lon-mids[i][0]), lat), y = wy(lat);
+      if(x<lo)lo=x; if(x>hi)hi=x; if(y<up)up=y; if(y>dn)dn=y; }
+    return Math.min(hi-lo, dn-up); });
+  const big = e.rings.map((r,i)=>i).filter(i => box[i] >= targetU);
+  const R = Math.PI/180;
+  const km = (a, b) => { const dp = (b[1]-a[1])*R, dl = (b[0]-a[0])*R;
+    const h = Math.sin(dp/2)**2 + Math.cos(a[1]*R)*Math.cos(b[1]*R)*Math.sin(dl/2)**2;
+    return 2*6371*Math.asin(Math.min(1, Math.sqrt(h))); };
+  e.rings.forEach((r, i) => {
+    if(big.includes(i)) return;
+    const [sz, w] = acrossOf(r, mids[i][0]);
+    if(w >= targetU) return;
+    for(const j of big) for(const v of e.rings[j]) if(km(mids[i], v) <= OUTER_KM) return;
+    e.outer.push({i, sz, w, skirt: (targetU - w) / 2});
+  });
+  return e.outer;
+}
+/* Their points, as heldPath records a small country's - at the size they are
+   drawn, which for these is their own. */
+function outerPoints(e, uu){
+  const out = outerRings(e);
+  if(!out.length) return null;
+  const where = [], boxes = [];
+  for(const {i, skirt, w} of out){
+    const r = e.rings[i];
+    let lo=Infinity, hi=-Infinity, up=Infinity, dn=-Infinity;
+    const P = r.map(([lon, lat]) => { const x = wx(wrapLon(lon - lam0), lat), y = wy(lat);
+      if(x<lo)lo=x; if(x>hi)hi=x; if(y<up)up=y; if(y>dn)dn=y; return [x, y]; });
+    const size = Math.max(hi-lo, dn-up), thin = Math.min(hi-lo, dn-up);
+    boxes.push([lo, hi, up, dn]);
+    const longPx = size * uu;
+    if(longPx < MIN_HIT_PX) continue;
+    const claimPx = Math.max(EDGE_PX, skirt * uu);
+    const want = Math.max(1, Math.min(48, Math.ceil(2*(size+thin)*uu / Math.max(claimPx*0.45, 1))));
+    const last = P.length - 1;
+    if(want <= 1 || last < 2) where.push([(lo+hi)/2, (up+dn)/2, size, thin, skirt, w]);
+    else for(let q = 0; q < want; q++){ const v = P[Math.round(q * last / want)];
+      where.push([v[0], v[1], size, thin, skirt, w]); }
+  }
+  e.outerBox = boxes;
+  return where.length ? where : null;
 }
 function tinyRing(r, minU){
   const P = [];
@@ -3584,13 +3657,23 @@ function reachFor(cx, cy, host){
      does not get to answer for a tap on Saint Vincent. */
   if(host && host.play && host.held && host.at && basis().includes(host))
     return {e: host, w: Math.max(0, ...host.at.map(a => a[2] * u))};
-  let best = null, bd = Infinity, bw = 0;
   /* the tap in board units, for asking a shape whether it covers it */
   let q = null, inv = null;
   if(host && host.play){
     inv = m.inverse();
     q = new DOMPoint(cx, cy).matrixTransform(inv);
   }
+  /* And so is a far-flung piece's: a tap on Martinique is France's, whatever
+     Saint Lucia's skirt would say about the ground. */
+  if(q && !host.held && host.outerBox && host.at && basis().includes(host) &&
+     host.outerBox.some(([lo, hi, up, dn]) => q.x >= lo && q.x <= hi && q.y >= up && q.y <= dn))
+    return {e: host, w: 0};
+  let best = null, bd = Infinity, bw = 0;
+  /* Small countries before the far-flung pieces of big ones. Where Saint Kitts
+     and Sint Eustatius both want the same water, Saint Kitts has it: a small
+     country's target is the promise, and an island's skirt is a courtesy to
+     a country that can be found somewhere else. */
+  let spare = null, sd = Infinity, sw = 0;
   for(const e of basis()){
     if(!e.play) continue;
     const pts = grabPoints(e);
@@ -3616,8 +3699,10 @@ function reachFor(cx, cy, host){
     if(q && host !== e && !e.held && !mayTake(e, host, q, cx, cy, inv)) continue;
     if(e.held && host && host !== e && !host.held && host.rings && d > EDGE_PX &&
        squeezes(host, e, nx, ny, cx, cy, inv || (inv = m.inverse()))) continue;
+    if(e.outerBox && !e.held && e.at){ if(d < sd){ sd = d; sw = w; spare = e; } continue; }
     bd = d; bw = w; best = e;
   }
+  if(!best && spare) return {e: spare, w: sw};
   return best ? {e: best, w: bw} : null;
 }
 

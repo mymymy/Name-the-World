@@ -6,7 +6,7 @@
    phone. Countries that are too small to click even at max zoom need
    compensating for."
 
-   So five checks. At full zoom, centred on each held country, there has to be a
+   So six checks. At full zoom, centred on each held country, there has to be a
    point with forty-four pixels all round it - a disc, sampled - that answers to that
    country, or, where two small places are close enough to want the same ground,
    to the nearer of them. A neighbour that is itself small - Israel, Qatar -
@@ -59,7 +59,11 @@ for(const name of held){
       const hit = c && BY_CODE[c.dataset.code];
       const near = reachFor(x, y, hit);
       const took = near && (!hit || near.e === hit || near.w < screenSize(hit));
-      return took ? near.e : hit;
+      const win = took ? near.e : hit;
+      /* the land of a big country's far-flung piece - Sint Eustatius, beside
+         Saint Kitts - is that country's to answer for, not a hole in the target */
+      say.own = !!(win && win === hit && win.outerBox && !win.held);
+      return win;
     };
     /* where to look: the middle of each piece, nearest the middle of the screen
        first - a piece's points are runs with the same size */
@@ -92,7 +96,7 @@ for(const name of held){
              places that both want the width the nearer one has it. */
           const w = say(x + rr*Math.cos(a), y + rr*Math.sin(a));
           if(w === e) good++;
-          else if(w && w.held) shared++;
+          else if(w && (w.held || say.own)) shared++;
         }
         /* whole if nothing in the disc went to a big country or to nobody, and
            most of it is the country's own */
@@ -177,6 +181,32 @@ const limbang = await p.evaluate(()=>{ const e = BY_CODE.BRN, h = BY_CODE.MYS;
   return {ground, kept}; });
 ok(`at full zoom, Limbang keeps its middle (${limbang.kept}/${limbang.ground})`,
    limbang.ground > 50 && limbang.kept / limbang.ground >= 0.25, true);
+
+/* And the far-flung pieces of big countries: a player who has not yet named
+   France will try Guadeloupe. Each must answer on its own land, and on at
+   least half of a 44px disc around it - the rest may rightly go to a small
+   country next door, which comes first. */
+const far = [];
+for(const [n, lon, lat, code] of [['Guadeloupe', -61.55, 16.2, 'FRA'], ['Martinique', -61.0, 14.65, 'FRA'],
+    ['Réunion', 55.53, -21.12, 'FRA'], ['Gran Canaria', -15.6, 27.95, 'ESP'], ['Funafuti', 179.19, -8.52, 'TUV']]){
+  const r = await p.evaluate(([lon, lat, code])=>{ S.sel = null; closeAsk(true); hideTip();
+    lam0 = lon; k = ZOOM_MAX;
+    const mm = svg.getScreenCTM(), rr = wrap.getBoundingClientRect();
+    ty = ((rr.top+rr.height/2)-mm.f)/mm.d - wy(lat)*k; clampView(); applyView(); turn();
+    const m = scene.getScreenCTM(), q = project(lon, lat);
+    const cx = m.a*q[0]+m.c*q[1]+m.e, cy = m.b*q[0]+m.d*q[1]+m.f, e = BY_CODE[code];
+    const say = (x, y) => { const el = document.elementFromPoint(x, y);
+      const c = el && el.closest ? el.closest('[data-code]') : null; const hit = c && BY_CODE[c.dataset.code];
+      const near = reachFor(x, y, hit); const took = near && (!hit || near.e === hit || near.w < screenSize(hit));
+      return took ? near.e : hit; };
+    let good = 0, total = 0;
+    for(const rad of [0, 11, 22]) for(let i = 0; i < (rad ? 24 : 1); i++){
+      const a = i*Math.PI/12; total++; if(say(cx + rad*Math.cos(a), cy + rad*Math.sin(a)) === e) good++; }
+    return {centre: say(cx, cy) === e, share: good/total};
+  }, [lon, lat, code]);
+  if(!r.centre || r.share < 0.5) far.push(`${n} ${r.centre ? '' : 'not on its own land, '}${Math.round(r.share*100)}%`);
+}
+ok('far-flung islands answer for their country', far, []);
 
 /* and at the opening view, the compensation costs nobody anything */
 await p.evaluate(()=>{ S.sel = null; closeAsk(true); fitCurrent(); });
