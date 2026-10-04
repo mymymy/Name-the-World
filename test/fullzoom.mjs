@@ -238,13 +238,14 @@ const andorra = await p.evaluate(()=>{ const e = BY_CODE.AND;
   return refused; });
 ok(`at full zoom, Andorra's skirt has no wedges cut out of it (${andorra} refused)`, andorra <= 5, true);
 
-/* And the far-flung pieces of big countries: a player who has not yet named
-   France will try Guadeloupe. Each must answer on its own land, and on at
+/* And the small islands of big countries: a player who has not yet named
+   France will try Guadeloupe, and one after Greece the Cyclades. Each must answer on its own land, and on at
    least half of a 44px disc around it - the rest may rightly go to a small
    country next door, which comes first. */
 const far = [];
 for(const [n, lon, lat, code] of [['Guadeloupe', -61.55, 16.2, 'FRA'], ['Martinique', -61.0, 14.65, 'FRA'],
-    ['Réunion', 55.53, -21.12, 'FRA'], ['Gran Canaria', -15.6, 27.95, 'ESP'], ['Funafuti', 179.19, -8.52, 'TUV']]){
+    ['Réunion', 55.53, -21.12, 'FRA'], ['Gran Canaria', -15.6, 27.95, 'ESP'], ['Funafuti', 179.19, -8.52, 'TUV'],
+    ['Mykonos', 25.35, 37.45, 'GRC'], ['Naxos', 25.45, 37.08, 'GRC']]){
   const r = await p.evaluate(([lon, lat, code])=>{ S.sel = null; closeAsk(true); hideTip();
     lam0 = lon; k = ZOOM_MAX;
     const mm = svg.getScreenCTM(), rr = wrap.getBoundingClientRect();

@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 4 oct · v174</span>
+      <span id="build" class="caps">build 4 oct · v175</span>
     </div>
   </div>
 </div>
@@ -1657,7 +1657,7 @@ function drawWorld(){
       continue;
     }
     const d = e.held ? heldPath(e, minU) : e.rings.map(r=>ringPath(r, 0)).join('');
-    if(!e.held) e.at = outerPoints(e, uu);
+    if(!e.held) e.at = outerPoints(e, uu, win);
     p.setAttribute('d', d); h.setAttribute('d', d);
     if(e.code === S.sel) setSelRing(d);      // it moves with the map like the rest
   }
@@ -2044,27 +2044,27 @@ function acrossOf(r, lam){
   const flat = Math.max(0, (L - Math.sqrt(Math.max(0, L*L - 16*A))) / 4);
   return [Math.max(hi-lo, dn-up), Math.min(box, flat || box)];
 }
-/* The far-flung small pieces of a country that is not small.
+/* The small islands of a country that is not small.
 
    France is easy to find in Europe, so France as a whole gets no skirt. But
    Guadeloupe and Martinique are France too, sixteen and twenty-six pixels
    across at full zoom in a sea of small countries that do have skirts, and a
    player who has not yet named France will try them. So will anyone after
-   Hawaii, the Canaries, the Azores, Aruba or Réunion. And Tuvalu is nine atolls
+   Hawaii, the Canaries or Crete's smaller neighbours: zoomed in on the Aegean,
+   Greece is mostly islands a few pixels across. And Tuvalu is nine atolls
    with no piece big enough to tap at all.
 
-   So a small piece gets the same skirt a small country would, sized the same
-   way, when it is far from anything of its own country you could tap instead:
-   more than 400km from the nearest big piece, or in a country with none. Big
-   is by the box here, not the width, because the width reads a ragged
-   coastline as narrow - by width Greece has no big piece and every one of its
-   islands would qualify. Worked out once per country, the first time it is
-   drawn.
+   So every island narrower than the target gets the same skirt a small
+   country would, sized the same way - 1,190 of them in 85 countries. Big is by
+   the box here, not the width, because the width reads a ragged coastline as
+   narrow: by width Greece has no mainland. Worked out once per country, the
+   first time it is drawn; and on each frame only the islands on screen and
+   big enough to have a skirt are looked at, and only the points that carry
+   it are projected.
 
    Unlike a small country's, this skirt goes over the sea and the country's own
    ground only: a board's rules, not the globe's, decide whether it may take a
    tap on a neighbour, so Guadeloupe does not get to take Dominica's coast. */
-const OUTER_KM = 400;
 function outerRings(e){
   if(e.outer !== undefined) return e.outer;
   e.outer = [];
@@ -2078,40 +2078,38 @@ function outerRings(e){
       if(x<lo)lo=x; if(x>hi)hi=x; if(y<up)up=y; if(y>dn)dn=y; }
     return Math.min(hi-lo, dn-up); });
   const big = e.rings.map((r,i)=>i).filter(i => box[i] >= targetU);
-  const R = Math.PI/180;
-  const km = (a, b) => { const dp = (b[1]-a[1])*R, dl = (b[0]-a[0])*R;
-    const h = Math.sin(dp/2)**2 + Math.cos(a[1]*R)*Math.cos(b[1]*R)*Math.sin(dl/2)**2;
-    return 2*6371*Math.asin(Math.min(1, Math.sqrt(h))); };
   e.rings.forEach((r, i) => {
     if(big.includes(i)) return;
     const [sz, w] = acrossOf(r, mids[i][0]);
     if(w >= targetU) return;
-    for(const j of big) for(const v of e.rings[j]) if(km(mids[i], v) <= OUTER_KM) return;
-    e.outer.push({i, sz, w, skirt: (targetU - w) / 2});
+    let a=180, b=-180, c=90, d=-90;
+    for(const [x, y] of r){ if(x<a)a=x; if(x>b)b=x; if(y<c)c=y; if(y>d)d=y; }
+    e.outer.push({i, sz, w, thin: box[i], ll: [a, b, c, d], mid: mids[i], skirt: (targetU - w) / 2});
   });
   return e.outer;
 }
 /* Their points, as heldPath records a small country's - at the size they are
    drawn, which for these is their own. */
-function outerPoints(e, uu){
+function outerPoints(e, uu, win){
   const out = outerRings(e);
   if(!out.length) return null;
   const where = [], boxes = [];
-  for(const {i, skirt, w} of out){
-    const r = e.rings[i];
-    let lo=Infinity, hi=-Infinity, up=Infinity, dn=-Infinity;
-    const P = r.map(([lon, lat]) => { const x = wx(wrapLon(lon - lam0), lat), y = wy(lat);
-      if(x<lo)lo=x; if(x>hi)hi=x; if(y<up)up=y; if(y>dn)dn=y; return [x, y]; });
-    const size = Math.max(hi-lo, dn-up), thin = Math.min(hi-lo, dn-up);
-    boxes.push([lo, hi, up, dn]);
-    const longPx = size * uu;
-    if(longPx < MIN_HIT_PX) continue;
+  for(const {i, sz, thin, skirt, w, ll, mid} of out){
+    /* Most of these are specks most of the time, and many are off the screen:
+       neither is worth projecting. Sizes were measured once, at the island's
+       own meridian, which is near enough for deciding how many points to take. */
+    if(sz * uu < MIN_HIT_PX) continue;
+    if(win && !onScreenBox(ll, win)) continue;
+    const r = e.rings[i], last = r.length - 1;
     const claimPx = Math.max(EDGE_PX, skirt * uu);
-    const want = Math.max(1, Math.min(48, Math.ceil(2*(size+thin)*uu / Math.max(claimPx*0.45, 1))));
-    const last = P.length - 1;
-    if(want <= 1 || last < 2) where.push([(lo+hi)/2, (up+dn)/2, size, thin, skirt, w]);
-    else for(let q = 0; q < want; q++){ const v = P[Math.round(q * last / want)];
-      where.push([v[0], v[1], size, thin, skirt, w]); }
+    const want = Math.max(1, Math.min(48, Math.ceil(2*(sz+thin)*uu / Math.max(claimPx*0.45, 1))));
+    let lo=Infinity, hi=-Infinity, up=Infinity, dn=-Infinity;
+    const at = (lon, lat) => { const x = wx(wrapLon(lon - lam0), lat), y = wy(lat);
+      if(x<lo)lo=x; if(x>hi)hi=x; if(y<up)up=y; if(y>dn)dn=y; return [x, y]; };
+    if(want <= 1 || last < 2){ const [x, y] = at(mid[0], mid[1]); where.push([x, y, sz, thin, skirt, w]); }
+    else for(let q = 0; q < want; q++){ const v = r[Math.round(q * last / want)];
+      const [x, y] = at(v[0], v[1]); where.push([x, y, sz, thin, skirt, w]); }
+    boxes.push([lo, hi, up, dn]);
   }
   e.outerBox = boxes;
   return where.length ? where : null;
