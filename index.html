@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 4 oct · v172</span>
+      <span id="build" class="caps">build 4 oct · v173</span>
     </div>
   </div>
 </div>
@@ -3701,13 +3701,14 @@ function jumps(own, host, px, py, cx, cy){
      the sea. Vatican City is eleven pixels from the coast at full zoom, all of
      it Italy, and without the sea beyond it has no target. */
   const nb = neighboursOf(own), only = !host && nb.size === 1 ? [...nb][0] : null;
+  /* A tap on a country the small place itself borders is no jump, whatever
+     the line clips on the way: north of Monaco the French border wiggles, and
+     the line to a point in France dips through a sliver of Italy. */
+  if(host && nb.has(host.code)) return false;
   for(let t = 1.5; t < L - 1; t += 1.5){
     const el = document.elementFromPoint(px + dx*t/L, py + dy*t/L);
     const c = el && el.closest ? el.closest('[data-code]') : null;
     if(!c || c.dataset.code === own.code || (host && c.dataset.code === host.code) || c.dataset.code === only) continue;
-    /* and between two of its own neighbours it may cross either: Andorra's
-       line to a point in Spain often passes over a sliver of France first */
-    if(host && nb.has(host.code) && nb.has(c.dataset.code)) continue;
     return true;
   }
   return false;
