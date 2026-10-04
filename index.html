@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 4 oct · v171</span>
+      <span id="build" class="caps">build 4 oct · v172</span>
     </div>
   </div>
 </div>
@@ -3551,9 +3551,12 @@ function wideOf(e){
       ? Math.max(...e.rings.map(r => acrossOf(r, e.cll ? e.cll[0] : 0)[1])) : Infinity;
   return e.wideU;
 }
-/* How much ground a country can spare to a small neighbour's skirt: a share
-   of its own size, taken as the side of a square of the same area. */
-const SPARE = 4;
+/* How much ground a country can spare to a small neighbour's skirt: the side
+   of a square its own size, divided by this. A smaller country's middle is
+   nearer on the screen, so it gives less. Bahrain once took 22px off Qatar's
+   west coast, 760 of the 2,010 pixels of Qatar in view; Qatar now gives 5.5px.
+   Switzerland gives Liechtenstein 11.6, Austria 16.6, Italy 31, Saudi Arabia 73. */
+let SPARE = 8;
 function spareOf(e){
   if(e.spareU === undefined){
     let A = 0;
@@ -3573,66 +3576,24 @@ function spareOf(e){
 /* How far from one of its points a place may claim, in screen pixels: a
    globe country by the ground it is owed, a dot or a board by what it is drawn.
    Nothing, for something already wider than a finger or too small to see.
-
-   And a skirt goes onto another country's land only where that country can
-   spare it. Israel is seventeen pixels wide at full zoom, exactly as wide as
-   the West Bank, and narrower than that through the middle: given its full
-   fifteen pixels, the West Bank's skirt took every tap from Tel Aviv to the
-   edge of Gaza's, and Israel could not be named there at all. So the skirt
-   crosses onto a neighbour only if the neighbour is more than twice as wide
-   as the piece reaching for it - Senegal for the Gambia, Italy for the
-   Vatican, Jordan for the West Bank - and otherwise stops at the edge
-   allowance. Over the sea it is not limited.
-
-   And even then only as much as the neighbour can spare. Twice as wide is a
-   test of the piece, not of the neighbour: Bahrain's islands are four pixels
-   across and Qatar thirty-two, so Bahrain passed it and took twenty-two pixels
-   off Qatar's west coast - 760 of the 2,010 pixels of Qatar in view at full
-   zoom. A country now gives at most a quarter of the side of a square its own
-   size: eleven pixels for Qatar, sixty for Italy, a hundred and forty-five for
-   Saudi Arabia. Qatar loses 167. The cost is Palestine's: Gaza may take only
-   sixteen pixels of Israel where it wanted twenty-two, and Palestine's widest
-   target at full zoom is forty-two pixels rather than forty-four, a little
-   way out to sea from Gaza. */
-function claimAt(pt, u, whole, on){
+   This is the whole skirt; how much of it a neighbour's land gives up is
+   hostAllows's question. */
+function claimAt(pt, u, whole){
   const [, , sz, tn, sk, wd] = pt;
   const iw = sz === undefined ? whole : sz * u;
   if(sz !== undefined && iw < MIN_HIT_PX) return 0;
   if(sk !== undefined){
     if(!(sk > 0)) return 0;
-    if(on && wd !== undefined){
-      if(wideOf(on) <= 2 * wd) return EDGE_PX;
-      return Math.max(EDGE_PX, Math.min(sk, spareOf(on)) * u);
-    }
     return Math.max(EDGE_PX, sk * u);
   }
   if(iw >= REACH_PX*2) return 0;
   return claimOf(iw, tn === undefined ? undefined : tn * u);
 }
-/* Whether a skirt reaching from (px,py) to the tap at (cx,cy) would take the
-   middle of a strip of the host that runs to another border.
-
-   The rules above look at the neighbour as a whole, and Senegal and Malaysia
-   as wholes have plenty to spare. But the stretch of Senegal between the
-   Gambia and Guinea-Bissau is thirty to forty pixels across at full zoom, and
-   the Gambia's skirt took half of it - and the middle of a strip between two
-   borders is exactly where someone looking for that country taps. Limbang,
-   the part of Malaysia between Brunei's two pieces, is eight pixels wide and
-   lost all of it.
-
-   So the question is asked along the line from the small place through the
-   tap: how thick is the host there, and what is on the far side? If the line
-   comes out on the sea, nothing is being cut off - Italy west of the Vatican
-   runs to the coast, and the Vatican may have it. If it comes out on land,
-   anyone's, the host is a strip between two borders, and the skirt takes at
-   most the first quarter of it. A third was tried and, measured along slanting
-   lines, still took up to 46% of the Casamance.
-
-   A strip runs to a border the small place does not itself sit on - see
-   below for Andorra, where it does. The cost is Liechtenstein, walled in by
-   real strips of Switzerland and Austria (Vorarlberg runs out into Germany):
-   twenty pixels at full zoom rather than forty-four. Palestine has forty-two. */
-const SQUEEZE = 4;
+/* Of a strip of a neighbour worth aiming at, a skirt takes at most one part in
+   this many - the stretch of Senegal between the Gambia and Guinea-Bissau keeps
+   its middle, where someone looking for Senegal there taps. A third was tried
+   and, measured along slanting lines, still took up to 46% of it. */
+let SQUEEZE = 4;
 /* The countries a small place touches, found once by stepping a little way out
    from every point of its outline and asking whose land that is. */
 const NEIGHBOURS = new Map();
@@ -3667,27 +3628,89 @@ function neighboursOf(e){
   NEIGHBOURS.set(e.code, found);
   return found;
 }
-function squeezes(host, own, px, py, cx, cy, inv){
+/* Whether a small place's skirt may take a tap that landed on a big
+   neighbour's land - which comes down to what the person tapping meant.
+
+   Someone after France taps the middle of France as it shows on their screen,
+   loosely; nobody aims for France at the corner beside Monaco, and a tap there
+   is a tap at Monaco. So the neighbour keeps the ground a person aiming at it
+   would plausibly tap, and the small place gets what is left within its skirt.
+   Asked in order:
+
+   - Is the neighbour as thin as the piece reaching for it? Then nothing past
+     the edge allowance: Israel is as wide as the West Bank.
+   - Along the line from the small place through the tap, how thick is the
+     neighbour, and what lies beyond it?
+     - Another piece of the same small place: the neighbour is a strip between
+       them, and keeps all of it bar the edge. Israel between Gaza and the West
+       Bank; Limbang between Brunei's two halves. Nobody tapping there means
+       either.
+     - A third country, and the strip too thin to aim at: it is the small
+       place's, whatever the neighbour could spare. France's corner beside
+       Monaco and Austria's end beside Liechtenstein are about twenty pixels
+       through at full zoom; the stretch of Senegal between the Gambia and
+       Guinea-Bissau is thirty-seven.
+     - A third country and a strip worth aiming at: the small place takes at
+       most the first quarter of it, and the middle is the neighbour's.
+     - The sea, a border the small place itself sits on (Andorra between France
+       and Spain), or a long way through: no strip.
+   - And never more than the neighbour can spare, which is less for a smaller
+     one: its middle on the screen is nearer. Switzerland gives Liechtenstein
+     less than Austria does. */
+function hostAllows(host, own, pt, d, px, py, cx, cy, inv, u){
+  const [, , , , sk, wd] = pt;
+  if(wideOf(host) <= 2 * wd) return false;
   const dx = cx - px, dy = cy - py, L = Math.hypot(dx, dy);
-  if(L < 1) return false;
+  if(L < 1) return true;
   const ux = dx / L, uy = dy / L;
   const on = (x, y) => inShape(host.code, new DOMPoint(x, y).matrixTransform(inv));
   let back = 0; while(back < L && on(cx - ux*(back+1), cy - uy*(back+1))) back++;
   const MAX = 160;
   let fwd = 0; while(fwd < MAX && on(cx + ux*(fwd+1), cy + uy*(fwd+1))) fwd++;
-  if(fwd >= MAX) return false;                 // a long way through: plenty
-  const el = document.elementFromPoint(cx + ux*(fwd+2), cy + uy*(fwd+2));
-  const c = el && el.closest ? el.closest('[data-code]') : null;
-  if(!c || c.dataset.code === host.code) return false;   // the sea, or the edge
-  /* A border the small place itself sits on is not the far side of a strip.
-     Andorra is on the line between France and Spain, and a tap just south of
-     it, in Spain, is reached by a line that runs nearly along that border and
-     comes out in France a few pixels on: along that line Spain looked thirty
-     pixels thick, and Andorra's skirt had wedges cut out of it on both sides.
-     Neither France nor Spain is a strip. Senegal between the Gambia and
-     Guinea-Bissau is: the Gambia does not touch Guinea-Bissau. */
-  if(c.dataset.code !== own.code && neighboursOf(own).has(c.dataset.code)) return false;
-  return back > Math.max(EDGE_PX, (back + fwd + 1) / SQUEEZE);
+  let beyond = null;
+  if(fwd < MAX){
+    const el = document.elementFromPoint(cx + ux*(fwd+2), cy + uy*(fwd+2));
+    const c = el && el.closest ? el.closest('[data-code]') : null;
+    if(c && c.dataset.code !== host.code) beyond = c.dataset.code;
+  }
+  if(beyond === own.code) return back <= EDGE_PX;
+  const third = beyond && !neighboursOf(own).has(beyond);
+  const T = back + fwd + 1;
+  if(third && T < Math.min(STRIP_MIN_PX * k / ZOOM_MAX, POCKET * sideOf(host) * u)) return true;
+  if(d > Math.max(EDGE_PX, Math.min(sk, spareOf(host)) * u)) return false;
+  if(third) return back <= Math.max(EDGE_PX, T / SQUEEZE);
+  return true;
+}
+/* A strip of a neighbour is too thin to aim at below this many pixels through
+   at full zoom - and below a fifth of the side of a square the neighbour's
+   size. France's corner beside Monaco is about 20px through and Austria's end
+   beside Liechtenstein 21, both small beside their countries; the Casamance is
+   37, and Switzerland's corner by Lake Constance 29 of a smaller country. */
+let STRIP_MIN_PX = 28, POCKET = 0.2;
+/* the side of a square a country's own size, in board units */
+function sideOf(e){ return spareOf(e) * SPARE; }
+/* Whether a skirt would reach past one neighbour to claim beyond it. Brunei's
+   skirt crossed the strip of Malaysia south of it and took a corner of
+   Indonesia; the West Bank's crossed Israel and took the sea off Tel Aviv.
+   Neither is what anyone tapping there means. The line from the small place to
+   the tap may cross the small place, the sea and the ground the tap is on, and
+   nothing else. */
+function jumps(own, host, px, py, cx, cy){
+  const dx = cx - px, dy = cy - py, L = Math.hypot(dx, dy);
+  /* Bar one: a place with a single neighbour on land may reach across it to
+     the sea. Vatican City is eleven pixels from the coast at full zoom, all of
+     it Italy, and without the sea beyond it has no target. */
+  const nb = neighboursOf(own), only = !host && nb.size === 1 ? [...nb][0] : null;
+  for(let t = 1.5; t < L - 1; t += 1.5){
+    const el = document.elementFromPoint(px + dx*t/L, py + dy*t/L);
+    const c = el && el.closest ? el.closest('[data-code]') : null;
+    if(!c || c.dataset.code === own.code || (host && c.dataset.code === host.code) || c.dataset.code === only) continue;
+    /* and between two of its own neighbours it may cross either: Andorra's
+       line to a point in Spain often passes over a sliver of France first */
+    if(host && nb.has(host.code) && nb.has(c.dataset.code)) continue;
+    return true;
+  }
+  return false;
 }
 /* Which place has a claim on this point, and how wide the part of it that
    claimed it was - {e, w}, or nothing.
@@ -3732,23 +3755,24 @@ function reachFor(cx, cy, host){
     const whole = screenSize(e);
     /* distance first, and the hit tests only for a place near enough to win -
        the rest are settled by arithmetic and never touch the geometry */
-    let d = Infinity, w = 0, nx = 0, ny = 0;
+    let d = Infinity, w = 0, nx = 0, ny = 0, np = null;
     for(const pt of pts){
       /* Asked of the island, not the country, so a big piece can pass out of
          this while a small one keeps its claim - and of the ground the tap
          landed on, which may not be able to spare it. */
-      const c = claimAt(pt, u, whole, host && host !== e && !host.held && host.rings ? host : null);
+      const c = claimAt(pt, u, whole);
       if(!c) continue;
       const [bx, by, sz] = pt;
       const px = m.a*bx + m.c*by + m.e, py = m.b*bx + m.d*by + m.f;
       const id = Math.hypot(px - cx, py - cy);
       if(id > c) continue;
-      if(id < d){ d = id; w = sz === undefined ? whole : sz * u; nx = px; ny = py; }
+      if(id < d){ d = id; w = sz === undefined ? whole : sz * u; nx = px; ny = py; np = pt; }
     }
     if(d >= bd) continue;
     if(q && host !== e && !e.held && !mayTake(e, host, q, cx, cy, inv)) continue;
     if(e.held && host && host !== e && !host.held && host.rings && d > EDGE_PX &&
-       squeezes(host, e, nx, ny, cx, cy, inv || (inv = m.inverse()))) continue;
+       !hostAllows(host, e, np, d, nx, ny, cx, cy, inv || (inv = m.inverse()), u)) continue;
+    if((e.held || e.outerBox) && d > EDGE_PX && jumps(e, host && host !== e ? host : null, nx, ny, cx, cy)) continue;
     if(e.outerBox && !e.held && e.at){ if(d < sd){ sd = d; sw = w; spare = e; } continue; }
     bd = d; bw = w; best = e;
   }

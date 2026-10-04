@@ -30,14 +30,17 @@ const g0 = await p.$('.menupanel:not([hidden]) button.go'); if(g0) await g0.clic
 await p.waitForTimeout(1500);
 
 const RADIUS = 22;          // forty-four across, a finger
-/* Except where the neighbours cannot spare it. A small country's target comes
-   out of the sea or out of its neighbours, and a neighbour gives at most a
-   quarter of a strip that runs to another border - the middle of a strip is
-   where people tap for it (see SQUEEZE). Palestine's target has to come out of
-   Israel, itself seventeen pixels wide; Liechtenstein is walled in by narrow
-   strips of Switzerland and Austria. Measured, not hoped: these are what they
-   have, so that any change that shrinks them further shows. */
-const RADIUS_FOR = {'Palestine': 21, 'Liechtenstein': 10};
+/* Except where the neighbours keep the ground. A small country's target comes
+   out of the sea or out of its neighbours, and a neighbour keeps what someone
+   aiming at it would plausibly tap (see hostAllows): Palestine's has to come
+   out of Israel, which keeps all but the edge between Gaza and the West Bank;
+   Liechtenstein is walled in by Switzerland, which gives little; Monaco and
+   Brunei may not reach across a corner of their neighbour into Italy and
+   Indonesia; Singapore and Saint Kitts not across another country's islets to
+   the sea beyond. Measured, not hoped: these are what they have, so that any
+   change that shrinks them further shows. */
+const RADIUS_FOR = {'Palestine': 18, 'Liechtenstein': 11, 'Monaco': 20, 'Brunei': 20,
+                    'Singapore': 21, 'Saint Kitts and Nevis': 21};
 
 const held = await p.evaluate(()=>DATA.filter(e=>e.play && e.held && e.g).map(e=>e.name));
 console.log(`${held.length} held countries, each at full zoom (k=${await p.evaluate(()=>ZOOM_MAX)})\n`);
@@ -149,7 +152,7 @@ const keeps = async (name, lon, lat) => {
 };
 const israel = await keeps('Israel', 35.0, 31.9);
 ok(`at full zoom, Israel keeps most of its own ground (${israel.kept}/${israel.ground})`,
-   israel.ground > 100 && israel.kept / israel.ground >= 0.75, true);
+   israel.ground > 100 && israel.kept / israel.ground >= 0.88, true);
 /* Qatar, beside Bahrain: thirty-two pixels wide, and Bahrain's skirt once took
    twenty-two of them - 38% of Qatar in view. */
 const qatar = await keeps('Qatar', 50.56, 26.03);
