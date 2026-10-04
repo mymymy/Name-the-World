@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 4 oct · v173</span>
+      <span id="build" class="caps">build 4 oct · v174</span>
     </div>
   </div>
 </div>
@@ -3676,7 +3676,8 @@ function hostAllows(host, own, pt, d, px, py, cx, cy, inv, u){
   if(beyond === own.code) return back <= EDGE_PX;
   const third = beyond && !neighboursOf(own).has(beyond);
   const T = back + fwd + 1;
-  if(third && T < Math.min(STRIP_MIN_PX * k / ZOOM_MAX, POCKET * sideOf(host) * u)) return true;
+  const side = sideOf(host) * u;
+  if(third && T < Math.min(Math.max(STRIP_MIN_PX * k / ZOOM_MAX, POCKET / 2 * side), POCKET * side)) return true;
   if(d > Math.max(EDGE_PX, Math.min(sk, spareOf(host)) * u)) return false;
   if(third) return back <= Math.max(EDGE_PX, T / SQUEEZE);
   return true;
@@ -3685,7 +3686,10 @@ function hostAllows(host, own, pt, d, px, py, cx, cy, inv, u){
    at full zoom - and below a fifth of the side of a square the neighbour's
    size. France's corner beside Monaco is about 20px through and Austria's end
    beside Liechtenstein 21, both small beside their countries; the Casamance is
-   37, and Switzerland's corner by Lake Constance 29 of a smaller country. */
+   37, and Switzerland's corner by Lake Constance 29 of a smaller country.
+   And for a big enough country, anything under a tenth of its side is a pocket
+   whatever its width: France runs thirty pixels north of Monaco before Italy,
+   and nobody aims for France there. */
 let STRIP_MIN_PX = 28, POCKET = 0.2;
 /* the side of a square a country's own size, in board units */
 function sideOf(e){ return spareOf(e) * SPARE; }
