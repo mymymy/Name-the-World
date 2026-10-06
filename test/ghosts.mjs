@@ -47,6 +47,21 @@ for(const [name, lon] of [['the Caribbean', -61], ['Europe', 10], ['the Pacific'
   ok(`over ${name}: nothing reachable that is not drawn`, r.stray, []);
   ok(`over ${name}: and nothing reachable away from its shape`, r.adrift, []);
 }
+/* And nothing is drawn where it is not. A small country on the map's edge used
+   to have some of its points wrap to the left side and some to the right, and
+   was drawn - halo and all - as a line clean across the world. Turned all the
+   way round in small steps, still and moving, no outline but Antarctica's may
+   span more than half the board. */
+const across = await p.evaluate(()=>{ S.sel = null; closeAsk(true); fitCurrent();
+  const bad = new Set();
+  for(const mv of [false, true]) for(let L = -180; L < 180; L += 0.37){
+    lam0 = L; moving = mv; drawWorld();
+    for(const [e, pp] of worldPaths){ if(e.code === 'ATA') continue; const d = pp.getAttribute('d'); if(!d) continue;
+      for(const seg of d.split('M')){ const xs = (seg.match(/-?[\d.]+(?=,)/g) || []).map(Number);
+        if(xs.length > 1 && Math.max(...xs) - Math.min(...xs) > 1000) bad.add(e.name); } } }
+  moving = false; return [...bad]; });
+ok('no outline is drawn across the world, at any turn', across, []);
+
 console.log('\nerrors:', [...new Set(errs)]);
 console.log(`\n${pass} passed, ${fail} failed`);
 await b.close();

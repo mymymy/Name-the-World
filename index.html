@@ -883,7 +883,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 6 oct · v176</span>
+      <span id="build" class="caps">build 6 oct · v177</span>
     </div>
   </div>
 </div>
@@ -1894,11 +1894,19 @@ function walkLimb(out, from, to, side){
    made a scribble of eleven overlapping coastlines, and far enough apart that
    the gaps let them grow a little. It gets a little. */
 function heldPath(e, minU){
+  /* Every point is placed relative to the country's own middle, not each on its
+     own. A country sitting on the map's edge used to have some points wrap to
+     the left side and some to the right, and its outline - and its halo - was
+     drawn as a line clean across the world. Measured from its middle it stays
+     in one piece, and whatever falls past the edge is clipped there like the
+     rest of the map. */
+  const ref = e.cll ? e.cll[0] : (e.box ? (e.box[0] + e.box[1]) / 2 : 0);
+  const base = wrapLon(ref - lam0);
   const R = e.rings.map(r=>{
     let lo=Infinity, hi=-Infinity, up=Infinity, dn=-Infinity;
     const P=[];
     for(const [lon, lat] of r){
-      const x = wx(wrapLon(lon - lam0), lat), y = wy(lat);
+      const x = wx(base + wrapLon(lon - ref), lat), y = wy(lat);
       P.push([x,y]);
       if(x<lo)lo=x; if(x>hi)hi=x; if(y<up)up=y; if(y>dn)dn=y;
     }
