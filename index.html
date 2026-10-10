@@ -396,6 +396,7 @@ path.c.sel{stroke:var(--live);stroke-width:2.6;stroke-opacity:1}
    as the coast. Drawn last, it cannot be covered by anything. */
 #selring{fill:none;stroke:var(--live);stroke-width:2.6;stroke-opacity:1;
   stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none}
+#selring.host{stroke:var(--ok);stroke-width:2.2}
 circle.dot{fill:#B9B4A6;stroke:#6E7269;stroke-width:.5;cursor:pointer;vector-effect:non-scaling-stroke}
 circle.dot.out{fill:#DEDCD3;stroke:#B2B6AD;pointer-events:none}
 circle.dot.right{fill:var(--tint,var(--right))}
@@ -883,7 +884,7 @@ path.c.lit,circle.dot.lit{stroke:var(--ok);stroke-width:3}
     </nav>
 
     <div id="homefoot">
-      <span id="build" class="caps">build 10 oct · v178</span>
+      <span id="build" class="caps">build 10 oct · v179</span>
     </div>
   </div>
 </div>
@@ -1647,7 +1648,7 @@ function drawWorld(){
          sitting somewhere it is not. */
       if(p.hasAttribute('d')){
         p.removeAttribute('d'); h.removeAttribute('d');
-        if(e.code === S.sel) setSelRing('');
+        if(e.code === selShape()) setSelRing('');
       }
       /* And what it could be grabbed by, which is the same ghost by another
          route. This was left behind when the shape was cleared, so a country
@@ -1662,7 +1663,7 @@ function drawWorld(){
     const d = e.held ? heldPath(e, minU) : e.rings.map(r=>ringPath(lodOf(r, lod), 0)).join('');
     if(!e.held) e.at = outerPoints(e, uu, win);
     p.setAttribute('d', d); h.setAttribute('d', d);
-    if(e.code === S.sel) setSelRing(d);      // it moves with the map like the rest
+    if(e.code === selShape()) setSelRing(d);      // it moves with the map like the rest
   }
   for(let i=0;i<worldDots.length;i++){
     const [e,c] = worldDots[i];
@@ -1920,6 +1921,7 @@ function heldPath(e, minU){
     (e.across = e.rings.map(r => acrossOf(r, e.cll ? e.cll[0] : lam0)));
 
   let out='', where = [], lifted = false;
+  const polys = [];          // the outline as drawn, kept for asking what it covers
   const uu = minU ? MIN_SHAPE_PX/minU : 1;        // one board unit, in screen px
   for(let i=0;i<R.length;i++){
     const a = R[i];
@@ -1939,12 +1941,16 @@ function heldPath(e, minU){
     m = Math.max(1, Math.min(m, grow(a.size)));
     if(m > 1.02) lifted = true;
     let d='M', n=0;
+    const poly = [];
     for(const [x,y] of a.P){
       const X = gx + (x-gx)*G, Y = gy + (y-gy)*G;      // the rigid part
-      d += (n++ ? 'L' : '') + f1(cx + (X-cx)*(m/G)) + ',' + f1(cy + (Y-cy)*(m/G));
+      const px = Math.round((cx + (X-cx)*(m/G))*10)/10, py = Math.round((cy + (Y-cy)*(m/G))*10)/10;
+      d += (n++ ? 'L' : '') + px + ',' + py;
+      poly.push(px, py);
     }
     if(n >= 3){
       out += d + 'Z';
+      polys.push(poly);
       /* Somewhere to grab it - but not every islet. A country's claim on the
          screen is spread between its islands, and the Grenadines run north from
          Saint Vincent until the last of them is on top of Saint Lucia: both
@@ -2027,6 +2033,7 @@ function heldPath(e, minU){
      around it. */
   e.at = where;
   e.lifted = lifted;
+  e.poly = polys;
   return out;
 }
 /* How long a ring is, and how wide - in board units, as it is drawn when the
@@ -2338,11 +2345,21 @@ function drawGraticule(){
   gratPath.setAttribute('d', d);
 }
 const selRing = $('#selring');
-const setSelRing = d => selRing.setAttribute('d', d || '');
+const setSelRing = d => {
+  selRing.setAttribute('d', d || '');
+  /* in the capitals game the country is the city's host, and keeps its colour */
+  selRing.classList.toggle('host', !!(S.sel && S.sel.startsWith('CAP-')));
+};
+/* The shape whose outline the selection draws. In the capitals game what is
+   selected is the capital, and its country is the shape: asked for the
+   capital's own code, the outline on top was never drawn, and what showed was
+   the country's stroke underneath its neighbours - half the width along any
+   border with a country painted after it. France beside Belgium. */
+const selShape = () => S.sel && S.sel.startsWith('CAP-') ? S.sel.slice(4) : S.sel;
 /* the selected shape's own outline, copied out so it can be drawn on top */
 function syncSelRing(){
   if(!S.sel) return setSelRing('');
-  const el = scene.querySelector(`path.c[data-code="${S.sel}"]`);
+  const el = scene.querySelector(`path.c[data-code="${selShape()}"]`);
   setSelRing(el && el.getAttribute('d'));
 }
 const layerCounties = $('#counties'), layerStates = $('#states'), layerBoroughs = $('#boroughs');
@@ -2611,6 +2628,20 @@ function sizeDots(){
    is small and deliberate and its whole purpose is to tell two dots apart, so a
    reach left behind at the old spot would hand the tap to the other one. */
 const DOT_GAP = 0.81;                        // of a radius, centre to centre
+let spreadU = 0, spreadOff = null, spreadT = 0;
+/* whether a small country's outline, as last drawn, covers a board point -
+   answered from the points heldPath kept, without asking the page, which would
+   have to lay out the whole freshly drawn map before it could reply */
+function polyHas(polys, x, y){
+  if(!polys) return false;
+  let inside = false;
+  for(const r of polys)
+    for(let i = 0, j = r.length - 2; i < r.length; j = i, i += 2){
+      const xi = r[i], yi = r[i+1], xj = r[j], yj = r[j+1];
+      if(((yi > y) !== (yj > y)) && (x < (xj - xi)*(y - yi)/(yj - yi) + xi)) inside = !inside;
+    }
+  return inside;
+}
 function spreadDots(u){
   if(!u || !worldDots.length) return;
   /* The dots are only shown in the game that is about them; everywhere else
@@ -2618,6 +2649,40 @@ function spreadDots(u){
      costs a millisecond of every frame of every drag in the countries game,
      which is the one most played. */
   if(S.mode !== 'capitals') return;
+  /* Turning the globe does not change which dots overlap or by how much - they
+     are a fixed size on the screen, so only the zoom does that - but parting
+     them from scratch, with every nudge checked against its country's shape,
+     was a third of each frame of a drag at the fit view. So while the globe is
+     turning at one zoom, the nudges found last time are reused as they are,
+     and a moment after it stops they are worked out afresh and checked. */
+  if(spreadOff && spreadU === u){
+    /* Each nudge is kept as a place - the latitude and longitude the dot was
+       moved to - not as an offset on the screen. A place inside the country
+       stays inside it however the globe turns, because the country turns with
+       it; an offset on the screen drifted against the country as the curve of
+       the globe changed under it, and could carry a dot out of a small one. */
+    /* All the asking first, then all the moving: a dot moved between two
+       questions makes the page lay itself out again before the second. */
+    const go = [];
+    for(const [e, c] of worldDots){
+      const a = e.at && e.at[0], ll = a && spreadOff.get(e.code);
+      if(!ll) continue;
+      const q = project(ll[0], ll[1]), x = +q[0].toFixed(3), y = +q[1].toFixed(3);
+      /* The one exception is a small country drawn larger than it is: its
+         drawing is grown about its middle, by an amount that shifts a little as
+         the globe turns, so a place near its edge can fall off it. Those are
+         asked - their outlines are a few points, so it is cheap - and a dot
+         that would leave stays on its city until the next full parting. */
+      const host = BY_CODE[e.iso];
+      if(host && host.held && !polyHas(host.poly, x, y)) continue;
+      go.push([a, c, x, y]);
+    }
+    for(const [a, c, x, y] of go){ a[0] = x; a[1] = y; c.setAttribute('cx', x); c.setAttribute('cy', y); }
+    clearTimeout(spreadT);
+    spreadT = setTimeout(()=>{ spreadU = 0; if(S.mode === 'capitals' && worldMap()) drawWorld(); }, 150);
+    return;
+  }
+  spreadU = u; spreadOff = new Map();
   const gap = DOT_GAP * DOT_PX / u;          // the same distance, in board units
   /* Read from what was just worked out, not back off the elements. Two hundred
      dots is four hundred attribute reads a frame, each one a string to parse,
@@ -2722,6 +2787,8 @@ function spreadDots(u){
     if(!onOwn(p, rx, ry)){ p.x = p.ox; p.y = p.oy; }   // the safety net
     else { p.x = rx; p.y = ry; }
     if(p.x === p.ox && p.y === p.oy) continue;
+    { const lat = latOfY(p.y);
+      spreadOff.set(p.e.code, [wrapLon(lam0 + (p.x - 1000)/(PS*RAD*nl(lat*RAD))), lat]); }
     p.c.setAttribute('cx', p.x); p.c.setAttribute('cy', p.y);
     p.e.at[0][0] = p.x; p.e.at[0][1] = p.y;
   }

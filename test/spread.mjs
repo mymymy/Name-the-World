@@ -16,7 +16,7 @@ await p.click('.game[data-mode="capitals"]'); await p.waitForTimeout(300);
 const g0 = await p.$('.menupanel:not([hidden]) button.go'); if(g0) await g0.click();
 await p.waitForTimeout(1600);
 
-const survey = await p.evaluate(()=>{
+const survey = await p.evaluate(async ()=>{
   const out = [];
   const base = worldFill();
   for(const mult of [1, 2, 4, 8, 16]){
@@ -27,6 +27,10 @@ const survey = await p.evaluate(()=>{
     const mm = svg.getScreenCTM(), rr = wrap.getBoundingClientRect();
     ty = ((rr.top+rr.height/2)-mm.f)/mm.d - wy(41.9)*k;
     clampView(); applyView(); turn();
+    /* and let it come to rest: while the globe turns the dots keep the
+       partings found last time, and a moment after it stops they are worked
+       out afresh - what is checked here is the map at rest */
+    await new Promise(r => setTimeout(r, 250));
     const u = k*unitPx(), need = DOT_GAP*DOT_PX;
     /* as drawn, on screen */
     const m = scene.getScreenCTM();
@@ -95,9 +99,10 @@ ok('every pair still touching had nowhere left to go',
 ok('no dot is moved onto another country', survey.filter(r=>r.strays>0).map(r=>r.mult+'x'), []);
 
 /* the Vatican and Rome: the pair no zoom can part */
-const vr = await p.evaluate(()=>{
+const vr = await p.evaluate(async ()=>{
   const base = worldFill();
   k = base; lam0 = 12; clampView(); applyView(); turn();
+  await new Promise(r => setTimeout(r, 250));
   const m = scene.getScreenCTM();
   const get = n => { const e = targets().find(x=>x.name===n);
     const c = document.querySelector(`circle.dot[data-code="${e.code}"]`);
